@@ -2,14 +2,18 @@ const CONFIG = {
 
     ADMIN_EMAIL: 'hvasei90@gmail.com',
 
-    // این رمز را حتماً خودت تغییر بده.
-    ADMIN_PASSWORD: 'CHANGE_THIS_ADMIN_PASSWORD',
+    // حتماً رمز مدیر را تغییر بده.
+    ADMIN_PASSWORD: 'Avang20',
 
     SHEET_NAME: 'Requests',
 
     DRIVE_FOLDER_NAME: 'QuizDuo Receipts'
 };
 
+
+/* =========================================================
+   CREATE PAYMENT REQUEST
+========================================================= */
 
 function doPost(e) {
 
@@ -19,6 +23,7 @@ function doPost(e) {
             JSON.parse(
                 e.postData.contents || '{}'
             );
+
 
         if (
             body.action !==
@@ -37,31 +42,43 @@ function doPost(e) {
                 body.username || ''
             ).trim();
 
+
+        const phone =
+            String(
+                body.phone || ''
+            ).trim();
+
+
         const plan =
             String(
                 body.plan || ''
             ).trim();
+
 
         const planName =
             String(
                 body.planName || ''
             ).trim();
 
+
         const amount =
             Number(
                 body.amount || 0
             );
+
 
         const receiptBase64 =
             String(
                 body.receiptBase64 || ''
             );
 
+
         const receiptName =
             String(
                 body.receiptName ||
                 'receipt.jpg'
             );
+
 
         const receiptType =
             String(
@@ -72,6 +89,7 @@ function doPost(e) {
 
         if (
             !username ||
+            !phone ||
             !plan ||
             !planName ||
             !amount ||
@@ -80,7 +98,8 @@ function doPost(e) {
 
             return json_({
                 ok: false,
-                error: 'Missing required fields'
+                error:
+                    'Missing required fields'
             });
         }
 
@@ -102,6 +121,10 @@ function doPost(e) {
         const now =
             new Date();
 
+
+        /* -------------------------
+           DRIVE
+        ------------------------- */
 
         const folder =
             getReceiptFolder_();
@@ -131,9 +154,15 @@ function doPost(e) {
             'QuizDuo payment receipt - ' +
             username +
             ' - ' +
+            phone +
+            ' - ' +
             planName
         );
 
+
+        /* -------------------------
+           SHEET
+        ------------------------- */
 
         const sheet =
             getSheet_();
@@ -146,6 +175,8 @@ function doPost(e) {
             now,
 
             username,
+
+            phone,
 
             plan,
 
@@ -164,18 +195,24 @@ function doPost(e) {
         ]);
 
 
+        /* -------------------------
+           EMAIL
+        ------------------------- */
+
         MailApp.sendEmail({
 
-            to: CONFIG.ADMIN_EMAIL,
+            to:
+                CONFIG.ADMIN_EMAIL,
 
             subject:
-                'QuizDuo | درخواست پرداخت جدید | ' +
+                'QuizDuo | درخواست اشتراک جدید | ' +
                 planName,
 
             htmlBody:
                 buildAdminEmail_(
                     requestId,
                     username,
+                    phone,
                     planName,
                     amount,
                     now,
@@ -206,12 +243,17 @@ function doPost(e) {
 
             ok: false,
 
-            error: String(err)
+            error:
+                String(err)
 
         });
     }
 }
 
+
+/* =========================================================
+   GET / STATUS / ADMIN PAGE
+========================================================= */
 
 function doGet(e) {
 
@@ -224,7 +266,13 @@ function doGet(e) {
         );
 
 
-    if (action === 'status') {
+    /* -------------------------
+       PAYMENT STATUS
+    ------------------------- */
+
+    if (
+        action === 'status'
+    ) {
 
         const requestId =
             String(
@@ -232,11 +280,13 @@ function doGet(e) {
                 ''
             );
 
+
         const username =
             String(
                 e.parameter.username ||
                 ''
             );
+
 
         const callback =
             String(
@@ -252,34 +302,59 @@ function doGet(e) {
             );
 
 
+        /*
+         * JSONP برای جلوگیری از مشکل
+         * CORS در GitHub Pages
+         */
+
         if (callback) {
 
             return ContentService
+
                 .createTextOutput(
+
                     callback +
                     '(' +
-                    JSON.stringify(result) +
+                    JSON.stringify(
+                        result
+                    ) +
                     ');'
+
                 )
+
                 .setMimeType(
-                    ContentService.MimeType.JAVASCRIPT
+                    ContentService
+                        .MimeType
+                        .JAVASCRIPT
                 );
         }
 
 
-        return json_(result);
+        return json_(
+            result
+        );
     }
 
 
+    /* -------------------------
+       ADMIN PANEL
+    ------------------------- */
+
     return HtmlService
+
         .createHtmlOutputFromFile(
             'Admin'
         )
+
         .setTitle(
             'QuizDuo Admin'
         );
 }
 
+
+/* =========================================================
+   ADMIN LOGIN
+========================================================= */
 
 function adminLogin(password) {
 
@@ -299,7 +374,9 @@ function adminLogin(password) {
 
 
     CacheService
+
         .getScriptCache()
+
         .put(
             'admin:' + token,
             '1',
@@ -311,9 +388,15 @@ function adminLogin(password) {
 }
 
 
+/* =========================================================
+   ADMIN LIST
+========================================================= */
+
 function adminList(token) {
 
-    requireAdmin_(token);
+    requireAdmin_(
+        token
+    );
 
 
     const sheet =
@@ -321,24 +404,31 @@ function adminList(token) {
 
 
     const values =
-        sheet.getDataRange()
+        sheet
+            .getDataRange()
             .getValues();
 
 
     if (
         values.length <= 1
     ) {
+
         return [];
     }
 
 
     return values
+
         .slice(1)
+
         .reverse()
+
         .map(row => ({
 
             requestId:
-                String(row[0]),
+                String(
+                    row[0]
+                ),
 
             createdAt:
                 new Date(
@@ -346,26 +436,47 @@ function adminList(token) {
                 ).toISOString(),
 
             username:
-                String(row[2]),
+                String(
+                    row[2]
+                ),
+
+            phone:
+                String(
+                    row[3]
+                ),
 
             plan:
-                String(row[3]),
+                String(
+                    row[4]
+                ),
 
             planName:
-                String(row[4]),
+                String(
+                    row[5]
+                ),
 
             amount:
-                Number(row[5]),
+                Number(
+                    row[6]
+                ),
 
             status:
-                String(row[6]),
+                String(
+                    row[7]
+                ),
 
             receiptUrl:
-                String(row[8] || '')
+                String(
+                    row[9] || ''
+                )
 
         }));
 }
 
+
+/* =========================================================
+   ADMIN SET STATUS
+========================================================= */
 
 function adminSetStatus(
     token,
@@ -373,7 +484,9 @@ function adminSetStatus(
     status
 ) {
 
-    requireAdmin_(token);
+    requireAdmin_(
+        token
+    );
 
 
     if (
@@ -394,7 +507,8 @@ function adminSetStatus(
 
 
     const values =
-        sheet.getDataRange()
+        sheet
+            .getDataRange()
             .getValues();
 
 
@@ -405,23 +519,48 @@ function adminSetStatus(
     ) {
 
         if (
-            String(values[i][0]) ===
-            String(requestId)
+            String(
+                values[i][0]
+            ) ===
+            String(
+                requestId
+            )
         ) {
 
+            /*
+             * ستون H = Status
+             */
+
             sheet
-                .getRange(i + 1, 7)
-                .setValue(status);
+                .getRange(
+                    i + 1,
+                    8
+                )
+                .setValue(
+                    status
+                );
 
 
+            /*
+             * ستون K = Reviewed At
+             */
+
             sheet
-                .getRange(i + 1, 10)
-                .setValue(new Date());
+                .getRange(
+                    i + 1,
+                    11
+                )
+                .setValue(
+                    new Date()
+                );
 
 
             return {
+
                 ok: true,
+
                 status
+
             };
         }
     }
@@ -432,6 +571,10 @@ function adminSetStatus(
     );
 }
 
+
+/* =========================================================
+   GET PAYMENT STATUS
+========================================================= */
 
 function getStatus_(
     requestId,
@@ -444,8 +587,12 @@ function getStatus_(
     ) {
 
         return {
+
             ok: false,
-            status: 'not_found'
+
+            status:
+                'not_found'
+
         };
     }
 
@@ -455,7 +602,8 @@ function getStatus_(
 
 
     const values =
-        sheet.getDataRange()
+        sheet
+            .getDataRange()
             .getValues();
 
 
@@ -466,12 +614,18 @@ function getStatus_(
     ) {
 
         if (
-            String(values[i][0]) ===
+
+            String(
+                values[i][0]
+            ) ===
             requestId &&
 
-            String(values[i][2])
+            String(
+                values[i][2]
+            )
                 .toLowerCase() ===
             username.toLowerCase()
+
         ) {
 
             return {
@@ -481,13 +635,19 @@ function getStatus_(
                 requestId,
 
                 status:
-                    String(values[i][6]),
+                    String(
+                        values[i][7]
+                    ),
 
                 plan:
-                    String(values[i][4]),
+                    String(
+                        values[i][5]
+                    ),
 
                 amount:
-                    Number(values[i][5])
+                    Number(
+                        values[i][6]
+                    )
 
             };
         }
@@ -495,11 +655,19 @@ function getStatus_(
 
 
     return {
+
         ok: false,
-        status: 'not_found'
+
+        status:
+            'not_found'
+
     };
 }
 
+
+/* =========================================================
+   SHEET
+========================================================= */
 
 function getSheet_() {
 
@@ -523,7 +691,9 @@ function getSheet_() {
 
             ss =
                 SpreadsheetApp
-                    .openById(id);
+                    .openById(
+                        id
+                    );
 
         } catch (_) {}
 
@@ -536,6 +706,7 @@ function getSheet_() {
             SpreadsheetApp.create(
                 'QuizDuo Payment Requests'
             );
+
 
         props.setProperty(
             'QUIZDUO_SHEET_ID',
@@ -559,6 +730,10 @@ function getSheet_() {
     }
 
 
+    /* -------------------------
+       CREATE HEADER
+    ------------------------- */
+
     if (
         sheet.getLastRow() === 0
     ) {
@@ -568,6 +743,7 @@ function getSheet_() {
             'Request ID',
             'Created At',
             'Username',
+            'Phone',
             'Plan ID',
             'Plan Name',
             'Amount',
@@ -577,6 +753,47 @@ function getSheet_() {
             'Reviewed At'
 
         ]);
+
+    } else {
+
+        /*
+         * اگر Sheet از نسخه قبلی باشد،
+         * ستون Phone را اضافه می‌کنیم.
+         */
+
+        const header =
+            sheet
+                .getRange(
+                    1,
+                    1,
+                    1,
+                    Math.max(
+                        1,
+                        sheet.getLastColumn()
+                    )
+                )
+                .getValues()[0];
+
+
+        if (
+            header.indexOf(
+                'Phone'
+            ) === -1
+        ) {
+
+            sheet.insertColumnAfter(
+                3
+            );
+
+            sheet
+                .getRange(
+                    1,
+                    4
+                )
+                .setValue(
+                    'Phone'
+                );
+        }
     }
 
 
@@ -584,30 +801,47 @@ function getSheet_() {
 }
 
 
+/* =========================================================
+   DRIVE FOLDER
+========================================================= */
+
 function getReceiptFolder_() {
 
     const folders =
-        DriveApp.getFoldersByName(
-            CONFIG.DRIVE_FOLDER_NAME
-        );
+        DriveApp
+            .getFoldersByName(
+                CONFIG.DRIVE_FOLDER_NAME
+            );
 
 
     return folders.hasNext()
+
         ? folders.next()
+
         : DriveApp.createFolder(
             CONFIG.DRIVE_FOLDER_NAME
         );
 }
 
 
-function requireAdmin_(token) {
+/* =========================================================
+   ADMIN AUTH
+========================================================= */
+
+function requireAdmin_(
+    token
+) {
 
     if (
+
         !token ||
+
         CacheService
             .getScriptCache()
-            .get('admin:' + token) !==
-        '1'
+            .get(
+                'admin:' + token
+            ) !== '1'
+
     ) {
 
         throw new Error(
@@ -617,9 +851,14 @@ function requireAdmin_(token) {
 }
 
 
+/* =========================================================
+   ADMIN EMAIL
+========================================================= */
+
 function buildAdminEmail_(
     requestId,
     username,
+    phone,
     planName,
     amount,
     createdAt,
@@ -629,46 +868,99 @@ function buildAdminEmail_(
     return (
 
         '<div dir="rtl" ' +
-        'style="font-family:Arial,sans-serif;line-height:1.9">' +
+
+        'style="' +
+        'font-family:Arial,sans-serif;' +
+        'line-height:1.9' +
+        '">' +
 
         '<h2>' +
         'درخواست اشتراک جدید QuizDuo' +
         '</h2>' +
 
-        '<p><b>شناسه درخواست:</b> ' +
-        escape_(requestId) +
+        '<p>' +
+
+        '<b>شناسه درخواست:</b> ' +
+
+        escape_(
+            requestId
+        ) +
+
         '</p>' +
 
-        '<p><b>نام کاربری:</b> ' +
-        escape_(username) +
+        '<p>' +
+
+        '<b>نام کاربری:</b> ' +
+
+        escape_(
+            username
+        ) +
+
         '</p>' +
 
-        '<p><b>اشتراک:</b> ' +
-        escape_(planName) +
+        '<p>' +
+
+        '<b>شماره تلفن:</b> ' +
+
+        escape_(
+            phone
+        ) +
+
         '</p>' +
 
-        '<p><b>مبلغ:</b> ' +
-        Number(amount)
-            .toLocaleString('fa-IR') +
-        ' تومان</p>' +
+        '<p>' +
 
-        '<p><b>زمان:</b> ' +
+        '<b>اشتراک:</b> ' +
+
+        escape_(
+            planName
+        ) +
+
+        '</p>' +
+
+        '<p>' +
+
+        '<b>مبلغ:</b> ' +
+
+        Number(
+            amount
+        )
+            .toLocaleString(
+                'fa-IR'
+            ) +
+
+        ' تومان' +
+
+        '</p>' +
+
+        '<p>' +
+
+        '<b>زمان:</b> ' +
+
         escape_(
             createdAt.toLocaleString(
                 'fa-IR'
             )
         ) +
+
         '</p>' +
 
         '<p>' +
+
         'فیش در این ایمیل پیوست شده است. ' +
+
         'همچنین در Google Drive ذخیره شده است.' +
+
         '</p>' +
 
         '<p>' +
 
         '<a href="' +
-        escape_(receiptUrl) +
+
+        escape_(
+            receiptUrl
+        ) +
+
         '">' +
 
         'مشاهده فایل فیش' +
@@ -680,7 +972,13 @@ function buildAdminEmail_(
         '<hr>' +
 
         '<p>' +
-        'برای تأیید یا رد، وارد پنل مدیر QuizDuo شوید.' +
+
+        'پس از بررسی فیش، ' +
+
+        'از پنل مدیر وضعیت درخواست را ' +
+
+        'تأیید یا رد کنید.' +
+
         '</p>' +
 
         '</div>'
@@ -688,29 +986,56 @@ function buildAdminEmail_(
 }
 
 
+/* =========================================================
+   ESCAPE
+========================================================= */
+
 function escape_(value) {
 
-    return String(value)
+    return String(
+        value
+    )
         .replace(
             /[&<>'"]/g,
             c => ({
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                "'": '&#39;',
-                '"': '&quot;'
+
+                '&':
+                    '&amp;',
+
+                '<':
+                    '&lt;',
+
+                '>':
+                    '&gt;',
+
+                "'":
+                    '&#39;',
+
+                '"':
+                    '&quot;'
+
             }[c])
         );
 }
 
 
+/* =========================================================
+   JSON RESPONSE
+========================================================= */
+
 function json_(obj) {
 
     return ContentService
+
         .createTextOutput(
-            JSON.stringify(obj)
+            JSON.stringify(
+                obj
+            )
         )
+
         .setMimeType(
-            ContentService.MimeType.JSON
+            ContentService
+                .MimeType
+                .JSON
         );
 }
