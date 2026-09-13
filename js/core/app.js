@@ -1,1297 +1,4249 @@
-<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+import {
+    DEFAULT_STATE,
+    createDefaultState,
+    calculateLevel,
+    addXP,
+    getUnlockedStage,
+    isStageCompleted,
+    markStageCompleted
+} from "./state.js";
 
-    <title>QuizDuo</title>
+import {
+    loadState,
+    saveState,
+    getCurrentUser,
+    setCurrentUser,
+    logoutUser,
+    getUsers,
+    saveUsers,
+    getLeaderboard,
+    updateLeaderboard
+} from "./storage.js";
 
-    <link rel="stylesheet" href="css/style.css">
-</head>
+import {
+    todayKey,
+    updateStreak,
+    escapeHTML
+} from "./utils.js";
 
-<body>
+import {
+    QuizEngine,
+    QUIZ_CONFIG
+} from "./quiz.js";
 
-<header class="site-header">
 
-    <a class="logo" data-page="home">
-        Quiz<span>Duo</span>
-    </a>
+/* =========================================================
+   CONFIG
+========================================================= */
 
-    <nav class="main-nav">
+const BACKEND_URL =
+    "https://script.google.com/macros/s/AKfycbxbioqGAQ4cMTG4UDnKJSBkBGBgakRnTf7oU0fh5sCeU_ICdNqadod3HNTiJX5ycoZYyg/exec";
 
-        <button data-page="home">
-            خانه
-        </button>
 
-        <button data-page="quiz">
-            سؤالات
-        </button>
+const MAX_RECEIPT_SIZE =
+    5 * 1024 * 1024;
 
-        <button data-page="subscription">
-            اشتراک 👑
-        </button>
 
-        <button data-page="leaderboard">
-            لیدربورد
-        </button>
+const DAILY_XP =
+    10;
 
-        <button data-page="chat">
-            گفت‌وگو
-        </button>
 
-        <button data-page="support">
-            پشتیبانی
-        </button>
+/* =========================================================
+   SUBSCRIPTION PLANS
+========================================================= */
 
-        <button data-page="profile">
-            پروفایل
-        </button>
+const subscriptionPlans = {
 
-    </nav>
+    monthly: {
 
-    <div class="auth-area">
+        name: "ماهانه",
 
-        <button
-            id="themeToggle"
-            class="icon-btn"
-            type="button"
-        >
-            🌙
-        </button>
+        months: 1,
 
-        <button
-            id="authButton"
-            class="secondary-btn"
-            type="button"
-        >
-            ورود
-        </button>
+        gift: 0,
 
-        <button
-            id="logoutButton"
-            class="secondary-btn hidden"
-            type="button"
-        >
-            خروج
-        </button>
+        price: 100000
 
-    </div>
+    },
 
-</header>
 
-<main>
+    quarterly: {
 
-    <!-- HOME -->
+        name: "سه‌ماهه",
 
-    <section
-        id="home"
-        class="page active"
-    >
+        months: 3,
 
-        <div class="hero">
+        gift: 0,
 
-            <div>
+        price: 270000
 
-                <span class="eyebrow">
-                    QUIZDUO
-                </span>
+    },
 
-                <h1>
-                    بازی کن، یاد بگیر،
-                    <span>پیشرفت کن.</span>
-                </h1>
 
-                <p>
-                    QuizDuo یک فضای بازی‌محور برای
-                    حل سؤال، رقابت و ساختن رکوردهای جدید است.
-                </p>
+    sixMonth: {
 
-                <div class="hero-actions">
+        name: "شش‌ماهه",
 
-                    <button
-                        class="primary-btn"
-                        data-page="quiz"
-                    >
-                        شروع بازی
-                    </button>
+        months: 6,
 
-                    <button
-                        class="secondary-btn"
-                        data-page="subscription"
-                    >
-                        مشاهده اشتراک‌ها
-                    </button>
+        gift: 1,
+
+        price: 480000
+
+    },
+
+
+    nineMonth: {
+
+        name: "نه‌ماهه",
+
+        months: 9,
+
+        gift: 2,
+
+        price: 660000
+
+    }
+
+};
+
+
+/* =========================================================
+   DISCOUNT CODES
+========================================================= */
+
+const discountCodes = {
+
+    QUIZDUO10: 10,
+
+    WELCOME15: 15,
+
+    STUDENT10: 10
+
+};
+
+
+/* =========================================================
+   APP
+========================================================= */
+
+class QuizDuoApp {
+
+    constructor() {
+
+        this.currentUser =
+            getCurrentUser();
+
+
+        this.state =
+            this.currentUser
+
+                ? loadState(
+                    createDefaultState(),
+                    this.currentUser
+                )
+
+                : loadState(
+                    createDefaultState(),
+                    "guest"
+                );
+
+
+        if (
+            !this.state.username
+        ) {
+
+            this.state.username =
+                this.currentUser ||
+                "بازیکن مهمان";
+        }
+
+
+        this.currentCategory =
+            "general";
+
+
+        this.quiz =
+            new QuizEngine(
+                this.state,
+                () => this.persist()
+            );
+
+
+        this.currentQuestionTimer =
+            null;
+
+
+        this.selectedPlan =
+            "monthly";
+
+
+        this.discountPercent =
+            0;
+
+
+        this.paymentRequestId =
+            null;
+
+
+        this.paymentStatusTimer =
+            null;
+
+
+        this.authMode =
+            "login";
+
+
+        this.categoryData = {
+
+            general: [],
+
+            fun: []
+
+        };
+
+
+        this.init();
+    }
+
+
+    /* =====================================================
+       INIT
+    ===================================================== */
+
+    async init() {
+
+        this.bindNavigation();
+
+        this.bindTheme();
+
+        this.bindAuth();
+
+        this.bindQuiz();
+
+        this.bindSubscription();
+
+        this.bindProfile();
+
+        this.bindChat();
+
+        this.bindSupport();
+
+        this.loadSavedPaymentRequest();
+
+        this.updateUI();
+
+        await this.loadQuizData();
+
+        this.renderStages();
+
+        this.updateUI();
+    }
+
+
+    /* =====================================================
+       STORAGE
+    ===================================================== */
+
+    persist() {
+
+        if (
+            this.currentUser
+        ) {
+
+            this.state.username =
+                this.currentUser;
+
+            saveState(
+                this.state,
+                this.currentUser
+            );
+
+            updateLeaderboard(
+                this.state
+            );
+
+        } else {
+
+            saveState(
+                this.state,
+                "guest"
+            );
+        }
+    }
+
+
+    /* =====================================================
+       NAVIGATION
+    ===================================================== */
+
+    bindNavigation() {
+
+        document
+            .querySelectorAll(
+                "[data-page]"
+            )
+            .forEach(
+                button => {
+
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            this.showPage(
+                                button.dataset.page
+                            );
+                        }
+                    );
+                }
+            );
+    }
+
+
+    showPage(pageId) {
+
+        document
+            .querySelectorAll(
+                ".page"
+            )
+            .forEach(
+                page => {
+
+                    page.classList.toggle(
+                        "active",
+                        page.id === pageId
+                    );
+                }
+            );
+
+
+        document
+            .querySelectorAll(
+                ".main-nav button"
+            )
+            .forEach(
+                button => {
+
+                    button.classList.toggle(
+                        "active",
+                        button.dataset.page ===
+                        pageId
+                    );
+                }
+            );
+
+
+        if (
+            pageId === "profile"
+        ) {
+
+            this.renderProfile();
+        }
+
+
+        if (
+            pageId === "leaderboard"
+        ) {
+
+            this.renderLeaderboard();
+        }
+
+
+        if (
+            pageId === "subscription"
+        ) {
+
+            this.renderSubscription();
+
+            this.checkSavedPaymentStatus();
+        }
+
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
+    }
+
+
+    /* =====================================================
+       THEME
+    ===================================================== */
+
+    bindTheme() {
+
+        const button =
+            document.getElementById(
+                "themeToggle"
+            );
+
+
+        const savedTheme =
+            localStorage.getItem(
+                "quizduo_theme"
+            ) ||
+            this.state.theme ||
+            "light";
+
+
+        this.applyTheme(
+            savedTheme
+        );
+
+
+        button?.addEventListener(
+            "click",
+            () => {
+
+                const next =
+                    document.body.classList.contains(
+                        "dark"
+                    )
+                        ? "light"
+                        : "dark";
+
+
+                this.applyTheme(
+                    next
+                );
+            }
+        );
+    }
+
+
+    applyTheme(theme) {
+
+        document.body.classList.toggle(
+            "dark",
+            theme === "dark"
+        );
+
+
+        localStorage.setItem(
+            "quizduo_theme",
+            theme
+        );
+
+
+        this.state.theme =
+            theme;
+
+
+        this.persist();
+
+
+        const button =
+            document.getElementById(
+                "themeToggle"
+            );
+
+
+        if (button) {
+
+            button.textContent =
+                theme === "dark"
+                    ? "☀️"
+                    : "🌙";
+        }
+    }
+
+
+    /* =====================================================
+       AUTH
+    ===================================================== */
+
+    bindAuth() {
+
+        document
+            .getElementById(
+                "authButton"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.showPage(
+                        "auth"
+                    );
+                }
+            );
+
+
+        document
+            .getElementById(
+                "logoutButton"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    logoutUser();
+
+                    this.currentUser =
+                        null;
+
+                    this.state =
+                        loadState(
+                            createDefaultState(),
+                            "guest"
+                        );
+
+                    this.quiz.state =
+                        this.state;
+
+                    this.updateUI();
+
+                    this.showPage(
+                        "home"
+                    );
+                }
+            );
+
+
+        document
+            .getElementById(
+                "toggleAuth"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.authMode =
+                        this.authMode === "login"
+                            ? "register"
+                            : "login";
+
+
+                    this.updateAuthForm();
+                }
+            );
+
+
+        document
+            .getElementById(
+                "authSubmit"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.submitAuth();
+                }
+            );
+    }
+
+
+    updateAuthForm() {
+
+        const title =
+            document.getElementById(
+                "authTitle"
+            );
+
+
+        const submit =
+            document.getElementById(
+                "authSubmit"
+            );
+
+
+        const toggle =
+            document.getElementById(
+                "toggleAuth"
+            );
+
+
+        const confirmWrap =
+            document.getElementById(
+                "confirmPasswordWrap"
+            );
+
+
+        if (
+            this.authMode === "login"
+        ) {
+
+            title.textContent =
+                "ورود";
+
+
+            submit.textContent =
+                "ورود";
+
+
+            toggle.textContent =
+                "ساخت حساب جدید";
+
+
+            confirmWrap
+                .classList
+                .add("hidden");
+
+        } else {
+
+            title.textContent =
+                "ساخت حساب";
+
+
+            submit.textContent =
+                "ثبت‌نام";
+
+
+            toggle.textContent =
+                "قبلاً حساب دارم";
+
+
+            confirmWrap
+                .classList
+                .remove("hidden");
+        }
+    }
+
+
+    submitAuth() {
+
+        const name =
+            document
+                .getElementById(
+                    "authName"
+                )
+                .value
+                .trim();
+
+
+        const password =
+            document
+                .getElementById(
+                    "authPassword"
+                )
+                .value;
+
+
+        const confirm =
+            document
+                .getElementById(
+                    "authConfirmPassword"
+                )
+                .value;
+
+
+        const message =
+            document.getElementById(
+                "authMsg"
+            );
+
+
+        message.textContent =
+            "";
+
+
+        if (
+            name.length < 3
+        ) {
+
+            message.textContent =
+                "نام کاربری باید حداقل ۳ کاراکتر باشد.";
+
+            return;
+        }
+
+
+        if (
+            password.length < 6
+        ) {
+
+            message.textContent =
+                "رمز عبور باید حداقل ۶ کاراکتر باشد.";
+
+            return;
+        }
+
+
+        const users =
+            getUsers();
+
+
+        if (
+            this.authMode ===
+            "register"
+        ) {
+
+            const duplicate =
+                users.some(
+                    user =>
+                        String(
+                            user.username
+                        )
+                            .toLowerCase() ===
+                        name.toLowerCase()
+                );
+
+
+            if (
+                duplicate
+            ) {
+
+                message.textContent =
+                    "این نام کاربری قبلاً ثبت شده است.";
+
+                return;
+            }
+
+
+            if (
+                password !==
+                confirm
+            ) {
+
+                message.textContent =
+                    "تکرار رمز عبور درست نیست.";
+
+                return;
+            }
+
+
+            users.push({
+
+                username:
+                    name,
+
+                password:
+                    password,
+
+                createdAt:
+                    Date.now()
+
+            });
+
+
+            saveUsers(
+                users
+            );
+
+
+            this.currentUser =
+                name;
+
+
+            setCurrentUser(
+                name
+            );
+
+
+            this.state =
+                loadState(
+                    createDefaultState(),
+                    name
+                );
+
+
+            this.state.username =
+                name;
+
+
+            this.persist();
+
+
+            message.textContent =
+                "حساب با موفقیت ساخته شد.";
+
+
+            this.quiz.state =
+                this.state;
+
+
+            this.updateUI();
+
+            this.showPage(
+                "home"
+            );
+
+            return;
+        }
+
+
+        const user =
+            users.find(
+                item =>
+                    String(
+                        item.username
+                    )
+                        .toLowerCase() ===
+                    name.toLowerCase()
+            );
+
+
+        if (
+            !user ||
+            user.password !==
+            password
+        ) {
+
+            message.textContent =
+                "نام کاربری یا رمز عبور اشتباه است.";
+
+            return;
+        }
+
+
+        this.currentUser =
+            user.username;
+
+
+        setCurrentUser(
+            this.currentUser
+        );
+
+
+        this.state =
+            loadState(
+                createDefaultState(),
+                this.currentUser
+            );
+
+
+        this.state.username =
+            this.currentUser;
+
+
+        this.quiz.state =
+            this.state;
+
+
+        this.updateUI();
+
+        this.checkSavedPaymentStatus();
+
+        this.showPage(
+            "home"
+        );
+    }
+
+
+    /* =====================================================
+       QUIZ DATA
+    ===================================================== */
+
+    async loadQuizData() {
+
+        try {
+
+            for (
+                const category of [
+                    "general",
+                    "fun"
+                ]
+            ) {
+
+                const response =
+                    await fetch(
+                        `data/${category}.json`,
+                        {
+                            cache:
+                                "no-store"
+                        }
+                    );
+
+
+                if (
+                    !response.ok
+                ) {
+
+                    throw new Error(
+                        `خطا در دریافت ${category}.json`
+                    );
+                }
+
+
+                const data =
+                    await response.json();
+
+
+                let questions =
+                    [];
+
+
+                if (
+                    Array.isArray(
+                        data.questions
+                    )
+                ) {
+
+                    questions =
+                        data.questions;
+
+                } else if (
+                    Array.isArray(
+                        data.stages
+                    )
+                ) {
+
+                    questions =
+                        data.stages.flatMap(
+                            stage =>
+
+                                (
+                                    stage.questions ||
+                                    []
+                                ).map(
+                                    question => ({
+                                        ...question,
+                                        stage:
+                                            stage.stage
+                                    })
+                                )
+                        );
+                }
+
+
+                this.categoryData[
+                    category
+                ] =
+                    questions;
+            }
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
+        }
+    }
+
+
+    /* =====================================================
+       QUIZ
+    ===================================================== */
+
+    bindQuiz() {
+
+        document
+            .querySelectorAll(
+                "[data-category-tab]"
+            )
+            .forEach(
+                button => {
+
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            this.currentCategory =
+                                button.dataset.categoryTab;
+
+
+                            document
+                                .querySelectorAll(
+                                    "[data-category-tab]"
+                                )
+                                .forEach(
+                                    item =>
+                                        item.classList.toggle(
+                                            "active",
+                                            item ===
+                                            button
+                                        )
+                                );
+
+
+                            this.renderStages();
+                        }
+                    );
+                }
+            );
+
+
+        document
+            .getElementById(
+                "nextQuestionBtn"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.renderCurrentQuestion();
+                }
+            );
+    }
+
+
+    renderStages() {
+
+        const container =
+            document.getElementById(
+                "stageList"
+            );
+
+
+        if (
+            !container
+        ) {
+            return;
+        }
+
+
+        const questions =
+            this.categoryData[
+                this.currentCategory
+            ] || [];
+
+
+        const stages =
+            [
+                ...new Set(
+                    questions
+                        .map(
+                            q =>
+                                Number(
+                                    q.stage
+                                )
+                        )
+                        .filter(
+                            Number.isFinite
+                        )
+                )
+            ].sort(
+                (a, b) =>
+                    a - b
+            );
+
+
+        if (
+            !stages.length
+        ) {
+
+            container.innerHTML = `
+
+                <div class="panel">
+
+                    هنوز مرحله‌ای برای این بخش
+                    تعریف نشده است.
 
                 </div>
 
-            </div>
+            `;
+
+            return;
+        }
+
+
+        const unlocked =
+            getUnlockedStage(
+                this.state,
+                this.currentCategory
+            );
+
+
+        container.innerHTML =
+            stages
+                .map(
+                    stage => {
+
+                        const completed =
+                            isStageCompleted(
+                                this.state,
+                                this.currentCategory,
+                                stage
+                            );
+
+
+                        const locked =
+                            stage >
+                            unlocked;
+
+
+                        return `
+
+                            <article
+                                class="
+                                    stage-card
+                                    ${
+                                        locked
+                                            ? "locked"
+                                            : ""
+                                    }
+                                    ${
+                                        completed
+                                            ? "completed"
+                                            : ""
+                                    }
+                                "
+                            >
+
+                                <div class="stage-number">
+                                    ${stage}
+                                </div>
+
+                                <h3>
+                                    مرحله ${stage}
+                                </h3>
+
+                                <small>
+
+                                    ${
+                                        completed
+                                            ? "✓ تکمیل شده"
+                                            : locked
+                                                ? "🔒 قفل"
+                                                : "۱۰ XP"
+                                    }
+
+                                </small>
+
+
+                                <button
+                                    type="button"
+                                    class="
+                                        primary-btn
+                                        stage-action
+                                    "
+                                    data-stage="${stage}"
+                                    ${
+                                        locked
+                                            ? "disabled"
+                                            : ""
+                                    }
+                                >
+
+                                    ${
+                                        completed
+                                            ? "بازی دوباره"
+                                            : "شروع مرحله"
+                                    }
+
+                                </button>
+
+                            </article>
+
+                        `;
+                    }
+                )
+                .join("");
+
+
+        container
+            .querySelectorAll(
+                "[data-stage]"
+            )
+            .forEach(
+                button => {
 
-            <div class="hero-stats">
+                    button.addEventListener(
+                        "click",
+                        () => {
 
-                <div>
-                    <b id="homeXP">0</b>
-                    <span>XP</span>
-                </div>
+                            this.startStage(
+                                Number(
+                                    button.dataset.stage
+                                )
+                            );
+                        }
+                    );
+                }
+            );
+    }
 
-                <div>
-                    <b id="homeLevel">1</b>
-                    <span>سطح</span>
-                </div>
 
-                <div>
-                    <b id="homeStreak">0</b>
-                    <span>Streak</span>
-                </div>
-
-            </div>
+    async startStage(
+        stage
+    ) {
 
-        </div>
+        if (
+            !this.currentUser &&
+            stage > 3
+        ) {
 
-        <div
-            id="dailyRewardCard"
-            class="daily-reward-card"
-        ></div>
-
-        <div class="feature-grid">
-
-            <article class="feature-card">
-                <span>🧠</span>
-                <h3>اطلاعات عمومی</h3>
-                <p>
-                    سؤال‌های متنوع برای سنجش دانسته‌ها.
-                </p>
-            </article>
-
-            <article class="feature-card">
-                <span>🎮</span>
-                <h3>تفریحی</h3>
-                <p>
-                    سؤال‌های سرگرم‌کننده و غیرمنتظره.
-                </p>
-            </article>
-
-            <article class="feature-card">
-                <span>🔥</span>
-                <h3>Streak</h3>
-                <p>
-                    با برگشتن روزانه رکوردت را حفظ کن.
-                </p>
-            </article>
-
-            <article class="feature-card">
-                <span>🏆</span>
-                <h3>رقابت</h3>
-                <p>
-                    XP جمع کن و در رتبه‌بندی بالا برو.
-                </p>
-            </article>
+            alert(
+                "برای ادامه بازی بعد از مرحله ۳ باید ثبت‌نام یا وارد حساب شوی."
+            );
 
-        </div>
+            this.showPage(
+                "auth"
+            );
 
-    </section>
+            return;
+        }
 
 
-    <!-- AUTH -->
+        const completed =
+            isStageCompleted(
+                this.state,
+                this.currentCategory,
+                stage
+            );
 
-    <section
-        id="auth"
-        class="page"
-    >
 
-        <div class="panel auth-panel">
+        let replay =
+            false;
 
-            <div class="section-heading">
 
-                <span>👤</span>
+        if (
+            completed
+        ) {
 
-                <div>
+            replay =
+                confirm(
+                    "شما قبلاً امتیاز این مرحله را کسب کرده‌اید.\n\n" +
+                    "آیا مایلید دوباره این مرحله را بازی کنید؟\n\n" +
+                    "بازی کردن در این مرحله نه از شما قلب کم می‌کند " +
+                    "و نه XP اضافه می‌کند."
+                );
 
-                    <h2 id="authTitle">
-                        ورود
-                    </h2>
 
-                    <p>
-                        وارد حساب QuizDuo شو.
-                    </p>
+            if (
+                !replay
+            ) {
+                return;
+            }
+        }
 
-                </div>
 
-            </div>
+        try {
 
-            <input
-                id="authName"
-                placeholder="نام کاربری"
-                autocomplete="username"
-            >
+            await this.quiz.loadCategory(
+                this.currentCategory
+            );
 
-            <input
-                id="authPassword"
-                type="password"
-                placeholder="رمز عبور"
-                autocomplete="current-password"
-            >
 
-            <div
-                id="confirmPasswordWrap"
-                class="hidden"
-            >
+            const questions =
+                this.quiz.startStage(
+                    this.currentCategory,
+                    stage,
+                    replay
+                );
 
-                <input
-                    id="authConfirmPassword"
-                    type="password"
-                    placeholder="تکرار رمز عبور"
-                    autocomplete="new-password"
-                >
 
-            </div>
+            if (
+                !questions.length
+            ) {
 
-            <button
-                id="authSubmit"
-                class="primary-btn full-btn"
-                type="button"
-            >
-                ورود
-            </button>
+                alert(
+                    "برای این مرحله سؤال کافی وجود ندارد."
+                );
 
-            <p
-                id="authMsg"
-                class="form-message"
-            ></p>
+                return;
+            }
 
-            <button
-                id="toggleAuth"
-                class="secondary-btn full-btn"
-                type="button"
-            >
-                ساخت حساب جدید
-            </button>
 
-        </div>
+            this.showPage(
+                "quiz"
+            );
 
-    </section>
 
+            document
+                .getElementById(
+                    "quizBox"
+                )
+                .classList
+                .remove("hidden");
 
-    <!-- QUIZ -->
 
-    <section
-        id="quiz"
-        class="page"
-    >
+            this.renderCurrentQuestion();
 
-        <div class="section-heading">
+        } catch (error) {
 
-            <span>🎯</span>
+            console.error(
+                error
+            );
 
-            <div>
 
-                <h2>
-                    سؤالات
-                </h2>
+            alert(
+                "در بارگذاری مرحله مشکلی پیش آمد."
+            );
+        }
+    }
 
-                <p>
-                    مرحله‌ها را کامل کن و XP بگیر.
-                </p>
 
-            </div>
+    renderCurrentQuestion() {
 
-        </div>
+        clearInterval(
+            this.currentQuestionTimer
+        );
 
-        <div class="quiz-tabs">
 
-            <button
-                class="active"
-                data-category-tab="general"
-            >
-                🧠 اطلاعات عمومی
-            </button>
+        const question =
+            this.quiz.getCurrentQuestion();
 
-            <button
-                data-category-tab="fun"
-            >
-                🎮 تفریحی
-            </button>
 
-        </div>
+        const total =
+            this.quiz.getQuestionCount();
 
-        <div class="quiz-stats">
 
-            <span>
-                ⭐ XP:
-                <b id="quizXP">0</b>
-            </span>
+        const index =
+            this.quiz.currentQuestion;
 
-            <span>
-                🎁 XP روزانه:
-                <b id="dailyXPValue">10</b>
-            </span>
 
-            <span>
-                🔥 Streak:
-                <b id="quizStreak">0</b>
-            </span>
+        if (
+            !question
+        ) {
 
-            <span>
-                ❤️ قلب:
-                <b id="heartValue">5</b>
-            </span>
+            return;
+        }
 
-            <span>
-                ⚡ Combo:
-                <b id="comboValue">0</b>
-            </span>
 
-        </div>
+        document
+            .getElementById(
+                "quizCategory"
+            )
+            .textContent =
+            this.currentCategory ===
+            "general"
 
-        <div
-            id="stageList"
-            class="stage-grid"
-        ></div>
+                ? "🧠 اطلاعات عمومی"
 
-        <div
-            id="quizBox"
-            class="quiz-box panel hidden"
-        >
+                : "🎮 تفریحی";
 
-            <div class="quiz-topline">
 
-                <span id="quizCategory"></span>
+        document
+            .getElementById(
+                "questionNumber"
+            )
+            .textContent =
+            `سؤال ${index + 1} از ${total}`;
 
-                <span id="questionNumber"></span>
 
-            </div>
+        document
+            .getElementById(
+                "questionText"
+            )
+            .textContent =
+            question.q ||
+            question.question ||
+            "";
 
-            <div class="progress-track">
-                <div
-                    id="quizProgress"
-                    class="progress-fill"
-                ></div>
-            </div>
 
-            <div class="timer-row">
+        const progress =
+            total
+                ? (
+                    index /
+                    total
+                ) *
+                100
+                : 0;
 
-                <span>
-                    زمان
-                </span>
 
-                <b id="questionTimer">
-                    20s
-                </b>
+        document
+            .getElementById(
+                "quizProgress"
+            )
+            .style.width =
+            `${progress}%`;
 
-            </div>
 
-            <div class="timer-track">
+        const answers =
+            document.getElementById(
+                "answers"
+            );
 
-                <div
-                    id="timerProgress"
-                    class="timer-fill"
-                ></div>
 
-            </div>
-
-            <h2 id="questionText"></h2>
-
-            <div
-                id="answers"
-                class="answers"
-            ></div>
-
-            <div id="quizResult"></div>
-
-            <button
-                id="nextQuestionBtn"
-                type="button"
-                class="primary-btn next-btn hidden"
-            >
-                سؤال بعدی →
-            </button>
-
-        </div>
-
-    </section>
-
-
-    <!-- SUBSCRIPTION -->
-
-    <section
-        id="subscription"
-        class="page"
-    >
-
-        <div class="subscription-hero">
-
-            <div>
-
-                <span class="eyebrow">
-                    QUIZDUO PREMIUM
-                </span>
-
-                <h1>
-                    بیشتر بازی کن،
-                    بیشتر پیشرفت کن 👑
-                </h1>
-
-                <p>
-                    اشتراک Premium برای بازیکن‌هایی
-                    که می‌خوان امکانات بیشتری داشته باشن.
-                </p>
-
-            </div>
-
-            <div class="premium-orb">
-                👑
-            </div>
-
-        </div>
-
-
-        <div class="sub-section-title">
-
-            <h2>
-                پلن مناسب خودت رو انتخاب کن
-            </h2>
-
-            <span>
-                ← برای دیدن همه پلن‌ها اسکرول کن
-            </span>
-
-        </div>
-
-
-        <div class="subscription-scroll">
-
-            <article
-                class="subscription-card"
-                data-plan-card="monthly"
-            >
-
-                <div class="plan-icon">
-                    🌱
-                </div>
-
-                <span class="plan-tag">
-                    شروع
-                </span>
-
-                <h3>
-                    ماهانه
-                </h3>
-
-                <div class="price">
-                    ۱۰۰,۰۰۰
-                    <small>تومان</small>
-                </div>
-
-                <p>
-                    ۱ ماه Premium
-                </p>
-
-                <button
-                    class="primary-btn plan-select"
-                    data-plan="monthly"
-                >
-                    انتخاب پلن
-                </button>
-
-            </article>
-
-
-            <article
-                class="subscription-card popular"
-                data-plan-card="quarterly"
-            >
-
-                <div class="popular-badge">
-                    محبوب‌ترین
-                </div>
-
-                <div class="plan-icon">
-                    🚀
-                </div>
-
-                <span class="plan-tag">
-                    به‌صرفه
-                </span>
-
-                <h3>
-                    سه‌ماهه
-                </h3>
-
-                <div class="price">
-                    ۲۷۰,۰۰۰
-                    <small>تومان</small>
-                </div>
-
-                <p>
-                    ۳ ماه Premium
-                </p>
-
-                <button
-                    class="primary-btn plan-select"
-                    data-plan="quarterly"
-                >
-                    انتخاب پلن
-                </button>
-
-            </article>
-
-
-            <article
-                class="subscription-card"
-                data-plan-card="sixMonth"
-            >
-
-                <div class="plan-icon">
-                    💎
-                </div>
-
-                <span class="plan-tag">
-                    ارزشمند
-                </span>
-
-                <h3>
-                    شش‌ماهه
-                </h3>
-
-                <div class="price">
-                    ۴۸۰,۰۰۰
-                    <small>تومان</small>
-                </div>
-
-                <p>
-                    ۶ ماه + ۱ ماه هدیه
-                </p>
-
-                <button
-                    class="primary-btn plan-select"
-                    data-plan="sixMonth"
-                >
-                    انتخاب پلن
-                </button>
-
-            </article>
-
-
-            <article
-                class="subscription-card"
-                data-plan-card="nineMonth"
-            >
-
-                <div class="plan-icon">
-                    🏆
-                </div>
-
-                <span class="plan-tag">
-                    ویژه
-                </span>
-
-                <h3>
-                    نه‌ماهه
-                </h3>
-
-                <div class="price">
-                    ۶۶۰,۰۰۰
-                    <small>تومان</small>
-                </div>
-
-                <p>
-                    ۹ ماه Premium + ۱ ماه هدیه
-                </p>
-
-                <button
-                    class="primary-btn plan-select"
-                    data-plan="nineMonth"
-                >
-                    انتخاب پلن
-                </button>
-
-            </article>
-
-        </div>
-
-
-        <div class="premium-benefits-section">
-
-            <div class="sub-section-title">
-
-                <h2>
-                    با Premium چی می‌گیری؟
-                </h2>
-
-                <span>
-                    مزایا بدون شلوغی اضافه
-                </span>
-
-            </div>
-
-            <div class="benefit-grid">
-
-                <article class="benefit-card">
-                    <span>❤️</span>
-                    <h3>قلب بیشتر</h3>
-                    <p>
-                        حداکثر ۸ قلب برای بازی راحت‌تر.
-                    </p>
-                </article>
-
-                <article class="benefit-card">
-                    <span>🔐</span>
-                    <h3>مراحل ویژه</h3>
-                    <p>
-                        دسترسی به محتوای ویژه در نسخه‌های بعدی.
-                    </p>
-                </article>
-
-                <article class="benefit-card">
-                    <span>📊</span>
-                    <h3>آمار پیشرفته</h3>
-                    <p>
-                        جزئیات بیشتر درباره عملکرد و رکوردها.
-                    </p>
-                </article>
-
-                <article class="benefit-card">
-                    <span>🎁</span>
-                    <h3>هدیه‌های دوره‌ای</h3>
-                    <p>
-                        پاداش‌های کوچک و جذاب برای اعضای Premium.
-                    </p>
-                </article>
-
-            </div>
-
-        </div>
-
-
-        <div class="referral-panel">
-
-            <div>
-
-                <span class="referral-icon">
-                    🤝
-                </span>
-
-                <div>
-
-                    <h2>
-                        دوستات رو دعوت کن
-                    </h2>
-
-                    <p>
-                        با رشد QuizDuo، خودت هم جایزه بگیر.
-                    </p>
-
-                </div>
-
-            </div>
-
-            <div class="referral-grid">
-
-                <div>
-                    <b>۵</b>
-                    <span>دعوت موفق</span>
-                    <strong>+۱ ماه</strong>
-                </div>
-
-                <div>
-                    <b>۱۰</b>
-                    <span>دعوت موفق</span>
-                    <strong>+۲ ماه</strong>
-                </div>
-
-                <div>
-                    <b>۲۰</b>
-                    <span>دعوت موفق</span>
-                    <strong>+۴ ماه</strong>
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <div
-            id="paymentPanel"
-            class="payment-panel panel"
-        >
-
-            <div class="payment-header">
-
-                <div>
-
-                    <span class="eyebrow">
-                        MANUAL PAYMENT
-                    </span>
-
-                    <h2>
-                        تکمیل اشتراک
-                    </h2>
-
-                </div>
-
-                <div class="secure-badge">
-                    🧾 بررسی دستی
-                </div>
-
-            </div>
-
-
-            <div class="payment-layout">
-
-
-                <div class="selected-plan-box">
-
-                    <span>
-                        پلن انتخاب‌شده
-                    </span>
-
-                    <strong id="selectedPlanName">
-                        ماهانه
-                    </strong>
-
-                    <b id="selectedPlanAmount">
-                        ۱۰۰,۰۰۰ تومان
-                    </b>
-
-                </div>
-
-
-                <div class="discount-box">
-
-                    <label for="discountCode">
-                        کد تخفیف
-                    </label>
-
-                    <div class="discount-row">
-
-                        <input
-                            id="discountCode"
-                            placeholder="مثلاً TEST100K"
-                        >
+        answers.innerHTML =
+            (
+                question.options ||
+                []
+            )
+                .map(
+                    (
+                        option,
+                        optionIndex
+                    ) => `
 
                         <button
-                            id="applyDiscount"
                             type="button"
-                            class="secondary-btn"
+                            class="answer-btn"
+                            data-answer="${optionIndex}"
                         >
-                            اعمال
+                            ${escapeHTML(
+                                option
+                            )}
                         </button>
 
+                    `
+                )
+                .join("");
+
+
+        document
+            .getElementById(
+                "quizResult"
+            )
+            .innerHTML =
+            "";
+
+
+        document
+            .getElementById(
+                "nextQuestionBtn"
+            )
+            .classList
+            .add("hidden");
+
+
+        answers
+            .querySelectorAll(
+                "[data-answer]"
+            )
+            .forEach(
+                button => {
+
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            this.answerQuestion(
+                                Number(
+                                    button.dataset.answer
+                                )
+                            );
+                        }
+                    );
+                }
+            );
+
+
+        this.startTimer();
+    }
+
+
+    startTimer() {
+
+        const duration =
+            QUIZ_CONFIG.questionTime;
+
+
+        let remaining =
+            duration;
+
+
+        const timerText =
+            document.getElementById(
+                "questionTimer"
+            );
+
+
+        const timerProgress =
+            document.getElementById(
+                "timerProgress"
+            );
+
+
+        timerText.textContent =
+            `${remaining}s`;
+
+
+        timerProgress.style.width =
+            "100%";
+
+
+        this.currentQuestionTimer =
+            setInterval(
+                () => {
+
+                    remaining--;
+
+                    timerText.textContent =
+                        `${Math.max(
+                            remaining,
+                            0
+                        )}s`;
+
+
+                    timerProgress.style.width =
+                        `${(
+                            Math.max(
+                                remaining,
+                                0
+                            ) /
+                            duration
+                        ) * 100}%`;
+
+
+                    if (
+                        remaining <= 0
+                    ) {
+
+                        clearInterval(
+                            this.currentQuestionTimer
+                        );
+
+
+                        this.answerQuestion(
+                            null
+                        );
+                    }
+
+                },
+                1000
+            );
+    }
+
+
+    answerQuestion(
+        answerIndex
+    ) {
+
+        clearInterval(
+            this.currentQuestionTimer
+        );
+
+
+        const result =
+            this.quiz.answer(
+                answerIndex
+            );
+
+
+        document
+            .querySelectorAll(
+                ".answer-btn"
+            )
+            .forEach(
+                button => {
+
+                    button.disabled =
+                        true;
+                }
+            );
+
+
+        const resultBox =
+            document.getElementById(
+                "quizResult"
+            );
+
+
+        resultBox.innerHTML = `
+
+            <div class="notice">
+
+                ${
+                    result.correct
+                        ? "✅ پاسخ درست بود!"
+                        : "❌ پاسخ درست نبود."
+                }
+
+                ${
+                    result.explanation
+                        ? `<br>${escapeHTML(
+                            result.explanation
+                        )}`
+                        : ""
+                }
+
+            </div>
+
+        `;
+
+
+        document
+            .getElementById(
+                "comboValue"
+            )
+            .textContent =
+            result.combo;
+
+
+        if (
+            result.finished
+        ) {
+
+            this.finishStage(
+                result
+            );
+
+        } else {
+
+            document
+                .getElementById(
+                    "nextQuestionBtn"
+                )
+                .classList
+                .remove("hidden");
+        }
+
+
+        this.updateUI();
+    }
+
+
+    finishStage(
+        result
+    ) {
+
+        const percentage =
+            Math.round(
+                result.percentage *
+                100
+            );
+
+
+        let message = "";
+
+
+        if (
+            result.passed
+        ) {
+
+            if (
+                result.newlyCompleted
+            ) {
+
+                message = `
+
+                    <div class="notice">
+
+                        🎉 مرحله با موفقیت کامل شد!
+
+                        <br>
+
+                        ⭐
+                        ${result.earnedXP}
+                        XP گرفتی.
+
+                        <br>
+
+                        نتیجه:
+                        ${percentage}٪
+
                     </div>
 
-                    <p
-                        id="discountMsg"
-                        class="form-message"
-                    ></p>
+                `;
 
-                </div>
+            } else {
 
+                message = `
 
-                <div class="payment-summary">
+                    <div class="notice">
 
-                    <div>
+                        🎉 مرحله را دوباره تمام کردی!
 
-                        <span>
-                            قیمت پلن
-                        </span>
+                        <br>
 
-                        <b id="basePrice">
-                            ۱۰۰,۰۰۰ تومان
+                        نتیجه:
+                        ${percentage}٪
+
+                        <br>
+
+                        این بار
+                        <b>
+                            XP و قلبی تغییر نمی‌کند.
                         </b>
 
                     </div>
 
-                    <div>
+                `;
+            }
 
-                        <span>
-                            تخفیف
-                        </span>
+        } else {
 
-                        <b id="discountAmount">
-                            ۰ تومان
-                        </b>
+            message = `
 
-                    </div>
+                <div class="notice">
 
-                    <div class="final-price">
+                    ❌ این مرحله را پاس نکردی.
 
-                        <span>
-                            مبلغ نهایی
-                        </span>
+                    <br>
 
-                        <strong id="finalPrice">
-                            ۱۰۰,۰۰۰ تومان
-                        </strong>
+                    نتیجه:
+                    ${percentage}٪
 
-                    </div>
+                    ${
+                        result.heartLost
+                            ? "<br>❤️ یک قلب کم شد."
+                            : ""
+                    }
 
                 </div>
 
-
-                <div class="bank-transfer-box">
-
-                    <div class="bank-transfer-head">
-
-                        <span class="gateway-logo">
-                            🏦
-                        </span>
-
-                        <div>
-
-                            <strong>
-                                پرداخت دستی QuizDuo
-                            </strong>
-
-                            <p>
-                                مبلغ نهایی را به حساب زیر واریز کن
-                                و تصویر فیش را ارسال کن.
-                            </p>
-
-                        </div>
-
-                    </div>
+            `;
+        }
 
 
-                    <div class="bank-details">
-
-                        <div>
-
-                            <span>
-                                نام صاحب حساب
-                            </span>
-
-                            <b>
-                                نام صاحب حساب را اینجا وارد کنید
-                            </b>
-
-                        </div>
-
-                        <div>
-
-                            <span>
-                                شماره کارت / حساب
-                            </span>
-
-                            <b dir="ltr">
-                                XXXX XXXX XXXX XXXX
-                            </b>
-
-                        </div>
-
-                        <div>
-
-                            <span>
-                                مبلغ قابل واریز
-                            </span>
-
-                            <b id="bankAmount">
-                                ۱۰۰,۰۰۰ تومان
-                            </b>
-
-                        </div>
-
-                    </div>
+        document
+            .getElementById(
+                "quizResult"
+            )
+            .innerHTML =
+            message;
 
 
-                    <div class="transfer-warning">
-
-                        ⚠️ لطفاً مبلغ دقیق نمایش‌داده‌شده
-                        را واریز کن و سپس فیش را انتخاب کن.
-
-                    </div>
-
-                </div>
+        document
+            .getElementById(
+                "quizProgress"
+            )
+            .style.width =
+            "100%";
 
 
-                <div class="receipt-upload-box">
-
-                    <label
-                        for="receiptFile"
-                        class="upload-label"
-                    >
-                        📎 تصویر فیش واریزی
-                    </label>
-
-                    <input
-                        id="receiptFile"
-                        type="file"
-                        accept="image/*"
-                    >
-
-                    <p
-                        id="receiptMsg"
-                        class="form-message"
-                    >
-                        فقط تصویر فیش، حداکثر ۵ مگابایت.
-                    </p>
-
-                </div>
+        document
+            .getElementById(
+                "nextQuestionBtn"
+            )
+            .classList
+            .add("hidden");
 
 
-                <button
-                    id="paymentButton"
-                    type="button"
-                    class="primary-btn payment-button"
-                >
-                    ارسال فیش و ثبت درخواست
-                </button>
+        this.renderStages();
+
+        this.updateUI();
 
 
-                <p
-                    id="paymentMsg"
-                    class="form-message"
-                ></p>
+        setTimeout(
+            () => {
+
+                document
+                    .getElementById(
+                        "quizBox"
+                    )
+                    .scrollIntoView({
+                        behavior:
+                            "smooth",
+                        block:
+                            "start"
+                    });
+
+            },
+            100
+        );
+    }
 
 
-                <div
-                    id="paymentStatusBox"
-                    class="payment-status-box hidden"
-                >
+    /* =====================================================
+       SUBSCRIPTION
+    ===================================================== */
+
+    bindSubscription() {
+
+        document
+            .querySelectorAll(
+                "[data-plan]"
+            )
+            .forEach(
+                button => {
+
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            this.selectPlan(
+                                button.dataset.plan
+                            );
+                        }
+                    );
+                }
+            );
+
+
+        document
+            .getElementById(
+                "applyDiscount"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.applyDiscount();
+                }
+            );
+
+
+        document
+            .getElementById(
+                "paymentButton"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.submitPaymentRequest();
+                }
+            );
+
+
+        document
+            .getElementById(
+                "receiptFile"
+            )
+            ?.addEventListener(
+                "change",
+                event => {
+
+                    const file =
+                        event.target.files?.[0];
+
+
+                    const message =
+                        document.getElementById(
+                            "receiptMsg"
+                        );
+
+
+                    if (
+                        !file
+                    ) {
+
+                        message.textContent =
+                            "فیشی انتخاب نشده است.";
+
+                        return;
+                    }
+
+
+                    if (
+                        !file.type.startsWith(
+                            "image/"
+                        )
+                    ) {
+
+                        event.target.value =
+                            "";
+
+
+                        message.textContent =
+                            "لطفاً فقط تصویر فیش را انتخاب کن.";
+
+                        return;
+                    }
+
+
+                    if (
+                        file.size >
+                        MAX_RECEIPT_SIZE
+                    ) {
+
+                        event.target.value =
+                            "";
+
+
+                        message.textContent =
+                            "حجم تصویر نباید بیشتر از ۵ مگابایت باشد.";
+
+                        return;
+                    }
+
+
+                    message.textContent =
+                        `فایل «${file.name}» آماده ارسال است.`;
+                }
+            );
+    }
+
+
+    selectPlan(
+        planKey
+    ) {
+
+        if (
+            !subscriptionPlans[
+                planKey
+            ]
+        ) {
+            return;
+        }
+
+
+        this.selectedPlan =
+            planKey;
+
+
+        document
+            .querySelectorAll(
+                "[data-plan-card]"
+            )
+            .forEach(
+                card => {
+
+                    card.classList.toggle(
+                        "selected",
+                        card.dataset.planCard ===
+                        planKey
+                    );
+                }
+            );
+
+
+        this.discountPercent =
+            0;
+
+
+        const discountInput =
+            document.getElementById(
+                "discountCode"
+            );
+
+
+        const discountMsg =
+            document.getElementById(
+                "discountMsg"
+            );
+
+
+        if (
+            discountInput
+        ) {
+            discountInput.value =
+                "";
+        }
+
+
+        if (
+            discountMsg
+        ) {
+            discountMsg.textContent =
+                "";
+        }
+
+
+        this.updatePaymentSummary();
+    }
+
+
+    applyDiscount() {
+
+        const input =
+            document.getElementById(
+                "discountCode"
+            );
+
+
+        const message =
+            document.getElementById(
+                "discountMsg"
+            );
+
+
+        const code =
+            input.value
+                .trim()
+                .toUpperCase();
+
+
+        if (
+            !code
+        ) {
+
+            this.discountPercent =
+                0;
+
+
+            message.textContent =
+                "کد تخفیف وارد نشده است.";
+
+            this.updatePaymentSummary();
+
+            return;
+        }
+
+
+        const percent =
+            discountCodes[
+                code
+            ];
+
+
+        if (
+            !percent
+        ) {
+
+            this.discountPercent =
+                0;
+
+
+            message.textContent =
+                "کد تخفیف معتبر نیست.";
+
+            this.updatePaymentSummary();
+
+            return;
+        }
+
+
+        this.discountPercent =
+            percent;
+
+
+        message.textContent =
+            `${percent}٪ تخفیف اعمال شد.`;
+
+        this.updatePaymentSummary();
+    }
+
+
+    updatePaymentSummary() {
+
+        const plan =
+            subscriptionPlans[
+                this.selectedPlan
+            ];
+
+
+        if (
+            !plan
+        ) {
+            return;
+        }
+
+
+        const discountAmount =
+            Math.round(
+                plan.price *
+                this.discountPercent /
+                100
+            );
+
+
+        const finalPrice =
+            Math.max(
+                0,
+                plan.price -
+                discountAmount
+            );
+
+
+        const planName =
+            document.getElementById(
+                "selectedPlanName"
+            );
+
+
+        const planAmount =
+            document.getElementById(
+                "selectedPlanAmount"
+            );
+
+
+        const basePrice =
+            document.getElementById(
+                "basePrice"
+            );
+
+
+        const discount =
+            document.getElementById(
+                "discountAmount"
+            );
+
+
+        const final =
+            document.getElementById(
+                "finalPrice"
+            );
+
+
+        const bankAmount =
+            document.getElementById(
+                "bankAmount"
+            );
+
+
+        if (
+            planName
+        ) {
+
+            planName.textContent =
+                plan.name;
+        }
+
+
+        if (
+            planAmount
+        ) {
+
+            planAmount.textContent =
+                this.formatPrice(
+                    plan.price
+                );
+        }
+
+
+        if (
+            basePrice
+        ) {
+
+            basePrice.textContent =
+                this.formatPrice(
+                    plan.price
+                );
+        }
+
+
+        if (
+            discount
+        ) {
+
+            discount.textContent =
+                this.formatPrice(
+                    discountAmount
+                );
+        }
+
+
+        if (
+            final
+        ) {
+
+            final.textContent =
+                this.formatPrice(
+                    finalPrice
+                );
+        }
+
+
+        if (
+            bankAmount
+        ) {
+
+            bankAmount.textContent =
+                this.formatPrice(
+                    finalPrice
+                );
+        }
+    }
+
+
+    renderSubscription() {
+
+        this.selectPlan(
+            this.selectedPlan
+        );
+
+
+        const premium =
+            this.isPremium();
+
+
+        document
+            .querySelectorAll(
+                "[data-plan-card]"
+            )
+            .forEach(
+                card => {
+
+                    const key =
+                        card.dataset.planCard;
+
+
+                    const button =
+                        card.querySelector(
+                            "[data-plan]"
+                        );
+
+
+                    if (
+                        premium
+                    ) {
+
+                        button.textContent =
+                            "Premium فعال است";
+
+                    } else {
+
+                        button.textContent =
+                            "انتخاب پلن";
+                    }
+                }
+            );
+    }
+
+
+    formatPrice(
+        value
+    ) {
+
+        return (
+            Number(
+                value || 0
+            )
+                .toLocaleString(
+                    "fa-IR"
+                ) +
+            " تومان"
+        );
+    }
+
+
+    /* =====================================================
+       PAYMENT REQUEST
+    ===================================================== */
+
+    async submitPaymentRequest() {
+
+        const message =
+            document.getElementById(
+                "paymentMsg"
+            );
+
+
+        message.textContent =
+            "";
+
+
+        if (
+            !this.currentUser
+        ) {
+
+            message.textContent =
+                "برای خرید اشتراک ابتدا وارد حساب خودت شو.";
+
+            this.showPage(
+                "auth"
+            );
+
+            return;
+        }
+
+
+        const phone =
+            String(
+                this.state.phone || ""
+            )
+                .trim();
+
+
+        if (
+            phone.length < 7
+        ) {
+
+            message.textContent =
+                "قبل از ارسال فیش، شماره تلفن خودت را در بخش پروفایل ثبت کن.";
+
+            this.showPage(
+                "profile"
+            );
+
+            return;
+        }
+
+
+        const fileInput =
+            document.getElementById(
+                "receiptFile"
+            );
+
+
+        const file =
+            fileInput?.files?.[0];
+
+
+        if (
+            !file
+        ) {
+
+            message.textContent =
+                "لطفاً تصویر فیش واریزی را انتخاب کن.";
+
+            return;
+        }
+
+
+        if (
+            !file.type.startsWith(
+                "image/"
+            )
+        ) {
+
+            message.textContent =
+                "فایل انتخاب‌شده تصویر نیست.";
+
+            return;
+        }
+
+
+        if (
+            file.size >
+            MAX_RECEIPT_SIZE
+        ) {
+
+            message.textContent =
+                "حجم فیش نباید بیشتر از ۵ مگابایت باشد.";
+
+            return;
+        }
+
+
+        const plan =
+            subscriptionPlans[
+                this.selectedPlan
+            ];
+
+
+        if (
+            !plan
+        ) {
+
+            message.textContent =
+                "لطفاً یک پلن انتخاب کن.";
+
+            return;
+        }
+
+
+        const discountAmount =
+            Math.round(
+                plan.price *
+                this.discountPercent /
+                100
+            );
+
+
+        const finalPrice =
+            Math.max(
+                0,
+                plan.price -
+                discountAmount
+            );
+
+
+        const requestId =
+            this.generateRequestId();
+
+
+        const button =
+            document.getElementById(
+                "paymentButton"
+            );
+
+
+        button.disabled =
+            true;
+
+
+        button.textContent =
+            "در حال ارسال فیش...";
+
+
+        try {
+
+            const base64 =
+                await this.fileToBase64(
+                    file
+                );
+
+
+            const payload = {
+
+                action:
+                    "create_request",
+
+                requestId,
+
+                username:
+                    this.currentUser,
+
+                phone,
+
+                plan:
+                    this.selectedPlan,
+
+                planName:
+                    plan.name,
+
+                amount:
+                    finalPrice,
+
+                receiptName:
+                    file.name,
+
+                receiptType:
+                    file.type,
+
+                receiptBase64:
+                    base64
+
+            };
+
+
+            /*
+             * text/plain باعث می‌شود
+             * درخواست ساده باشد و در GitHub Pages
+             * درگیر preflight پیچیده نشویم.
+             */
+
+            const response =
+                await fetch(
+                    BACKEND_URL,
+                    {
+
+                        method:
+                            "POST",
+
+                        headers: {
+
+                            "Content-Type":
+                                "text/plain;charset=utf-8"
+
+                        },
+
+                        body:
+                            JSON.stringify(
+                                payload
+                            )
+
+                    }
+                );
+
+
+            const result =
+                await response.json();
+
+
+            if (
+                !result.ok
+            ) {
+
+                throw new Error(
+                    result.error ||
+                    "ثبت درخواست ناموفق بود."
+                );
+            }
+
+
+            this.paymentRequestId =
+                result.requestId ||
+                requestId;
+
+
+            this.savePaymentRequest({
+
+                requestId:
+                    this.paymentRequestId,
+
+                username:
+                    this.currentUser,
+
+                plan:
+                    this.selectedPlan,
+
+                planName:
+                    plan.name,
+
+                amount:
+                    finalPrice,
+
+                createdAt:
+                    Date.now(),
+
+                status:
+                    "pending"
+
+            });
+
+
+            message.textContent =
+                "فیش با موفقیت ارسال شد.";
+
+
+            fileInput.value =
+                "";
+
+
+            document
+                .getElementById(
+                    "receiptMsg"
+                )
+                .textContent =
+                "فیش ارسال شد.";
+
+
+            this.showPaymentStatus(
+                "pending"
+            );
+
+
+            this.startPaymentStatusPolling();
+
+
+        } catch (error) {
+
+            console.error(
+                "Payment request error:",
+                error
+            );
+
+
+            message.textContent =
+                "ارسال فیش انجام نشد. اتصال اینترنت و تنظیمات Backend را بررسی کن.";
+
+        } finally {
+
+            button.disabled =
+                false;
+
+
+            button.textContent =
+                "ارسال فیش و ثبت درخواست";
+        }
+    }
+
+
+    fileToBase64(
+        file
+    ) {
+
+        return new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                const reader =
+                    new FileReader();
+
+
+                reader.onload =
+                    () => {
+
+                        const result =
+                            String(
+                                reader.result ||
+                                ""
+                            );
+
+
+                        resolve(
+                            result.includes(
+                                ","
+                            )
+
+                                ? result.split(
+                                    ","
+                                )[1]
+
+                                : result
+                        );
+                    };
+
+
+                reader.onerror =
+                    () => {
+
+                        reject(
+                            new Error(
+                                "خواندن تصویر فیش ناموفق بود."
+                            )
+                        );
+                    };
+
+
+                reader.readAsDataURL(
+                    file
+                );
+            }
+        );
+    }
+
+
+    generateRequestId() {
+
+        return (
+
+            "QD-" +
+
+            Date.now()
+                .toString(36)
+                .toUpperCase() +
+
+            "-" +
+
+            Math.random()
+                .toString(36)
+                .slice(
+                    2,
+                    7
+                )
+                .toUpperCase()
+
+        );
+    }
+
+
+    /* =====================================================
+       PAYMENT STATUS
+    ===================================================== */
+
+    savePaymentRequest(
+        request
+    ) {
+
+        localStorage.setItem(
+            "quizduo_payment_request_" +
+            String(
+                request.username
+            )
+                .toLowerCase(),
+
+            JSON.stringify(
+                request
+            )
+        );
+    }
+
+
+    loadSavedPaymentRequest() {
+
+        if (
+            !this.currentUser
+        ) {
+            return;
+        }
+
+
+        try {
+
+            const saved =
+                localStorage.getItem(
+                    "quizduo_payment_request_" +
+                    this.currentUser
+                        .toLowerCase()
+                );
+
+
+            if (
+                !saved
+            ) {
+                return;
+            }
+
+
+            const request =
+                JSON.parse(
+                    saved
+                );
+
+
+            this.paymentRequestId =
+                request.requestId;
+
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
+        }
+    }
+
+
+    async checkSavedPaymentStatus() {
+
+        if (
+            !this.currentUser
+        ) {
+            return;
+        }
+
+
+        try {
+
+            const saved =
+                localStorage.getItem(
+                    "quizduo_payment_request_" +
+                    this.currentUser
+                        .toLowerCase()
+                );
+
+
+            if (
+                !saved
+            ) {
+                return;
+            }
+
+
+            const request =
+                JSON.parse(
+                    saved
+                );
+
+
+            if (
+                !request.requestId
+            ) {
+                return;
+            }
+
+
+            this.paymentRequestId =
+                request.requestId;
+
+
+            this.showPaymentStatus(
+                request.status ||
+                "pending"
+            );
+
+
+            await this.fetchPaymentStatus();
+
+
+        } catch (error) {
+
+            console.error(
+                "Payment status error:",
+                error
+            );
+        }
+    }
+
+
+    fetchPaymentStatus() {
+
+        return new Promise(
+            resolve => {
+
+                if (
+                    !this.currentUser ||
+                    !this.paymentRequestId
+                ) {
+
+                    resolve(
+                        null
+                    );
+
+                    return;
+                }
+
+
+                const callbackName =
+                    "quizduoStatus_" +
+                    Date.now();
+
+
+                let finished =
+                    false;
+
+
+                const script =
+                    document.createElement(
+                        "script"
+                    );
+
+
+                const cleanup =
+                    () => {
+
+                        if (
+                            script.parentNode
+                        ) {
+
+                            script.parentNode
+                                .removeChild(
+                                    script
+                                );
+                        }
+
+
+                        try {
+
+                            delete window[
+                                callbackName
+                            ];
+
+                        } catch (_) {}
+                    };
+
+
+                const timeout =
+                    setTimeout(
+                        () => {
+
+                            if (
+                                finished
+                            ) {
+                                return;
+                            }
+
+
+                            finished =
+                                true;
+
+
+                            cleanup();
+
+                            resolve(
+                                null
+                            );
+
+                        },
+                        15000
+                    );
+
+
+                window[
+                    callbackName
+                ] =
+                    result => {
+
+                        if (
+                            finished
+                        ) {
+                            return;
+                        }
+
+
+                        finished =
+                            true;
+
+
+                        clearTimeout(
+                            timeout
+                        );
+
+
+                        cleanup();
+
+
+                        if (
+                            result &&
+                            result.ok
+                        ) {
+
+                            this.handlePaymentStatus(
+                                result
+                            );
+                        }
+
+
+                        resolve(
+                            result
+                        );
+                    };
+
+
+                const url =
+                    new URL(
+                        BACKEND_URL
+                    );
+
+
+                url.searchParams.set(
+                    "action",
+                    "status"
+                );
+
+
+                url.searchParams.set(
+                    "requestId",
+                    this.paymentRequestId
+                );
+
+
+                url.searchParams.set(
+                    "username",
+                    this.currentUser
+                );
+
+
+                url.searchParams.set(
+                    "callback",
+                    callbackName
+                );
+
+
+                script.src =
+                    url.toString();
+
+
+                script.onerror =
+                    () => {
+
+                        if (
+                            finished
+                        ) {
+                            return;
+                        }
+
+
+                        finished =
+                            true;
+
+
+                        clearTimeout(
+                            timeout
+                        );
+
+
+                        cleanup();
+
+
+                        resolve(
+                            null
+                        );
+                    };
+
+
+                document
+                    .body
+                    .appendChild(
+                        script
+                    );
+            }
+        );
+    }
+
+
+    handlePaymentStatus(
+        result
+    ) {
+
+        if (
+            !result ||
+            !result.status
+        ) {
+            return;
+        }
+
+
+        const savedKey =
+            this.currentUser
+
+                ? "quizduo_payment_request_" +
+                    this.currentUser
+                        .toLowerCase()
+
+                : null;
+
+
+        if (
+            savedKey
+        ) {
+
+            try {
+
+                const old =
+                    JSON.parse(
+                        localStorage.getItem(
+                            savedKey
+                        ) ||
+                        "{}"
+                    );
+
+
+                old.status =
+                    result.status;
+
+
+                old.plan =
+                    result.plan ||
+                    old.plan;
+
+
+                old.amount =
+                    result.amount ||
+                    old.amount;
+
+
+                localStorage.setItem(
+                    savedKey,
+                    JSON.stringify(
+                        old
+                    )
+                );
+
+            } catch (_) {}
+        }
+
+
+        if (
+            result.status ===
+            "approved"
+        ) {
+
+            this.activatePremium(
+                result
+            );
+
+        } else if (
+            result.status ===
+            "rejected"
+        ) {
+
+            this.showPaymentStatus(
+                "rejected"
+            );
+
+        } else {
+
+            this.showPaymentStatus(
+                "pending"
+            );
+        }
+    }
+
+
+    startPaymentStatusPolling() {
+
+        clearInterval(
+            this.paymentStatusTimer
+        );
+
+
+        this.paymentStatusTimer =
+            setInterval(
+                () => {
+
+                    this.fetchPaymentStatus();
+
+                },
+                30000
+            );
+    }
+
+
+    activatePremium(
+        result
+    ) {
+
+        const saved =
+            localStorage.getItem(
+                "quizduo_payment_request_" +
+                this.currentUser
+                    .toLowerCase()
+            );
+
+
+        let request =
+            {};
+
+
+        try {
+
+            request =
+                saved
+                    ? JSON.parse(
+                        saved
+                    )
+                    : {};
+
+        } catch (_) {}
+
+
+        const planKey =
+            request.plan ||
+            this.selectedPlan;
+
+
+        const plan =
+            subscriptionPlans[
+                planKey
+            ] ||
+            subscriptionPlans.monthly;
+
+
+        const totalMonths =
+            plan.months +
+            plan.gift;
+
+
+        const now =
+            new Date();
+
+
+        const expires =
+            new Date(
+                now
+            );
+
+
+        expires.setMonth(
+            expires.getMonth() +
+            totalMonths
+        );
+
+
+        this.state.subscription =
+            "premium";
+
+
+        this.state.subscriptionPlan =
+            planKey;
+
+
+        this.state.subscriptionPlanName =
+            plan.name;
+
+
+        this.state.subscriptionMonths =
+            totalMonths;
+
+
+        this.state.subscriptionActivatedAt =
+            now.toISOString();
+
+
+        this.state.subscriptionExpiresAt =
+            expires.toISOString();
+
+
+        /*
+         * Premium = حداکثر ۸ قلب
+         */
+
+        this.state.maxHearts =
+            8;
+
+
+        this.state.hearts =
+            Math.min(
+                8,
+                Math.max(
+                    Number(
+                        this.state.hearts ||
+                        0
+                    ),
+                    5
+                )
+            );
+
+
+        this.persist();
+
+
+        this.quiz.state =
+            this.state;
+
+
+        this.showPaymentStatus(
+            "approved"
+        );
+
+
+        this.updateUI();
+    }
+
+
+    isPremium() {
+
+        if (
+            this.state.subscription !==
+            "premium"
+        ) {
+
+            return false;
+        }
+
+
+        if (
+            !this.state.subscriptionExpiresAt
+        ) {
+
+            return true;
+        }
+
+
+        const expires =
+            new Date(
+                this.state
+                    .subscriptionExpiresAt
+            );
+
+
+        if (
+            Date.now() >=
+            expires.getTime()
+        ) {
+
+            this.state.subscription =
+                "free";
+
+
+            this.state.maxHearts =
+                5;
+
+
+            this.state.hearts =
+                Math.min(
+                    Number(
+                        this.state.hearts ||
+                        0
+                    ),
+                    5
+                );
+
+
+            this.persist();
+
+
+            return false;
+        }
+
+
+        return true;
+    }
+
+
+    showPaymentStatus(
+        status
+    ) {
+
+        const box =
+            document.getElementById(
+                "paymentStatusBox"
+            );
+
+
+        const icon =
+            document.getElementById(
+                "paymentStatusIcon"
+            );
+
+
+        const title =
+            document.getElementById(
+                "paymentStatusTitle"
+            );
+
+
+        const text =
+            document.getElementById(
+                "paymentStatusText"
+            );
+
+
+        const id =
+            document.getElementById(
+                "paymentRequestId"
+            );
+
+
+        if (
+            !box
+        ) {
+            return;
+        }
+
+
+        box.classList.remove(
+            "hidden",
+            "status-pending",
+            "status-approved",
+            "status-rejected"
+        );
+
+
+        if (
+            id
+        ) {
+
+            id.textContent =
+                this.paymentRequestId ||
+                "";
+        }
+
+
+        if (
+            status ===
+            "approved"
+        ) {
+
+            box.classList.add(
+                "status-approved"
+            );
+
+
+            if (
+                icon
+            ) {
+                icon.textContent =
+                    "🎉";
+            }
+
+
+            if (
+                title
+            ) {
+
+                title.textContent =
+                    "اشتراک شما فعال شد!";
+            }
+
+
+            if (
+                text
+            ) {
+
+                text.textContent =
+                    "پرداخت شما توسط مدیر تأیید شد و Premium برای حساب شما فعال است.";
+            }
+
+
+        } else if (
+            status ===
+            "rejected"
+        ) {
+
+            box.classList.add(
+                "status-rejected"
+            );
+
+
+            if (
+                icon
+            ) {
+
+                icon.textContent =
+                    "❌";
+            }
+
+
+            if (
+                title
+            ) {
+
+                title.textContent =
+                    "درخواست پرداخت رد شد";
+            }
+
+
+            if (
+                text
+            ) {
+
+                text.textContent =
+                    "فیش ارسالی تأیید نشده است. در صورت نیاز، فیش صحیح را دوباره ارسال کن.";
+            }
+
+
+        } else {
+
+            box.classList.add(
+                "status-pending"
+            );
+
+
+            if (
+                icon
+            ) {
+
+                icon.textContent =
+                    "🕐";
+            }
+
+
+            if (
+                title
+            ) {
+
+                title.textContent =
+                    "درخواست در حال بررسی است";
+            }
+
+
+            if (
+                text
+            ) {
+
+                text.textContent =
+                    "فیش شما ارسال شده و منتظر بررسی مدیر است. حداکثر زمان فعال‌سازی ۲۴ ساعت است.";
+            }
+        }
+    }
+
+
+    /* =====================================================
+       PROFILE
+    ===================================================== */
+
+    bindProfile() {
+
+        document
+            .getElementById(
+                "saveProfilePhone"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.saveProfilePhone();
+                }
+            );
+    }
+
+
+    saveProfilePhone() {
+
+        if (
+            !this.currentUser
+        ) {
+
+            const message =
+                document.getElementById(
+                    "profilePhoneMsg"
+                );
+
+
+            message.textContent =
+                "برای ذخیره شماره تلفن ابتدا وارد حساب شو.";
+
+            return;
+        }
+
+
+        const input =
+            document.getElementById(
+                "profilePhone"
+            );
+
+
+        const message =
+            document.getElementById(
+                "profilePhoneMsg"
+            );
+
+
+        const phone =
+            input.value.trim();
+
+
+        if (
+            phone.length < 7
+        ) {
+
+            message.textContent =
+                "شماره تلفن معتبر وارد کن.";
+
+            return;
+        }
+
+
+        this.state.phone =
+            phone;
+
+
+        this.persist();
+
+
+        message.textContent =
+            "شماره تلفن با موفقیت ذخیره شد.";
+    }
+
+
+    renderProfile() {
+
+        const name =
+            this.state.username ||
+            "بازیکن مهمان";
+
+
+        const avatar =
+            document.getElementById(
+                "profileAvatar"
+            );
+
+
+        const nameElement =
+            document.getElementById(
+                "profileName"
+            );
+
+
+        const phone =
+            document.getElementById(
+                "profilePhone"
+            );
+
+
+        const premiumBadge =
+            document.getElementById(
+                "premiumBadge"
+            );
+
+
+        if (
+            avatar
+        ) {
+
+            avatar.textContent =
+                name.charAt(0)
+                    .toUpperCase();
+        }
+
+
+        if (
+            nameElement
+        ) {
+
+            nameElement.textContent =
+                name;
+        }
+
+
+        if (
+            phone
+        ) {
+
+            phone.value =
+                this.state.phone ||
+                "";
+        }
+
+
+        if (
+            premiumBadge
+        ) {
+
+            premiumBadge.classList.toggle(
+                "hidden",
+                !this.isPremium()
+            );
+        }
+
+
+        document
+            .getElementById(
+                "profileLevel"
+            )
+            .textContent =
+            this.state.level;
+
+
+        document
+            .getElementById(
+                "profileXP"
+            )
+            .textContent =
+            this.state.xp;
+
+
+        document
+            .getElementById(
+                "profileStreak"
+            )
+            .textContent =
+            this.state.streak;
+
+
+        document
+            .getElementById(
+                "profileHearts"
+            )
+            .textContent =
+            this.state.hearts;
+
+
+        document
+            .getElementById(
+                "profileGeneral"
+            )
+            .textContent =
+            Math.max(
+                0,
+                this.state.generalStage -
+                1
+            );
+
+
+        document
+            .getElementById(
+                "profileFun"
+            )
+            .textContent =
+            Math.max(
+                0,
+                this.state.funStage -
+                1
+            );
+    }
+
+
+    /* =====================================================
+       UI
+    ===================================================== */
+
+    updateUI() {
+
+        updateStreak(
+            this.state
+        );
+
+
+        this.state.level =
+            calculateLevel(
+                this.state.xp
+            );
+
+
+        this.persist();
+
+
+        const premium =
+            this.isPremium();
+
+
+        if (
+            premium
+        ) {
+
+            this.state.maxHearts =
+                8;
+
+        } else {
+
+            this.state.maxHearts =
+                5;
+        }
+
+
+        const values = {
+
+            homeXP:
+                this.state.xp,
+
+            homeLevel:
+                this.state.level,
+
+            homeStreak:
+                this.state.streak,
+
+            quizXP:
+                this.state.xp,
+
+            quizStreak:
+                this.state.streak,
+
+            heartValue:
+                this.state.hearts,
+
+            profileXP:
+                this.state.xp,
+
+            profileLevel:
+                this.state.level,
+
+            profileStreak:
+                this.state.streak,
+
+            profileHearts:
+                this.state.hearts,
+
+            profileGeneral:
+                Math.max(
+                    0,
+                    this.state.generalStage -
+                    1
+                ),
+
+            profileFun:
+                Math.max(
+                    0,
+                    this.state.funStage -
+                    1
+                )
+
+        };
+
+
+        Object.entries(
+            values
+        )
+            .forEach(
+                (
+                    [
+                        id,
+                        value
+                    ]
+                ) => {
+
+                    const element =
+                        document.getElementById(
+                            id
+                        );
+
+
+                    if (
+                        element
+                    ) {
+
+                        element.textContent =
+                            value;
+                    }
+                }
+            );
+
+
+        const authButton =
+            document.getElementById(
+                "authButton"
+            );
+
+
+        const logoutButton =
+            document.getElementById(
+                "logoutButton"
+            );
+
+
+        if (
+            this.currentUser
+        ) {
+
+            if (
+                authButton
+            ) {
+
+                authButton.textContent =
+                    this.currentUser;
+            }
+
+
+            logoutButton
+                ?.classList
+                .remove(
+                    "hidden"
+                );
+
+        } else {
+
+            if (
+                authButton
+            ) {
+
+                authButton.textContent =
+                    "ورود / ثبت‌نام";
+            }
+
+
+            logoutButton
+                ?.classList
+                .add(
+                    "hidden"
+                );
+        }
+
+
+        const premiumBadge =
+            document.getElementById(
+                "premiumBadge"
+            );
+
+
+        if (
+            premiumBadge
+        ) {
+
+            premiumBadge.classList.toggle(
+                "hidden",
+                !premium
+            );
+        }
+
+
+        this.renderDailyReward();
+
+        this.renderProfile();
+    }
+
+
+    /* =====================================================
+       DAILY XP
+    ===================================================== */
+
+    renderDailyReward() {
+
+        const card =
+            document.getElementById(
+                "dailyRewardCard"
+            );
+
+
+        if (
+            !card
+        ) {
+            return;
+        }
+
+
+        const key =
+            "quizduo_daily_xp_" +
+            todayKey();
+
+
+        const claimed =
+            localStorage.getItem(
+                key
+            ) === "1";
+
+
+        if (
+            claimed
+        ) {
+
+            card.innerHTML = `
+
+                <div>
+
+                    <strong>
+                        🎁 پاداش روزانه دریافت شد
+                    </strong>
 
                     <span>
-                        🕐
+                        امروز ${DAILY_XP} XP روزانه‌ات را گرفتی.
                     </span>
 
-                    <div>
-
-                        <strong>
-                            درخواست در حال بررسی است
-                        </strong>
-
-                        <p id="paymentStatusText">
-                            در انتظار بررسی فیش
-                            • حداکثر تا ۲۴ ساعت
-                        </p>
-
-                        <small>
-                            شناسه:
-                            <b id="paymentRequestId"></b>
-                        </small>
-
-                    </div>
-
                 </div>
 
+            `;
 
-                <div class="payment-note">
-
-                    پس از ارسال فیش، درخواست و تصویر فیش
-                    برای مدیر QuizDuo ارسال می‌شود.
-                    مدیر پرداخت را
-                    <b>به‌صورت دستی</b>
-                    بررسی می‌کند و پس از تأیید،
-                    <b>همان اشتراک انتخاب‌شده</b>
-                    برای حساب شما فعال می‌شود.
-                    حداکثر زمان فعال‌سازی ۲۴ ساعت است.
-
-                </div>
+            return;
+        }
 
 
-                <div class="test-gateway-box">
-
-                    <div class="gateway-logo">
-                        Q
-                    </div>
-
-                    <div>
-
-                        <strong>
-                            حالت آزمایشی
-                        </strong>
-
-                        <p>
-                            برای تست بدون پرداخت واقعی،
-                            پلن ماهانه را انتخاب کن و کد
-                            <b>TEST100K</b>
-                            را وارد کن.
-                            این کد فقط برای نسخه آزمایشی است.
-                        </p>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- LEADERBOARD -->
-
-    <section
-        id="leaderboard"
-        class="page"
-    >
-
-        <div class="section-heading">
-
-            <span>🏆</span>
+        card.innerHTML = `
 
             <div>
 
-                <h2>
-                    لیدربورد
-                </h2>
+                <strong>
+                    🎁 پاداش روزانه
+                </strong>
 
-                <p>
-                    رتبه‌بندی بازیکنان ثبت‌نام‌شده روی این نسخه.
-                </p>
-
-            </div>
-
-        </div>
-
-        <div class="panel table-panel">
-
-            <table>
-
-                <thead>
-
-                    <tr>
-                        <th>رتبه</th>
-                        <th>بازیکن</th>
-                        <th>XP</th>
-                        <th>سطح</th>
-                        <th>مرحله</th>
-                    </tr>
-
-                </thead>
-
-                <tbody id="leaderboardBody"></tbody>
-
-            </table>
-
-        </div>
-
-        <p class="muted">
-            در این نسخه استاتیک، لیدربورد فقط بین حساب‌هایی
-            که روی همین مرورگر ساخته شده‌اند مشترک است.
-        </p>
-
-    </section>
-
-
-    <!-- PROFILE -->
-
-    <section
-        id="profile"
-        class="page"
-    >
-
-        <div class="section-heading">
-
-            <span>👤</span>
-
-            <div>
-
-                <h2>
-                    پروفایل
-                </h2>
-
-                <p>
-                    آمار پیشرفتت رو اینجا ببین.
-                </p>
-
-            </div>
-
-        </div>
-
-        <div class="profile-grid">
-
-            <div class="profile-card panel">
-
-                <div
-                    class="avatar"
-                    id="profileAvatar"
-                >
-                    م
-                </div>
-
-                <h2 id="profileName">
-                    بازیکن مهمان
-                </h2>
-
-                <p>
-                    سطح
-                    <b id="profileLevel">
-                        1
-                    </b>
-                </p>
-
-                <span
-                    id="premiumBadge"
-                    class="premium-badge hidden"
-                >
-                    👑 Premium
+                <span>
+                    با فعالیت امروز، ${DAILY_XP} XP پاداش بگیر.
                 </span>
 
             </div>
 
-
-            <div class="stats-card panel">
-
-                <div>
-                    <span>XP</span>
-                    <b id="profileXP">0</b>
-                </div>
-
-                <div>
-                    <span>Streak</span>
-                    <b id="profileStreak">0</b>
-                </div>
-
-                <div>
-                    <span>❤️ قلب</span>
-                    <b id="profileHearts">5</b>
-                </div>
-
-                <div>
-                    <span>عمومی</span>
-                    <b id="profileGeneral">0</b>
-                </div>
-
-                <div>
-                    <span>تفریحی</span>
-                    <b id="profileFun">0</b>
-                </div>
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- CHAT -->
-
-    <section
-        id="chat"
-        class="page"
-    >
-
-        <div class="section-heading">
-
-            <span>💬</span>
-
-            <div>
-
-                <h2>
-                    گفت‌وگو
-                </h2>
-
-                <p>
-                    فعلاً پیام‌ها فقط روی همین مرورگر ذخیره می‌شوند.
-                </p>
-
-            </div>
-
-        </div>
-
-        <div class="panel chat-panel">
-
-            <div
-                id="messages"
-                class="messages"
-            ></div>
-
-            <div class="chat-input">
-
-                <input
-                    id="chatInput"
-                    placeholder="پیامت رو بنویس..."
-                >
-
-                <button
-                    id="sendChat"
-                    class="primary-btn"
-                >
-                    ارسال
-                </button>
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- SUPPORT -->
-
-    <section
-        id="support"
-        class="page"
-    >
-
-        <div class="panel auth-panel">
-
-            <div class="section-heading">
-
-                <span>🎫</span>
-
-                <div>
-
-                    <h2>
-                        پشتیبانی
-                    </h2>
-
-                    <p>
-                        پیامت را ثبت کن.
-                    </p>
-
-                </div>
-
-            </div>
-
-            <input
-                id="supportSubject"
-                placeholder="موضوع"
-            >
-
-            <textarea
-                id="supportText"
-                placeholder="پیام"
-            ></textarea>
-
             <button
-                id="supportSend"
-                class="primary-btn full-btn"
+                id="dailyRewardButton"
+                class="primary-btn"
+                type="button"
             >
-                ارسال درخواست
+                دریافت ${DAILY_XP} XP
             </button>
 
-            <p
-                id="supportMsg"
-                class="form-message"
-            ></p>
+        `;
 
-        </div>
 
-    </section>
+        document
+            .getElementById(
+                "dailyRewardButton"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
 
-</main>
+                    this.claimDailyReward();
+                }
+            );
+    }
 
-<footer>
-    QuizDuo • نسخه آزمایشی
-</footer>
 
-<form
-    id="paymentSubmitForm"
-    class="hidden"
-    aria-hidden="true"
-></form>
+    claimDailyReward() {
 
-<iframe
-    id="paymentSubmitFrame"
-    name="paymentSubmitFrame"
-    class="hidden"
-    title="payment-submit"
-></iframe>
+        const key =
+            "quizduo_daily_xp_" +
+            todayKey();
 
-<script
-    type="module"
-    src="js/core/app.js"
-></script>
 
-</body>
-</html>
+        if (
+            localStorage.getItem(
+                key
+            ) === "1"
+        ) {
+            return;
+        }
+
+
+        addXP(
+            this.state,
+            DAILY_XP
+        );
+
+
+        localStorage.setItem(
+            key,
+            "1"
+        );
+
+
+        this.persist();
+
+        this.updateUI();
+    }
+
+
+    /* =====================================================
+       LEADERBOARD
+    ===================================================== */
+
+    renderLeaderboard() {
+
+        const body =
+            document.getElementById(
+                "leaderboardBody"
+            );
+
+
+        if (
+            !body
+        ) {
+            return;
+        }
+
+
+        const board =
+            getLeaderboard();
+
+
+        if (
+            !board.length
+        ) {
+
+            body.innerHTML = `
+
+                <tr>
+
+                    <td
+                        colspan="5"
+                        class="muted"
+                    >
+                        هنوز بازیکنی ثبت نشده است.
+                    </td>
+
+                </tr>
+
+            `;
+
+            return;
+        }
+
+
+        body.innerHTML =
+            board
+                .map(
+                    (
+                        item,
+                        index
+                    ) => `
+
+                        <tr>
+
+                            <td>
+                                ${index + 1}
+                            </td>
+
+                            <td>
+                                ${escapeHTML(
+                                    item.username
+                                )}
+                            </td>
+
+                            <td>
+                                ${item.xp}
+                            </td>
+
+                            <td>
+                                ${item.level}
+                            </td>
+
+                            <td>
+                                ${Math.max(
+                                    item.generalStage,
+                                    item.funStage
+                                )}
+                            </td>
+
+                        </tr>
+
+                    `
+                )
+                .join("");
+    }
+
+
+    /* =====================================================
+       CHAT
+    ===================================================== */
+
+    bindChat() {
+
+        document
+            .getElementById(
+                "sendChat"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.sendChat();
+                }
+            );
+
+
+        document
+            .getElementById(
+                "chatInput"
+            )
+            ?.addEventListener(
+                "keydown",
+                event => {
+
+                    if (
+                        event.key ===
+                        "Enter"
+                    ) {
+
+                        this.sendChat();
+                    }
+                }
+            );
+
+
+        this.renderChat();
+    }
+
+
+    sendChat() {
+
+        const input =
+            document.getElementById(
+                "chatInput"
+            );
+
+
+        const text =
+            input.value.trim();
+
+
+        if (
+            !text
+        ) {
+            return;
+        }
+
+
+        const messages =
+            this.getChatMessages();
+
+
+        messages.push({
+
+            username:
+                this.state.username ||
+                "مهمان",
+
+            text,
+
+            createdAt:
+                Date.now()
+
+        });
+
+
+        localStorage.setItem(
+            "quizduo_chat",
+            JSON.stringify(
+                messages.slice(
+                    -100
+                )
+            )
+        );
+
+
+        input.value =
+            "";
+
+
+        this.renderChat();
+    }
+
+
+    getChatMessages() {
+
+        try {
+
+            const messages =
+                JSON.parse(
+                    localStorage.getItem(
+                        "quizduo_chat"
+                    ) ||
+                    "[]"
+                );
+
+
+            return Array.isArray(
+                messages
+            )
+                ? messages
+                : [];
+
+        } catch {
+
+            return [];
+        }
+    }
+
+
+    renderChat() {
+
+        const container =
+            document.getElementById(
+                "messages"
+            );
+
+
+        if (
+            !container
+        ) {
+            return;
+        }
+
+
+        const messages =
+            this.getChatMessages();
+
+
+        container.innerHTML =
+            messages
+                .map(
+                    message => `
+
+                        <div class="message">
+
+                            <b>
+                                ${escapeHTML(
+                                    message.username
+                                )}
+                            </b>
+
+                            <div>
+                                ${escapeHTML(
+                                    message.text
+                                )}
+                            </div>
+
+                        </div>
+
+                    `
+                )
+                .join("");
+
+
+        container.scrollTop =
+            container.scrollHeight;
+    }
+
+
+    /* =====================================================
+       SUPPORT
+    ===================================================== */
+
+    bindSupport() {
+
+        document
+            .getElementById(
+                "supportSend"
+            )
+            ?.addEventListener(
+                "click",
+                () => {
+
+                    this.sendSupport();
+                }
+            );
+    }
+
+
+    sendSupport() {
+
+        const subject =
+            document
+                .getElementById(
+                    "supportSubject"
+                )
+                .value
+                .trim();
+
+
+        const text =
+            document
+                .getElementById(
+                    "supportText"
+                )
+                .value
+                .trim();
+
+
+        const message =
+            document.getElementById(
+                "supportMsg"
+            );
+
+
+        if (
+            !subject ||
+            !text
+        ) {
+
+            message.textContent =
+                "موضوع و پیام را کامل کن.";
+
+            return;
+        }
+
+
+        const requests =
+            JSON.parse(
+                localStorage.getItem(
+                    "quizduo_support"
+                ) ||
+                "[]"
+            );
+
+
+        requests.push({
+
+            username:
+                this.state.username,
+
+            subject,
+
+            text,
+
+            createdAt:
+                Date.now()
+
+        });
+
+
+        localStorage.setItem(
+            "quizduo_support",
+            JSON.stringify(
+                requests
+            )
+        );
+
+
+        document
+            .getElementById(
+                "supportSubject"
+            )
+            .value =
+            "";
+
+
+        document
+            .getElementById(
+                "supportText"
+            )
+            .value =
+            "";
+
+
+        message.textContent =
+            "درخواست پشتیبانی ثبت شد.";
+    }
+}
+
+
+/* =========================================================
+   START
+========================================================= */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        window.quizDuo =
+            new QuizDuoApp();
+
+    }
+);
