@@ -91,7 +91,8 @@
             border:1px solid #e1e6ef;
             border-radius:16px;
             padding:18px;
-            margin:12px 0
+            margin:12px 0;
+            background:#fff
         }
 
         .actions{
@@ -106,7 +107,8 @@
             padding:5px 9px;
             border-radius:999px;
             font-size:12px;
-            font-weight:700
+            font-weight:700;
+            margin-right:7px
         }
 
         .pending{
@@ -124,8 +126,40 @@
             color:#a1263a
         }
 
+        .info-grid{
+            display:grid;
+            grid-template-columns:repeat(2,1fr);
+            gap:8px;
+            margin-top:12px
+        }
+
+        .info-item{
+            padding:10px 12px;
+            border-radius:10px;
+            background:#f5f7fb
+        }
+
+        .info-item span{
+            display:block;
+            color:#69758a;
+            font-size:12px;
+            margin-bottom:3px
+        }
+
         a{
             color:#5267d8
+        }
+
+        @media(max-width:650px){
+
+            body{
+                padding:12px
+            }
+
+            .info-grid{
+                grid-template-columns:1fr
+            }
+
         }
 
     </style>
@@ -181,8 +215,7 @@
             </h1>
 
             <p class="muted">
-                هر درخواست را بعد از بررسی فیش
-                تأیید یا رد کن.
+                فیش را بررسی کن و سپس درخواست را تأیید یا رد کن.
             </p>
 
             <button
@@ -211,7 +244,9 @@ function login(){
 
     const password =
         document
-            .getElementById('password')
+            .getElementById(
+                'password'
+            )
             .value;
 
 
@@ -224,12 +259,16 @@ function login(){
                     receivedToken;
 
                 document
-                    .getElementById('login')
+                    .getElementById(
+                        'login'
+                    )
                     .classList
                     .add('hidden');
 
                 document
-                    .getElementById('panel')
+                    .getElementById(
+                        'panel'
+                    )
                     .classList
                     .remove('hidden');
 
@@ -241,13 +280,17 @@ function login(){
             error => {
 
                 document
-                    .getElementById('loginMsg')
+                    .getElementById(
+                        'loginMsg'
+                    )
                     .textContent =
                     error.message;
             }
         )
 
-        .adminLogin(password);
+        .adminLogin(
+            password
+        );
 }
 
 
@@ -261,10 +304,14 @@ function loadRequests(){
 
         .withFailureHandler(
             error =>
-                alert(error.message)
+                alert(
+                    error.message
+                )
         )
 
-        .adminList(token);
+        .adminList(
+            token
+        );
 }
 
 
@@ -276,7 +323,9 @@ function render(items){
         );
 
 
-    if (!items.length) {
+    if (
+        !items.length
+    ) {
 
         box.innerHTML =
             '<div class="card">' +
@@ -288,7 +337,9 @@ function render(items){
 
 
     box.innerHTML =
+
         items
+
             .map(item => `
 
                 <div class="req">
@@ -296,11 +347,15 @@ function render(items){
                     <div>
 
                         <b>
-                            ${esc(item.requestId)}
+                            ${esc(
+                                item.requestId
+                            )}
                         </b>
 
                         <span
-                            class="status ${item.status}"
+                            class="status ${esc(
+                                item.status
+                            )}"
                         >
                             ${statusText(
                                 item.status
@@ -309,42 +364,88 @@ function render(items){
 
                     </div>
 
+
+                    <div class="info-grid">
+
+                        <div class="info-item">
+
+                            <span>
+                                نام کاربری
+                            </span>
+
+                            <b>
+                                ${esc(
+                                    item.username
+                                )}
+                            </b>
+
+                        </div>
+
+
+                        <div class="info-item">
+
+                            <span>
+                                شماره تلفن
+                            </span>
+
+                            <b dir="ltr">
+                                ${esc(
+                                    item.phone
+                                )}
+                            </b>
+
+                        </div>
+
+
+                        <div class="info-item">
+
+                            <span>
+                                اشتراک
+                            </span>
+
+                            <b>
+                                ${esc(
+                                    item.planName
+                                )}
+                            </b>
+
+                        </div>
+
+
+                        <div class="info-item">
+
+                            <span>
+                                مبلغ
+                            </span>
+
+                            <b>
+                                ${Number(
+                                    item.amount
+                                ).toLocaleString(
+                                    'fa-IR'
+                                )}
+                                تومان
+                            </b>
+
+                        </div>
+
+                    </div>
+
+
                     <p>
-                        <b>
-                            کاربر:
-                        </b>
 
-                        ${esc(item.username)}
-                    </p>
-
-                    <p>
-                        <b>
-                            اشتراک:
-                        </b>
-
-                        ${esc(item.planName)}
-                    </p>
-
-                    <p>
-                        <b>
-                            مبلغ:
-                        </b>
-
-                        ${Number(
-                            item.amount
-                        ).toLocaleString('fa-IR')}
-                        تومان
-                    </p>
-
-                    <p>
                         <b>
                             زمان:
                         </b>
 
                         ${new Date(
                             item.createdAt
-                        ).toLocaleString('fa-IR')}
+                        ).toLocaleString(
+                            'fa-IR'
+                        )}
+
                     </p>
+
 
                     <p>
 
@@ -353,54 +454,63 @@ function render(items){
                                 item.receiptUrl
                             )}"
                             target="_blank"
+                            rel="noopener"
                         >
-                            مشاهده فیش
+                            📎 مشاهده فیش
                         </a>
 
                     </p>
+
 
                     ${
                         item.status ===
                         'pending'
 
-                            ? `
+                        ? `
 
-                                <div class="actions">
+                            <div class="actions">
 
-                                    <button
-                                        class="approve"
-                                        onclick="
-                                            setStatus(
-                                                '${esc(item.requestId)}',
-                                                'approved'
-                                            )
-                                        "
-                                    >
-                                        ✓ تأیید پرداخت
-                                    </button>
+                                <button
+                                    class="approve"
+                                    onclick="
+                                        setStatus(
+                                            '${esc(
+                                                item.requestId
+                                            )}',
+                                            'approved'
+                                        )
+                                    "
+                                >
+                                    ✓ تأیید پرداخت
+                                </button>
 
-                                    <button
-                                        class="reject"
-                                        onclick="
-                                            setStatus(
-                                                '${esc(item.requestId)}',
-                                                'rejected'
-                                            )
-                                        "
-                                    >
-                                        ✕ رد پرداخت
-                                    </button>
 
-                                </div>
+                                <button
+                                    class="reject"
+                                    onclick="
+                                        setStatus(
+                                            '${esc(
+                                                item.requestId
+                                            )}',
+                                            'rejected'
+                                        )
+                                    "
+                                >
+                                    ✕ رد پرداخت
+                                </button>
 
-                            `
+                            </div>
 
-                            : ''
+                        `
+
+                        : ''
+
                     }
 
                 </div>
 
             `)
+
             .join('');
 }
 
@@ -410,6 +520,21 @@ function setStatus(
     status
 ){
 
+    const message =
+        status === 'approved'
+            ? 'آیا از تأیید این پرداخت مطمئن هستید؟'
+            : 'آیا می‌خواهید این پرداخت را رد کنید؟';
+
+
+    if (
+        !confirm(
+            message
+        )
+    ) {
+        return;
+    }
+
+
     google.script.run
 
         .withSuccessHandler(
@@ -418,7 +543,9 @@ function setStatus(
 
         .withFailureHandler(
             error =>
-                alert(error.message)
+                alert(
+                    error.message
+                )
         )
 
         .adminSetStatus(
@@ -429,36 +556,58 @@ function setStatus(
 }
 
 
-function statusText(status){
+function statusText(
+    status
+){
 
     if (
         status === 'approved'
     ) {
+
         return 'تأیید شده';
     }
+
 
     if (
         status === 'rejected'
     ) {
+
         return 'رد شده';
     }
+
 
     return 'در انتظار بررسی';
 }
 
 
-function esc(value){
+function esc(
+    value
+){
 
-    return String(value)
+    return String(
+        value
+    )
+
         .replace(
             /[&<>'"]/g,
             character =>
                 ({
-                    '&':'&amp;',
-                    '<':'&lt;',
-                    '>':'&gt;',
-                    "'":'&#39;',
-                    '"':'&quot;'
+
+                    '&':
+                        '&amp;',
+
+                    '<':
+                        '&lt;',
+
+                    '>':
+                        '&gt;',
+
+                    "'":
+                        '&#39;',
+
+                    '"':
+                        '&quot;'
+
                 }[character])
         );
 }
