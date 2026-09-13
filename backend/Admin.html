@@ -1,0 +1,470 @@
+<!doctype html>
+
+<html
+    lang="fa"
+    dir="rtl"
+>
+
+<head>
+
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width,initial-scale=1"
+    >
+
+    <title>
+        QuizDuo Admin
+    </title>
+
+    <style>
+
+        body{
+            font-family:Arial,sans-serif;
+            background:#f5f7fb;
+            color:#172033;
+            margin:0;
+            padding:24px
+        }
+
+        .wrap{
+            max-width:1100px;
+            margin:auto
+        }
+
+        .card{
+            background:#fff;
+            border:1px solid #dfe5ef;
+            border-radius:18px;
+            padding:22px;
+            margin-bottom:18px;
+            box-shadow:0 10px 30px #18243a12
+        }
+
+        input,
+        button{
+            font:inherit
+        }
+
+        input{
+            padding:12px;
+            border:1px solid #ccd5e3;
+            border-radius:10px;
+            width:100%;
+            box-sizing:border-box;
+            margin:8px 0 12px
+        }
+
+        button{
+            border:0;
+            border-radius:10px;
+            padding:11px 16px;
+            cursor:pointer;
+            font-weight:700
+        }
+
+        .primary{
+            background:#20a99d;
+            color:#fff
+        }
+
+        .approve{
+            background:#168a5b;
+            color:#fff
+        }
+
+        .reject{
+            background:#d94a5b;
+            color:#fff
+        }
+
+        .muted{
+            color:#69758a
+        }
+
+        .hidden{
+            display:none
+        }
+
+        .req{
+            border:1px solid #e1e6ef;
+            border-radius:16px;
+            padding:18px;
+            margin:12px 0
+        }
+
+        .actions{
+            display:flex;
+            gap:8px;
+            flex-wrap:wrap;
+            margin-top:14px
+        }
+
+        .status{
+            display:inline-block;
+            padding:5px 9px;
+            border-radius:999px;
+            font-size:12px;
+            font-weight:700
+        }
+
+        .pending{
+            background:#fff3cd;
+            color:#8a6500
+        }
+
+        .approved{
+            background:#d9f7e8;
+            color:#087443
+        }
+
+        .rejected{
+            background:#fde0e5;
+            color:#a1263a
+        }
+
+        a{
+            color:#5267d8
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="wrap">
+
+
+    <div
+        id="login"
+        class="card"
+    >
+
+        <h1>
+            پنل مدیر QuizDuo
+        </h1>
+
+        <p class="muted">
+            برای بررسی و تأیید پرداخت‌ها وارد شوید.
+        </p>
+
+        <input
+            id="password"
+            type="password"
+            placeholder="رمز مدیر"
+        >
+
+        <button
+            class="primary"
+            onclick="login()"
+        >
+            ورود
+        </button>
+
+        <p id="loginMsg"></p>
+
+    </div>
+
+
+    <div
+        id="panel"
+        class="hidden"
+    >
+
+        <div class="card">
+
+            <h1>
+                درخواست‌های اشتراک
+            </h1>
+
+            <p class="muted">
+                هر درخواست را بعد از بررسی فیش
+                تأیید یا رد کن.
+            </p>
+
+            <button
+                class="primary"
+                onclick="loadRequests()"
+            >
+                به‌روزرسانی
+            </button>
+
+        </div>
+
+
+        <div id="requests"></div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+let token = '';
+
+
+function login(){
+
+    const password =
+        document
+            .getElementById('password')
+            .value;
+
+
+    google.script.run
+
+        .withSuccessHandler(
+            receivedToken => {
+
+                token =
+                    receivedToken;
+
+                document
+                    .getElementById('login')
+                    .classList
+                    .add('hidden');
+
+                document
+                    .getElementById('panel')
+                    .classList
+                    .remove('hidden');
+
+                loadRequests();
+            }
+        )
+
+        .withFailureHandler(
+            error => {
+
+                document
+                    .getElementById('loginMsg')
+                    .textContent =
+                    error.message;
+            }
+        )
+
+        .adminLogin(password);
+}
+
+
+function loadRequests(){
+
+    google.script.run
+
+        .withSuccessHandler(
+            render
+        )
+
+        .withFailureHandler(
+            error =>
+                alert(error.message)
+        )
+
+        .adminList(token);
+}
+
+
+function render(items){
+
+    const box =
+        document.getElementById(
+            'requests'
+        );
+
+
+    if (!items.length) {
+
+        box.innerHTML =
+            '<div class="card">' +
+            'درخواستی ثبت نشده است.' +
+            '</div>';
+
+        return;
+    }
+
+
+    box.innerHTML =
+        items
+            .map(item => `
+
+                <div class="req">
+
+                    <div>
+
+                        <b>
+                            ${esc(item.requestId)}
+                        </b>
+
+                        <span
+                            class="status ${item.status}"
+                        >
+                            ${statusText(
+                                item.status
+                            )}
+                        </span>
+
+                    </div>
+
+                    <p>
+                        <b>
+                            کاربر:
+                        </b>
+
+                        ${esc(item.username)}
+                    </p>
+
+                    <p>
+                        <b>
+                            اشتراک:
+                        </b>
+
+                        ${esc(item.planName)}
+                    </p>
+
+                    <p>
+                        <b>
+                            مبلغ:
+                        </b>
+
+                        ${Number(
+                            item.amount
+                        ).toLocaleString('fa-IR')}
+                        تومان
+                    </p>
+
+                    <p>
+                        <b>
+                            زمان:
+                        </b>
+
+                        ${new Date(
+                            item.createdAt
+                        ).toLocaleString('fa-IR')}
+                    </p>
+
+                    <p>
+
+                        <a
+                            href="${esc(
+                                item.receiptUrl
+                            )}"
+                            target="_blank"
+                        >
+                            مشاهده فیش
+                        </a>
+
+                    </p>
+
+                    ${
+                        item.status ===
+                        'pending'
+
+                            ? `
+
+                                <div class="actions">
+
+                                    <button
+                                        class="approve"
+                                        onclick="
+                                            setStatus(
+                                                '${esc(item.requestId)}',
+                                                'approved'
+                                            )
+                                        "
+                                    >
+                                        ✓ تأیید پرداخت
+                                    </button>
+
+                                    <button
+                                        class="reject"
+                                        onclick="
+                                            setStatus(
+                                                '${esc(item.requestId)}',
+                                                'rejected'
+                                            )
+                                        "
+                                    >
+                                        ✕ رد پرداخت
+                                    </button>
+
+                                </div>
+
+                            `
+
+                            : ''
+                    }
+
+                </div>
+
+            `)
+            .join('');
+}
+
+
+function setStatus(
+    requestId,
+    status
+){
+
+    google.script.run
+
+        .withSuccessHandler(
+            loadRequests
+        )
+
+        .withFailureHandler(
+            error =>
+                alert(error.message)
+        )
+
+        .adminSetStatus(
+            token,
+            requestId,
+            status
+        );
+}
+
+
+function statusText(status){
+
+    if (
+        status === 'approved'
+    ) {
+        return 'تأیید شده';
+    }
+
+    if (
+        status === 'rejected'
+    ) {
+        return 'رد شده';
+    }
+
+    return 'در انتظار بررسی';
+}
+
+
+function esc(value){
+
+    return String(value)
+        .replace(
+            /[&<>'"]/g,
+            character =>
+                ({
+                    '&':'&amp;',
+                    '<':'&lt;',
+                    '>':'&gt;',
+                    "'":'&#39;',
+                    '"':'&quot;'
+                }[character])
+        );
+}
+
+</script>
+
+</body>
+
+</html>
