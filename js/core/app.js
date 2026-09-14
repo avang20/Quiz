@@ -1,4 +1,3 @@
-
 import {
     createDefaultState,
     getUnlockedStage,
@@ -10,7 +9,6 @@ import {
     saveState,
     getCurrentUser,
     setCurrentUser,
-    logoutUser,
     getUsers,
     saveUsers,
     getLeaderboard,
@@ -22,11 +20,13 @@ import {
     escapeHTML
 } from "./utils.js";
 
-import { QuizEngine } from "./quiz.js";
+import {
+    QuizEngine
+} from "./quiz.js";
 
 
 const APPS_SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFkK02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXIkvZyuxzJiZQ/exec";
+    "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFkK02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXkIvzVyuxzJiZQ/exec";
 
 const ACCOUNT_NUMBER =
     "5022291615132519";
@@ -109,23 +109,25 @@ function normalizeQuestionForUI(question) {
                 : [];
     }
 
-    options = options.map(option => {
+    options =
+        options.map(option => {
 
-        if (
-            option &&
-            typeof option === "object"
-        ) {
-            return (
-                option.text ??
-                option.label ??
-                option.value ??
-                option.answer ??
-                ""
-            );
-        }
+            if (
+                option &&
+                typeof option === "object"
+            ) {
 
-        return option;
-    });
+                return (
+                    option.text ??
+                    option.label ??
+                    option.value ??
+                    option.answer ??
+                    ""
+                );
+            }
+
+            return option;
+        });
 
     return {
         ...question,
@@ -165,14 +167,19 @@ class App {
         this.authRegister = false;
 
         this.selectedPlan = null;
+
         this.discountPercent = 0;
+
         this.testFixedAmount = null;
+
         this.paymentFile = null;
 
-        this.userUpdates = {
+        this.lastServerUpdates = {
             payments: [],
             support: []
         };
+
+        this.serverSyncTimer = null;
     }
 
 
@@ -189,7 +196,9 @@ class App {
             this.state.username !==
             "بازیکن مهمان"
         ) {
-            updateLeaderboard(this.state);
+            updateLeaderboard(
+                this.state
+            );
         }
 
         this.renderProfile();
@@ -246,17 +255,13 @@ class App {
 
         this.go("home");
 
-        if (
-            this.state.username !==
-            "بازیکن مهمان"
-        ) {
-            this.loadUserUpdates();
+        this.syncServerUpdates();
 
-            setInterval(
-                () => this.loadUserUpdates(),
-                15000
+        this.serverSyncTimer =
+            window.setInterval(
+                () => this.syncServerUpdates(),
+                20000
             );
-        }
     }
 
 
@@ -264,8 +269,9 @@ class App {
 
         document
             .querySelectorAll(".page")
-            .forEach(p =>
-                p.classList.remove("active")
+            .forEach(
+                p =>
+                    p.classList.remove("active")
             );
 
         const target =
@@ -280,22 +286,28 @@ class App {
             this.renderStages();
         }
 
+
         if (page === "leaderboard") {
             this.renderLeaderboard();
         }
 
+
         if (page === "profile") {
             this.renderProfile();
-            this.loadUserUpdates();
         }
+
 
         if (page === "subscription") {
+
             this.renderPaymentState();
-            this.loadUserUpdates();
+
+            this.syncServerUpdates();
         }
 
+
         if (page === "support") {
-            this.loadUserUpdates();
+
+            this.syncServerUpdates();
         }
 
 
@@ -313,7 +325,9 @@ class App {
         );
 
         const theme =
-            document.body.classList.contains("dark")
+            document.body.classList.contains(
+                "dark"
+            )
                 ? "dark"
                 : "light";
 
@@ -435,19 +449,23 @@ class App {
             name.length < 2 ||
             password.length < 4
         ) {
+
             msg.textContent =
                 "نام کاربری و رمز عبور معتبر وارد کنید.";
+
             return;
         }
 
 
-        const users = getUsers();
+        const users =
+            getUsers();
 
         const existing =
             users.find(
                 u =>
-                    String(u.username)
-                        .toLowerCase() ===
+                    String(
+                        u.username
+                    ).toLowerCase() ===
                     name.toLowerCase()
             );
 
@@ -455,15 +473,21 @@ class App {
         if (this.authRegister) {
 
             if (existing) {
+
                 msg.textContent =
                     "این نام کاربری قبلاً استفاده شده است.";
+
                 return;
             }
 
 
-            if (!/^09\d{9}$/.test(phone)) {
+            if (
+                !/^09\d{9}$/.test(phone)
+            ) {
+
                 msg.textContent =
                     "شماره تماس را به شکل 09123456789 وارد کنید.";
+
                 return;
             }
 
@@ -493,14 +517,18 @@ class App {
             msg.textContent =
                 "حساب با موفقیت ساخته شد.";
 
-        } else {
+        }
+
+        else {
 
             if (
                 !existing ||
                 existing.password !== password
             ) {
+
                 msg.textContent =
                     "نام کاربری یا رمز عبور اشتباه است.";
+
                 return;
             }
 
@@ -527,8 +555,11 @@ class App {
 
         setTimeout(
             () => {
+
                 this.go("home");
-                this.loadUserUpdates();
+
+                this.syncServerUpdates();
+
             },
             450
         );
@@ -629,10 +660,7 @@ class App {
                     );
 
                 const questions =
-                    this.quiz.getStageQuestions(
-                        i
-                    );
-
+                    this.quiz.getStageQuestions(i);
 
                 const card =
                     document.createElement(
@@ -640,16 +668,9 @@ class App {
                     );
 
                 card.className =
-                    `stage-card panel ${
-                        available
-                            ? ""
-                            : "locked"
-                    } ${
-                        completed
-                            ? "completed"
-                            : ""
-                    }`;
-
+                    `stage-card panel
+                    ${available ? "" : "locked"}
+                    ${completed ? "completed" : ""}`;
 
                 card.innerHTML =
                     `<div class="stage-number">
@@ -692,12 +713,13 @@ class App {
                 box.appendChild(card);
             }
 
-
             document
                 .getElementById("quizBox")
                 .classList.add("hidden");
 
-        } catch (error) {
+        }
+
+        catch (error) {
 
             box.innerHTML =
                 `<div class="panel error">
@@ -804,9 +826,12 @@ class App {
                 <span>
                     مرحله ${this.quiz.currentStage}
                 </span>
+
                 <span>
-                    سوال ${this.quiz.currentQuestion + 1}
-                    از ${this.quiz.getQuestionCount()}
+                    سوال
+                    ${this.quiz.currentQuestion + 1}
+                    از
+                    ${this.quiz.getQuestionCount()}
                 </span>
             </div>
 
@@ -817,18 +842,22 @@ class App {
             </h3>
 
             <div class="options">
+
                 ${
-                    options.map(
-                        (option, index) =>
-                            `<button
-                                class="option"
-                                data-i="${index}">
-                                ${escapeHTML(
-                                    String(option)
-                                )}
-                            </button>`
-                    ).join("")
+                    options
+                        .map(
+                            (option, index) =>
+                                `<button
+                                    class="option"
+                                    data-i="${index}">
+                                    ${escapeHTML(
+                                        String(option)
+                                    )}
+                                </button>`
+                        )
+                        .join("")
                 }
+
             </div>
 
             <div
@@ -838,7 +867,9 @@ class App {
 
 
         box
-            .querySelectorAll(".option")
+            .querySelectorAll(
+                ".option"
+            )
             .forEach(btn => {
 
                 btn.addEventListener(
@@ -871,7 +902,9 @@ class App {
             );
 
         box
-            .querySelectorAll(".option")
+            .querySelectorAll(
+                ".option"
+            )
             .forEach(
                 button =>
                     button.disabled = true
@@ -888,10 +921,10 @@ class App {
             result.correct
                 ? `<div class="success">
                     ✓ پاسخ درست بود!
-                  </div>`
+                   </div>`
                 : `<div class="error">
                     ✗ پاسخ درست نبود.
-                  </div>`;
+                   </div>`;
 
 
         if (result.explanation) {
@@ -916,7 +949,8 @@ class App {
                                 ? `+${result.earnedXP} XP`
                                 : ""
                         }
-                      </div>`
+                       </div>`
+
                     : `<div class="result-bad">
                         این مرحله را رد نکردی.
                         ${
@@ -924,7 +958,7 @@ class App {
                                 ? "یک قلب کم شد."
                                 : ""
                         }
-                      </div>`;
+                       </div>`;
 
 
             feedback.innerHTML +=
@@ -936,11 +970,16 @@ class App {
 
 
             document
-                .getElementById("quizNext")
+                .getElementById(
+                    "quizNext"
+                )
                 .onclick =
-                () => this.renderStages();
+                () =>
+                    this.renderStages();
 
-        } else {
+        }
+
+        else {
 
             feedback.innerHTML +=
                 `<button
@@ -951,7 +990,9 @@ class App {
 
 
             document
-                .getElementById("quizNext")
+                .getElementById(
+                    "quizNext"
+                )
                 .onclick =
                 () =>
                     this.renderQuestion(
@@ -1061,15 +1102,13 @@ class App {
         const rows =
             board.length
                 ? board
-                : [
-                    {
-                        username:
-                            "هنوز داده‌ای وجود ندارد",
-                        xp: 0,
-                        generalStage: 1,
-                        funStage: 1
-                    }
-                ];
+                : [{
+                    username:
+                        "هنوز داده‌ای وجود ندارد",
+                    xp: 0,
+                    generalStage: 1,
+                    funStage: 1
+                }];
 
 
         body.innerHTML =
@@ -1175,8 +1214,7 @@ class App {
             )
             .addEventListener(
                 "click",
-                () =>
-                    this.submitPayment()
+                () => this.submitPayment()
             );
     }
 
@@ -1191,6 +1229,7 @@ class App {
         this.selectedPlan = id;
 
         this.discountPercent = 0;
+
         this.testFixedAmount = null;
 
 
@@ -1275,9 +1314,10 @@ class App {
                 .toUpperCase();
 
         const msg =
-            document.getElementById(
-                "discountMessage"
-            );
+            document
+                .getElementById(
+                    "discountMessage"
+                );
 
 
         if (!this.selectedPlan) {
@@ -1288,6 +1328,7 @@ class App {
         if (!code) {
 
             this.testFixedAmount = null;
+
             this.discountPercent = 0;
 
             msg.textContent =
@@ -1326,10 +1367,12 @@ class App {
                     APPS_SCRIPT_URL,
                     {
                         method: "POST",
+
                         headers: {
                             "Content-Type":
                                 "text/plain;charset=utf-8"
                         },
+
                         body:
                             JSON.stringify({
                                 action:
@@ -1362,20 +1405,26 @@ class App {
                 msg.textContent =
                     "کد تست خصوصی تأیید شد؛ مبلغ نهایی ۱۰۰٬۰۰۰ تومان است.";
 
-            } else {
+            }
+
+            else {
 
                 this.testFixedAmount = null;
+
                 this.discountPercent = 0;
 
                 msg.textContent =
                     "کد تخفیف معتبر نیست.";
             }
 
-        } catch (error) {
+        }
+
+        catch (error) {
 
             console.error(error);
 
             this.testFixedAmount = null;
+
             this.discountPercent = 0;
 
             msg.textContent =
@@ -1393,12 +1442,10 @@ class App {
             return;
         }
 
-
         const base =
             subscriptionPlans[
                 this.selectedPlan
             ].price;
-
 
         const final =
             this.testFixedAmount ??
@@ -1409,7 +1456,6 @@ class App {
                     this.discountPercent / 100
                 )
             );
-
 
         document
             .getElementById(
@@ -1431,9 +1477,10 @@ class App {
     async submitPayment() {
 
         const msg =
-            document.getElementById(
-                "paymentMessage"
-            );
+            document
+                .getElementById(
+                    "paymentMessage"
+                );
 
 
         if (
@@ -1467,9 +1514,8 @@ class App {
 
 
         if (
-            !this.paymentFile.type.startsWith(
-                "image/"
-            )
+            !this.paymentFile.type
+                .startsWith("image/")
         ) {
 
             msg.textContent =
@@ -1502,12 +1548,10 @@ class App {
                     this.paymentFile
                 );
 
-
             const plan =
                 subscriptionPlans[
                     this.selectedPlan
                 ];
-
 
             const enteredCode =
                 document
@@ -1518,14 +1562,14 @@ class App {
                     .trim()
                     .toUpperCase();
 
-
             const normalAmount =
                 this.testFixedAmount ??
                 Math.round(
                     plan.price *
                     (
                         1 -
-                        this.discountPercent / 100
+                        this.discountPercent /
+                        100
                     )
                 );
 
@@ -1569,55 +1613,27 @@ class App {
             };
 
 
-            const response =
-                await fetch(
-                    APPS_SCRIPT_URL,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type":
-                                "text/plain;charset=utf-8"
-                        },
-                        body:
-                            JSON.stringify(
-                                payload
-                            )
-                    }
+            const data =
+                await this.serverRequest(
+                    payload
                 );
 
 
-            const text =
-                await response.text();
-
-
-            let data = null;
-
-            try {
-                data =
-                    JSON.parse(text);
-            } catch {
-                // پاسخ غیر JSON
-            }
-
-
-            if (
-                !response.ok ||
-                (
-                    data &&
-                    data.success === false
-                )
-            ) {
+            if (!data.success) {
 
                 throw new Error(
-                    data?.message ||
+                    data.message ||
                     "ارسال ناموفق بود."
                 );
             }
 
 
             msg.textContent =
-                data?.message ||
+                data.message ||
                 "فیش با موفقیت برای بررسی ارسال شد.";
+
+
+            this.syncServerUpdates();
 
 
             document
@@ -1637,20 +1653,18 @@ class App {
 
             this.paymentFile = null;
 
+        }
 
-            setTimeout(
-                () =>
-                    this.loadUserUpdates(),
-                1000
-            );
-
-        } catch (error) {
+        catch (error) {
 
             console.error(error);
 
             msg.textContent =
-                error.message ||
-                "ارسال فیش انجام نشد.";
+                error.message &&
+                error.message !==
+                    "Failed to fetch"
+                    ? error.message
+                    : "ارسال فیش انجام نشد. اتصال Google Apps Script را بررسی کنید.";
         }
     }
 
@@ -1685,8 +1699,7 @@ class App {
                         resolve(
                             String(
                                 reader.result
-                            ).split(",")[1] ||
-                            ""
+                            ).split(",")[1] || ""
                         );
 
                 reader.onerror =
@@ -1703,7 +1716,6 @@ class App {
     initChat() {
 
         this.loadChat();
-
 
         document
             .getElementById(
@@ -1735,7 +1747,9 @@ class App {
                     arr.push({
                         username:
                             this.state.username,
+
                         text,
+
                         date:
                             Date.now()
                     });
@@ -1765,16 +1779,11 @@ class App {
             );
 
 
-        const messages =
-            document.getElementById(
+        document
+            .getElementById(
                 "messages"
-            );
-
-
-        if (!messages) return;
-
-
-        messages.innerHTML =
+            )
+            .innerHTML =
             arr
                 .map(
                     message =>
@@ -1797,25 +1806,154 @@ class App {
 
     initSupport() {
 
-        const button =
-            document.getElementById(
+        document
+            .getElementById(
                 "supportSend"
+            )
+            .addEventListener(
+                "click",
+                () => this.submitSupport()
             );
 
-        if (!button) return;
-
-
-        button.addEventListener(
-            "click",
-            () => this.sendSupport()
-        );
-
-
-        this.renderSupportUpdates();
+        this.ensureUserUpdatesPanel();
     }
 
 
-    async sendSupport() {
+    ensureUserUpdatesPanel() {
+
+        const supportPanel =
+            document.querySelector(
+                "#support .panel"
+            );
+
+        const subscriptionPanel =
+            document.getElementById(
+                "subscription"
+            );
+
+
+        if (!supportPanel) {
+            return;
+        }
+
+
+        if (
+            !document.getElementById(
+                "userUpdatesPanel"
+            )
+        ) {
+
+            const panel =
+                document.createElement(
+                    "div"
+                );
+
+            panel.id =
+                "userUpdatesPanel";
+
+            panel.className =
+                "panel user-updates-panel";
+
+
+            panel.innerHTML =
+                `<div class="section-heading">
+
+                    <div>
+                        <span class="eyebrow">
+                            اعلان‌ها
+                        </span>
+
+                        <h3>
+                            وضعیت درخواست‌ها
+                        </h3>
+                    </div>
+
+                    <button
+                        id="refreshUserUpdates"
+                        class="secondary">
+                        به‌روزرسانی
+                    </button>
+
+                </div>
+
+                <div id="userUpdatesContent">
+                    <p class="message">
+                        برای مشاهده آخرین وضعیت،
+                        وارد حساب شوید.
+                    </p>
+                </div>`;
+
+
+            supportPanel.parentNode
+                .insertBefore(
+                    panel,
+                    supportPanel
+                );
+
+
+            document
+                .getElementById(
+                    "refreshUserUpdates"
+                )
+                ?.addEventListener(
+                    "click",
+                    () =>
+                        this.syncServerUpdates()
+                );
+        }
+
+
+        if (
+            subscriptionPanel &&
+            !document.getElementById(
+                "subscriptionUserUpdates"
+            )
+        ) {
+
+            const panel =
+                document.createElement(
+                    "div"
+                );
+
+            panel.id =
+                "subscriptionUserUpdates";
+
+            panel.className =
+                "panel user-updates-panel";
+
+
+            panel.innerHTML =
+                `<div class="section-heading">
+
+                    <div>
+                        <span class="eyebrow">
+                            اعلان‌های اشتراک
+                        </span>
+
+                        <h3>
+                            آخرین وضعیت پرداخت
+                        </h3>
+                    </div>
+
+                </div>
+
+                <div id="subscriptionUpdatesContent">
+                    <p class="message">
+                        در حال بررسی...
+                    </p>
+                </div>`;
+
+
+            subscriptionPanel
+                .insertBefore(
+                    panel,
+                    subscriptionPanel.firstChild
+                );
+        }
+    }
+
+
+    async submitSupport() {
 
         const subject =
             document
@@ -1834,9 +1972,10 @@ class App {
                 .trim();
 
         const msg =
-            document.getElementById(
-                "supportMsg"
-            );
+            document
+                .getElementById(
+                    "supportMsg"
+                );
 
 
         if (
@@ -1845,7 +1984,7 @@ class App {
         ) {
 
             msg.textContent =
-                "برای ارسال درخواست پشتیبانی ابتدا وارد حساب شوید.";
+                "ابتدا وارد حساب شوید یا ثبت‌نام کنید.";
 
             return;
         }
@@ -1866,38 +2005,25 @@ class App {
 
         try {
 
-            const response =
-                await fetch(
-                    APPS_SCRIPT_URL,
+            const data =
+                await this.jsonpRequest(
+                    "support",
                     {
-                        method: "POST",
-                        headers: {
-                            "Content-Type":
-                                "text/plain;charset=utf-8"
-                        },
-                        body:
-                            JSON.stringify({
-                                action:
-                                    "support",
-                                username:
-                                    this.state.username,
-                                phone:
-                                    this.getRegisteredPhone(),
-                                subject,
-                                text
-                            })
+                        username:
+                            this.state.username,
+
+                        phone:
+                            this.getRegisteredPhone(),
+
+                        subject,
+
+                        message:
+                            text
                     }
                 );
 
 
-            const data =
-                await response.json();
-
-
-            if (
-                !response.ok ||
-                data.success === false
-            ) {
+            if (!data.success) {
 
                 throw new Error(
                     data.message ||
@@ -1906,16 +2032,12 @@ class App {
             }
 
 
-            msg.textContent =
-                data.message ||
-                "درخواست پشتیبانی با موفقیت ارسال شد.";
-
-
             document
                 .getElementById(
                     "supportSubject"
                 )
                 .value = "";
+
 
             document
                 .getElementById(
@@ -1924,269 +2046,614 @@ class App {
                 .value = "";
 
 
-            await this.loadUserUpdates();
+            msg.textContent =
+                data.message ||
+                "درخواست پشتیبانی با موفقیت ارسال شد.";
 
-        } catch (error) {
 
-            console.error(error);
+            await this.syncServerUpdates();
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Support error:",
+                error
+            );
 
             msg.textContent =
                 error.message ||
-                "ارسال درخواست پشتیبانی انجام نشد.";
+                "ارسال درخواست پشتیبانی ناموفق بود.";
         }
     }
 
 
-    async loadUserUpdates() {
+    serverRequest(payload) {
+
+        return fetch(
+            APPS_SCRIPT_URL,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "text/plain;charset=utf-8"
+                },
+
+                body:
+                    JSON.stringify(payload)
+            }
+        )
+            .then(
+                response =>
+                    response.text()
+            )
+            .then(text => {
+
+                let data;
+
+                try {
+
+                    data =
+                        JSON.parse(text);
+
+                } catch {
+
+                    throw new Error(
+                        "پاسخ نامعتبر از سامانه دریافت شد."
+                    );
+                }
+
+
+                if (
+                    !data.success &&
+                    data.message
+                ) {
+
+                    throw new Error(
+                        data.message
+                    );
+                }
+
+
+                return data;
+            });
+    }
+
+
+    jsonpRequest(
+        action,
+        params = {}
+    ) {
+
+        return new Promise(
+            (resolve, reject) => {
+
+                const callbackName =
+                    "__quizduo_cb_" +
+                    Date.now() +
+                    "_" +
+                    Math.floor(
+                        Math.random() * 100000
+                    );
+
+
+                const query =
+                    new URLSearchParams();
+
+
+                query.set(
+                    "action",
+                    action
+                );
+
+                query.set(
+                    "callback",
+                    callbackName
+                );
+
+
+                Object.entries(params)
+                    .forEach(
+                        ([key, value]) => {
+
+                            query.set(
+                                key,
+                                String(
+                                    value ?? ""
+                                )
+                            );
+                        }
+                    );
+
+
+                const script =
+                    document.createElement(
+                        "script"
+                    );
+
+
+                let finished = false;
+
+
+                const cleanup =
+                    () => {
+
+                        finished = true;
+
+                        delete window[
+                            callbackName
+                        ];
+
+                        script.remove();
+
+                        clearTimeout(
+                            timeout
+                        );
+                    };
+
+
+                const timeout =
+                    setTimeout(
+                        () => {
+
+                            if (finished) {
+                                return;
+                            }
+
+                            cleanup();
+
+                            reject(
+                                new Error(
+                                    "اتصال به سامانه پشتیبانی برقرار نشد. Web App را بررسی کنید."
+                                )
+                            );
+
+                        },
+                        15000
+                    );
+
+
+                window[callbackName] =
+                    data => {
+
+                        if (finished) {
+                            return;
+                        }
+
+                        cleanup();
+
+                        resolve(data);
+                    };
+
+
+                script.onerror =
+                    () => {
+
+                        if (finished) {
+                            return;
+                        }
+
+                        cleanup();
+
+                        reject(
+                            new Error(
+                                "ارتباط با سامانه پشتیبانی برقرار نشد."
+                            )
+                        );
+                    };
+
+
+                script.src =
+                    APPS_SCRIPT_URL +
+                    "?" +
+                    query.toString();
+
+
+                document
+                    .head
+                    .appendChild(script);
+            }
+        );
+    }
+
+
+    async syncServerUpdates() {
 
         if (
             this.state.username ===
             "بازیکن مهمان"
         ) {
+
+            this.renderUserUpdates();
+
             return;
         }
 
 
         try {
 
-            const response =
-                await fetch(
-                    APPS_SCRIPT_URL,
+            const data =
+                await this.jsonpRequest(
+                    "userUpdates",
                     {
-                        method: "POST",
-                        headers: {
-                            "Content-Type":
-                                "text/plain;charset=utf-8"
-                        },
-                        body:
-                            JSON.stringify({
-                                action:
-                                    "getUserUpdates",
-                                username:
-                                    this.state.username
-                            })
+                        username:
+                            this.state.username
                     }
                 );
 
 
-            const data =
-                await response.json();
+            if (!data.success) {
 
-
-            if (
-                !response.ok ||
-                data.success === false
-            ) {
-                return;
+                throw new Error(
+                    data.message ||
+                    "دریافت وضعیت ناموفق بود."
+                );
             }
 
 
-            this.userUpdates = {
+            this.lastServerUpdates = {
+
                 payments:
-                    Array.isArray(data.payments)
+                    Array.isArray(
+                        data.payments
+                    )
                         ? data.payments
                         : [],
 
                 support:
-                    Array.isArray(data.support)
+                    Array.isArray(
+                        data.support
+                    )
                         ? data.support
                         : []
             };
 
 
-            this.applyPaymentUpdates();
-            this.renderSupportUpdates();
+            /*
+              فقط وقتی پرداخت تأیید شده باشد
+              اشتراک کاربر فعال می‌شود.
+            */
 
-        } catch (error) {
+            const approved =
+                this.lastServerUpdates.payments
+                    .find(
+                        p =>
+                            p.status ===
+                            "تأیید شد"
+                    );
+
+
+            if (approved) {
+
+                const plan =
+                    approved.planId;
+
+                const isPremium =
+                    plan === "nineMonth";
+
+                const changed =
+                    this.state.subscriptionPlan !==
+                        plan ||
+                    this.state.subscriptionStatus !==
+                        "active" ||
+                    this.state.subscription !==
+                        (
+                            isPremium
+                                ? "premium"
+                                : "paid"
+                        );
+
+
+                this.state.subscriptionStatus =
+                    "active";
+
+                this.state.subscriptionPlan =
+                    plan;
+
+                this.state.subscriptionName =
+                    approved.planName;
+
+                this.state.subscription =
+                    isPremium
+                        ? "premium"
+                        : "paid";
+
+
+                if (changed) {
+                    this.persist();
+                }
+            }
+
+
+            this.renderUserUpdates();
+
+        }
+
+        catch (error) {
 
             console.error(
-                "User updates error:",
+                "User update sync failed:",
+                error
+            );
+
+            this.renderUserUpdates(
                 error
             );
         }
     }
 
 
-    applyPaymentUpdates() {
+    renderUserUpdates(
+        error = null
+    ) {
 
-        const payments =
-            this.userUpdates.payments || [];
-
-
-        if (!payments.length) {
-            return;
-        }
+        this.ensureUserUpdatesPanel();
 
 
-        const latest =
-            payments[payments.length - 1];
+        const paymentUpdates =
+            this.lastServerUpdates
+                ?.payments ||
+            [];
 
 
-        if (
-            latest.status ===
-            "تأیید شد"
-        ) {
-
-            this.state.subscription =
-                latest.planId === "nineMonth"
-                    ? "premium"
-                    : "paid";
-
-            this.persist();
-        }
+        const supportUpdates =
+            this.lastServerUpdates
+                ?.support ||
+            [];
 
 
-        const statusBox =
+        const formatDate =
+            value => {
+
+                if (!value) {
+                    return "";
+                }
+
+                try {
+
+                    return new Date(
+                        value
+                    ).toLocaleString(
+                        "fa-IR"
+                    );
+
+                } catch {
+
+                    return value;
+                }
+            };
+
+
+        /*
+          اعلان‌های پرداخت
+        */
+
+        const paymentHtml =
+            paymentUpdates
+                .slice(0, 8)
+                .map(item => {
+
+                    const cls =
+                        item.status ===
+                        "تأیید شد"
+
+                            ? "success"
+
+                            : item.status ===
+                              "رد شد"
+
+                                ? "danger"
+
+                                : "pending";
+
+
+                    return `
+                        <div
+                            class="user-update-item ${cls}">
+
+                            <b>
+                                💳
+                                ${escapeHTML(
+                                    item.planName ||
+                                    item.planId
+                                )}
+                            </b>
+
+                            <span>
+                                ${escapeHTML(
+                                    item.status
+                                )}
+                            </span>
+
+                            ${
+                                item.userMessage
+                                    ? `
+                                        <p>
+                                            ${escapeHTML(
+                                                item.userMessage
+                                            )}
+                                        </p>
+                                      `
+                                    : ""
+                            }
+
+                            <small>
+                                ${escapeHTML(
+                                    formatDate(
+                                        item.statusTimestamp ||
+                                        item.timestamp
+                                    )
+                                )}
+                            </small>
+
+                        </div>
+                    `;
+                })
+                .join("");
+
+
+        /*
+          پاسخ‌های پشتیبانی
+        */
+
+        const supportHtml =
+            supportUpdates
+                .slice(0, 8)
+                .map(item => {
+
+                    return `
+                        <div
+                            class="user-update-item ${
+                                item.adminReply
+                                    ? "success"
+                                    : "pending"
+                            }">
+
+                            <b>
+                                🎫
+                                ${escapeHTML(
+                                    item.subject ||
+                                    "پشتیبانی"
+                                )}
+                            </b>
+
+                            <span>
+                                ${escapeHTML(
+                                    item.status ||
+                                    "جدید"
+                                )}
+                            </span>
+
+                            <div class="support-user-message">
+
+                                <strong>
+                                    پیام شما:
+                                </strong>
+
+                                <p>
+                                    ${escapeHTML(
+                                        item.message
+                                    )}
+                                </p>
+
+                            </div>
+
+                            ${
+                                item.adminReply
+                                    ? `
+                                        <div
+                                            class="support-admin-reply">
+
+                                            <strong>
+                                                پاسخ پشتیبانی:
+                                            </strong>
+
+                                            <p>
+                                                ${escapeHTML(
+                                                    item.adminReply
+                                                )}
+                                            </p>
+
+                                        </div>
+                                      `
+                                    : `
+                                        <p>
+                                            درخواست شما ثبت شده
+                                            و منتظر پاسخ پشتیبانی است.
+                                        </p>
+                                      `
+                            }
+
+                            <small>
+                                ${escapeHTML(
+                                    formatDate(
+                                        item.replyTimestamp ||
+                                        item.timestamp
+                                    )
+                                )}
+                            </small>
+
+                        </div>
+                    `;
+                })
+                .join("");
+
+
+        const content =
             document.getElementById(
-                "paymentMessage"
+                "userUpdatesContent"
             );
 
 
-        if (
-            statusBox &&
-            latest.message
-        ) {
+        if (content) {
 
-            statusBox.textContent =
-                latest.message;
+            if (
+                error &&
+                !paymentHtml &&
+                !supportHtml
+            ) {
 
-            statusBox.className =
-                "message " +
-                (
-                    latest.status ===
-                    "تأیید شد"
-                        ? "success"
-                        : latest.status ===
-                          "رد شد"
-                            ? "error"
-                            : ""
-                );
-        }
-    }
+                content.innerHTML =
+                    `<p class="message">
+                        اتصال به سامانه برقرار نشد.
+                        بعداً دوباره تلاش کنید.
+                    </p>`;
 
+            }
 
-    renderSupportUpdates() {
+            else if (
+                !paymentHtml &&
+                !supportHtml
+            ) {
 
-        const supportSection =
-            document.getElementById(
-                "support"
-            );
+                content.innerHTML =
+                    `<p class="message">
+                        هنوز اعلان یا پاسخ جدیدی ندارید.
+                    </p>`;
 
-        if (!supportSection) {
-            return;
-        }
+            }
 
+            else {
 
-        let box =
-            document.getElementById(
-                "supportReplies"
-            );
-
-
-        if (!box) {
-
-            box =
-                document.createElement(
-                    "div"
-                );
-
-            box.id =
-                "supportReplies";
-
-            box.className =
-                "panel support-replies";
-
-
-            const panel =
-                supportSection.querySelector(
-                    ".panel"
-                );
-
-            if (panel) {
-                supportSection.appendChild(
-                    box
-                );
-            } else {
-                supportSection.appendChild(
-                    box
-                );
+                content.innerHTML =
+                    paymentHtml +
+                    supportHtml;
             }
         }
 
 
-        const items =
-            this.userUpdates.support || [];
+        const subscriptionContent =
+            document.getElementById(
+                "subscriptionUpdatesContent"
+            );
 
 
-        if (!items.length) {
+        if (subscriptionContent) {
 
-            box.innerHTML =
-                `<h3>پاسخ‌های پشتیبانی</h3>
-                 <p>
-                    هنوز پاسخی برای درخواست‌های شما ثبت نشده است.
-                 </p>`;
+            if (!paymentHtml) {
 
-            return;
+                subscriptionContent.innerHTML =
+                    `<p class="message">
+                        هنوز وضعیت پرداختی
+                        برای این حساب ثبت نشده است.
+                    </p>`;
+
+            }
+
+            else {
+
+                subscriptionContent.innerHTML =
+                    paymentHtml;
+            }
         }
-
-
-        box.innerHTML =
-            `<h3>📩 پاسخ‌های پشتیبانی</h3>` +
-            items
-                .slice()
-                .reverse()
-                .map(item => {
-
-                    const status =
-                        escapeHTML(
-                            item.status || ""
-                        );
-
-                    const reply =
-                        item.reply
-                            ? `<div class="support-reply">
-                                <strong>پاسخ مدیریت:</strong>
-                                <p>
-                                    ${escapeHTML(
-                                        item.reply
-                                    )}
-                                </p>
-                               </div>`
-                            : `<p>
-                                هنوز پاسخی ثبت نشده است.
-                               </p>`;
-
-
-                    return `
-                        <article class="support-ticket">
-                            <h4>
-                                ${escapeHTML(
-                                    item.subject
-                                )}
-                            </h4>
-
-                            <p>
-                                ${escapeHTML(
-                                    item.text
-                                )}
-                            </p>
-
-                            <small>
-                                وضعیت:
-                                ${status}
-                            </small>
-
-                            ${reply}
-                        </article>
-                    `;
-                })
-                .join("");
     }
 }
 
 
 window.addEventListener(
     "DOMContentLoaded",
-    () => new App().init()
+    () =>
+        new App().init()
 );
-
