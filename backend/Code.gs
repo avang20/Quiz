@@ -1,1041 +1,255 @@
 const CONFIG = {
-
-    ADMIN_EMAIL: 'hvasei90@gmail.com',
-
-    // حتماً رمز مدیر را تغییر بده.
-    ADMIN_PASSWORD: 'Avang20',
-
-    SHEET_NAME: 'Requests',
-
-    DRIVE_FOLDER_NAME: 'QuizDuo Receipts'
+  SHEET_NAME: 'Payments',
+  DRIVE_FOLDER_NAME: 'QuizDuo Receipts',
+  PRIVATE_TEST_CODE: 'QDZ-100K-HASTI',
+  TEST_AMOUNT: 100000,
+  MAX_RECEIPT_BYTES: 5 * 1024 * 1024,
+  ADMIN_PASSWORD: 'CHANGE_THIS_ADMIN_PASSWORD'
 };
 
+function doGet(e) {
+  const page = e && e.parameter && e.parameter.page;
 
-/* =========================================================
-   CREATE PAYMENT REQUEST
-========================================================= */
+  if (page === 'admin') {
+    return HtmlService.createTemplateFromFile('Admin')
+      .evaluate()
+      .setTitle('QuizDuo Admin')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ success: true, service: 'QuizDuo' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
 function doPost(e) {
+  try {
+    const body = e && e.postData && e.postData.contents;
+    if (!body) return jsonResponse({ success: false, message: 'درخواست خالی است.' });
 
-    try {
+    const data = JSON.parse(body);
 
-        const body =
-            JSON.parse(
-                e.postData.contents || '{}'
-            );
-
-
-        if (
-            body.action !==
-            'create_request'
-        ) {
-
-            return json_({
-                ok: false,
-                error: 'Invalid action'
-            });
-        }
-
-
-        const username =
-            String(
-                body.username || ''
-            ).trim();
-
-
-        const phone =
-            String(
-                body.phone || ''
-            ).trim();
-
-
-        const plan =
-            String(
-                body.plan || ''
-            ).trim();
-
-
-        const planName =
-            String(
-                body.planName || ''
-            ).trim();
-
-
-        const amount =
-            Number(
-                body.amount || 0
-            );
-
-
-        const receiptBase64 =
-            String(
-                body.receiptBase64 || ''
-            );
-
-
-        const receiptName =
-            String(
-                body.receiptName ||
-                'receipt.jpg'
-            );
-
-
-        const receiptType =
-            String(
-                body.receiptType ||
-                'image/jpeg'
-            );
-
-
-        if (
-            !username ||
-            !phone ||
-            !plan ||
-            !planName ||
-            !amount ||
-            !receiptBase64
-        ) {
-
-            return json_({
-                ok: false,
-                error:
-                    'Missing required fields'
-            });
-        }
-
-
-        const requestId =
-            String(
-                body.requestId ||
-                (
-                    'QD-' +
-                    Utilities
-                        .getUuid()
-                        .replace(/-/g, '')
-                        .slice(0, 10)
-                        .toUpperCase()
-                )
-            );
-
-
-        const now =
-            new Date();
-
-
-        /* -------------------------
-           DRIVE
-        ------------------------- */
-
-        const folder =
-            getReceiptFolder_();
-
-
-        const bytes =
-            Utilities.base64Decode(
-                receiptBase64
-            );
-
-
-        const blob =
-            Utilities.newBlob(
-                bytes,
-                receiptType,
-                requestId +
-                '-' +
-                receiptName
-            );
-
-
-        const file =
-            folder.createFile(blob);
-
-
-        file.setDescription(
-            'QuizDuo payment receipt - ' +
-            username +
-            ' - ' +
-            phone +
-            ' - ' +
-            planName
-        );
-
-
-        /* -------------------------
-           SHEET
-        ------------------------- */
-
-        const sheet =
-            getSheet_();
-
-
-        sheet.appendRow([
-
-            requestId,
-
-            now,
-
-            username,
-
-            phone,
-
-            plan,
-
-            planName,
-
-            amount,
-
-            'pending',
-
-            file.getId(),
-
-            file.getUrl(),
-
-            ''
-
-        ]);
-
-
-        /* -------------------------
-           EMAIL
-        ------------------------- */
-
-        MailApp.sendEmail({
-
-            to:
-                CONFIG.ADMIN_EMAIL,
-
-            subject:
-                'QuizDuo | درخواست اشتراک جدید | ' +
-                planName,
-
-            htmlBody:
-                buildAdminEmail_(
-                    requestId,
-                    username,
-                    phone,
-                    planName,
-                    amount,
-                    now,
-                    file.getUrl()
-                ),
-
-            attachments: [
-                blob
-            ]
-
-        });
-
-
-        return json_({
-
-            ok: true,
-
-            requestId,
-
-            status: 'pending'
-
-        });
-
-
-    } catch (err) {
-
-        return json_({
-
-            ok: false,
-
-            error:
-                String(err)
-
-        });
+    if (data.action === 'payment') {
+      return handlePayment(data);
     }
+
+    if (data.action === 'validateDiscount') {
+      return validateDiscount(data);
+    }
+
+    if (data.action === 'adminList') {
+      return jsonResponse({ success: false, message: 'برای Admin از google.script.run استفاده کنید.' });
+    }
+
+    return jsonResponse({ success: false, message: 'عملیات ناشناخته است.' });
+  } catch (error) {
+    console.error(error);
+    return jsonResponse({ success: false, message: 'خطای سرور: ' + error.message });
+  }
 }
 
+function validateDiscount(data) {
+  const code = String(data.code || '').trim().toUpperCase();
+  const plan = String(data.plan || '');
 
-/* =========================================================
-   GET / STATUS / ADMIN PAGE
-========================================================= */
+  const valid = code === CONFIG.PRIVATE_TEST_CODE && plan === 'nineMonth';
 
-function doGet(e) {
-
-    const action =
-        String(
-            e &&
-            e.parameter &&
-            e.parameter.action ||
-            ''
-        );
-
-
-    /* -------------------------
-       PAYMENT STATUS
-    ------------------------- */
-
-    if (
-        action === 'status'
-    ) {
-
-        const requestId =
-            String(
-                e.parameter.requestId ||
-                ''
-            );
-
-
-        const username =
-            String(
-                e.parameter.username ||
-                ''
-            );
-
-
-        const callback =
-            String(
-                e.parameter.callback ||
-                ''
-            );
-
-
-        const result =
-            getStatus_(
-                requestId,
-                username
-            );
-
-
-        /*
-         * JSONP برای جلوگیری از مشکل
-         * CORS در GitHub Pages
-         */
-
-        if (callback) {
-
-            return ContentService
-
-                .createTextOutput(
-
-                    callback +
-                    '(' +
-                    JSON.stringify(
-                        result
-                    ) +
-                    ');'
-
-                )
-
-                .setMimeType(
-                    ContentService
-                        .MimeType
-                        .JAVASCRIPT
-                );
-        }
-
-
-        return json_(
-            result
-        );
-    }
-
-
-    /* -------------------------
-       ADMIN PANEL
-    ------------------------- */
-
-    return HtmlService
-
-        .createHtmlOutputFromFile(
-            'Admin'
-        )
-
-        .setTitle(
-            'QuizDuo Admin'
-        );
+  return jsonResponse({
+    success: true,
+    testCodeApplied: valid,
+    amount: valid ? CONFIG.TEST_AMOUNT : null
+  });
 }
 
-
-/* =========================================================
-   ADMIN LOGIN
-========================================================= */
-
-function adminLogin(password) {
-
-    if (
-        String(password || '') !==
-        CONFIG.ADMIN_PASSWORD
-    ) {
-
-        throw new Error(
-            'رمز مدیر اشتباه است.'
-        );
-    }
-
-
-    const token =
-        Utilities.getUuid();
-
-
-    CacheService
-
-        .getScriptCache()
-
-        .put(
-            'admin:' + token,
-            '1',
-            21600
-        );
-
-
-    return token;
-}
-
-
-/* =========================================================
-   ADMIN LIST
-========================================================= */
-
-function adminList(token) {
-
-    requireAdmin_(
-        token
-    );
-
-
-    const sheet =
-        getSheet_();
-
-
-    const values =
-        sheet
-            .getDataRange()
-            .getValues();
-
-
-    if (
-        values.length <= 1
-    ) {
-
-        return [];
-    }
-
-
-    return values
-
-        .slice(1)
-
-        .reverse()
-
-        .map(row => ({
-
-            requestId:
-                String(
-                    row[0]
-                ),
-
-            createdAt:
-                new Date(
-                    row[1]
-                ).toISOString(),
-
-            username:
-                String(
-                    row[2]
-                ),
-
-            phone:
-                String(
-                    row[3]
-                ),
-
-            plan:
-                String(
-                    row[4]
-                ),
-
-            planName:
-                String(
-                    row[5]
-                ),
-
-            amount:
-                Number(
-                    row[6]
-                ),
-
-            status:
-                String(
-                    row[7]
-                ),
-
-            receiptUrl:
-                String(
-                    row[9] || ''
-                )
-
-        }));
-}
-
-
-/* =========================================================
-   ADMIN SET STATUS
-========================================================= */
-
-function adminSetStatus(
-    token,
-    requestId,
-    status
-) {
-
-    requireAdmin_(
-        token
-    );
-
-
-    if (
-        ![
-            'approved',
-            'rejected'
-        ].includes(status)
-    ) {
-
-        throw new Error(
-            'وضعیت نامعتبر است.'
-        );
-    }
-
-
-    const sheet =
-        getSheet_();
-
-
-    const values =
-        sheet
-            .getDataRange()
-            .getValues();
-
-
-    for (
-        let i = 1;
-        i < values.length;
-        i++
-    ) {
-
-        if (
-            String(
-                values[i][0]
-            ) ===
-            String(
-                requestId
-            )
-        ) {
-
-            /*
-             * ستون H = Status
-             */
-
-            sheet
-                .getRange(
-                    i + 1,
-                    8
-                )
-                .setValue(
-                    status
-                );
-
-
-            /*
-             * ستون K = Reviewed At
-             */
-
-            sheet
-                .getRange(
-                    i + 1,
-                    11
-                )
-                .setValue(
-                    new Date()
-                );
-
-
-            return {
-
-                ok: true,
-
-                status
-
-            };
-        }
-    }
-
-
-    throw new Error(
-        'درخواست پیدا نشد.'
-    );
-}
-
-
-/* =========================================================
-   GET PAYMENT STATUS
-========================================================= */
-
-function getStatus_(
-    requestId,
-    username
-) {
-
-    if (
-        !requestId ||
-        !username
-    ) {
-
-        return {
-
-            ok: false,
-
-            status:
-                'not_found'
-
-        };
-    }
-
-
-    const sheet =
-        getSheet_();
-
-
-    const values =
-        sheet
-            .getDataRange()
-            .getValues();
-
-
-    for (
-        let i = 1;
-        i < values.length;
-        i++
-    ) {
-
-        if (
-
-            String(
-                values[i][0]
-            ) ===
-            requestId &&
-
-            String(
-                values[i][2]
-            )
-                .toLowerCase() ===
-            username.toLowerCase()
-
-        ) {
-
-            return {
-
-                ok: true,
-
-                requestId,
-
-                status:
-                    String(
-                        values[i][7]
-                    ),
-
-                plan:
-                    String(
-                        values[i][5]
-                    ),
-
-                amount:
-                    Number(
-                        values[i][6]
-                    )
-
-            };
-        }
-    }
-
-
-    return {
-
-        ok: false,
-
-        status:
-            'not_found'
-
-    };
-}
-
-
-/* =========================================================
-   SHEET
-========================================================= */
-
-function getSheet_() {
-
-    const props =
-        PropertiesService
-            .getScriptProperties();
-
-
-    let id =
-        props.getProperty(
-            'QUIZDUO_SHEET_ID'
-        );
-
-
-    let ss;
-
-
-    if (id) {
-
-        try {
-
-            ss =
-                SpreadsheetApp
-                    .openById(
-                        id
-                    );
-
-        } catch (_) {}
-
-    }
-
-
-    if (!ss) {
-
-        ss =
-            SpreadsheetApp.create(
-                'QuizDuo Payment Requests'
-            );
-
-
-        props.setProperty(
-            'QUIZDUO_SHEET_ID',
-            ss.getId()
-        );
-    }
-
-
-    let sheet =
-        ss.getSheetByName(
-            CONFIG.SHEET_NAME
-        );
-
-
-    if (!sheet) {
-
-        sheet =
-            ss.insertSheet(
-                CONFIG.SHEET_NAME
-            );
-    }
-
-
-    /* -------------------------
-       CREATE HEADER
-    ------------------------- */
-
-    if (
-        sheet.getLastRow() === 0
-    ) {
-
-        sheet.appendRow([
-
-            'Request ID',
-            'Created At',
-            'Username',
-            'Phone',
-            'Plan ID',
-            'Plan Name',
-            'Amount',
-            'Status',
-            'Receipt File ID',
-            'Receipt URL',
-            'Reviewed At'
-
-        ]);
-
-    } else {
-
-        /*
-         * اگر Sheet از نسخه قبلی باشد،
-         * ستون Phone را اضافه می‌کنیم.
-         */
-
-        const header =
-            sheet
-                .getRange(
-                    1,
-                    1,
-                    1,
-                    Math.max(
-                        1,
-                        sheet.getLastColumn()
-                    )
-                )
-                .getValues()[0];
-
-
-        if (
-            header.indexOf(
-                'Phone'
-            ) === -1
-        ) {
-
-            sheet.insertColumnAfter(
-                3
-            );
-
-            sheet
-                .getRange(
-                    1,
-                    4
-                )
-                .setValue(
-                    'Phone'
-                );
-        }
-    }
-
-
-    return sheet;
-}
-
-
-/* =========================================================
-   DRIVE FOLDER
-========================================================= */
-
-function getReceiptFolder_() {
-
-    const folders =
-        DriveApp
-            .getFoldersByName(
-                CONFIG.DRIVE_FOLDER_NAME
-            );
-
-
-    return folders.hasNext()
-
-        ? folders.next()
-
-        : DriveApp.createFolder(
-            CONFIG.DRIVE_FOLDER_NAME
-        );
-}
-
-
-/* =========================================================
-   ADMIN AUTH
-========================================================= */
-
-function requireAdmin_(
-    token
-) {
-
-    if (
-
-        !token ||
-
-        CacheService
-            .getScriptCache()
-            .get(
-                'admin:' + token
-            ) !== '1'
-
-    ) {
-
-        throw new Error(
-            'نشست مدیر منقضی شده است.'
-        );
-    }
-}
-
-
-/* =========================================================
-   ADMIN EMAIL
-========================================================= */
-
-function buildAdminEmail_(
-    requestId,
-    username,
-    phone,
-    planName,
+function handlePayment(data) {
+  if (!data.username || !data.plan || !data.receiptBase64) {
+    return jsonResponse({ success: false, message: 'اطلاعات پرداخت کامل نیست.' });
+  }
+
+  const base64 = String(data.receiptBase64);
+  const estimatedBytes = Math.floor(base64.length * 0.75);
+  if (estimatedBytes > CONFIG.MAX_RECEIPT_BYTES) {
+    return jsonResponse({ success: false, message: 'حجم فیش بیشتر از ۵ مگابایت است.' });
+  }
+
+  const planPrices = {
+    monthly: 100000,
+    quarterly: 270000,
+    sixMonth: 480000,
+    nineMonth: 660000
+  };
+
+  if (!Object.prototype.hasOwnProperty.call(planPrices, data.plan)) {
+    return jsonResponse({ success: false, message: 'پلن نامعتبر است.' });
+  }
+
+  const originalAmount = Number(planPrices[data.plan]);
+  let amount = Number(data.amount || originalAmount);
+  let testCodeApplied = false;
+
+  if (
+    String(data.discountCode || '').trim().toUpperCase() === CONFIG.PRIVATE_TEST_CODE &&
+    data.plan === 'nineMonth'
+  ) {
+    amount = CONFIG.TEST_AMOUNT;
+    testCodeApplied = true;
+  }
+
+  const mimeType = data.mimeType || 'image/jpeg';
+  const fileName = data.fileName || ('receipt_' + Date.now() + '.jpg');
+  const bytes = Utilities.base64Decode(base64);
+  const blob = Utilities.newBlob(bytes, mimeType, fileName);
+
+  const folder = getOrCreateReceiptFolder();
+  const savedFile = folder.createFile(blob);
+  savedFile.setName('QuizDuo_' + sanitizeFileName(data.username) + '_' + Date.now() + '_' + fileName);
+
+  const fileUrl = savedFile.getUrl();
+  const timestamp = new Date();
+  const row = [
+    timestamp,
+    data.username,
+    data.phone || '',
+    data.plan,
+    data.planName || data.plan,
+    originalAmount,
     amount,
-    createdAt,
-    receiptUrl
-) {
+    Number(data.discountPercent || 0),
+    data.discountCode || '',
+    fileName,
+    fileUrl,
+    'در انتظار بررسی'
+  ];
 
-    return (
+  appendPaymentRow(row);
+  sendReceiptEmail(data, amount, fileUrl, savedFile);
 
-        '<div dir="rtl" ' +
-
-        'style="' +
-        'font-family:Arial,sans-serif;' +
-        'line-height:1.9' +
-        '">' +
-
-        '<h2>' +
-        'درخواست اشتراک جدید QuizDuo' +
-        '</h2>' +
-
-        '<p>' +
-
-        '<b>شناسه درخواست:</b> ' +
-
-        escape_(
-            requestId
-        ) +
-
-        '</p>' +
-
-        '<p>' +
-
-        '<b>نام کاربری:</b> ' +
-
-        escape_(
-            username
-        ) +
-
-        '</p>' +
-
-        '<p>' +
-
-        '<b>شماره تلفن:</b> ' +
-
-        escape_(
-            phone
-        ) +
-
-        '</p>' +
-
-        '<p>' +
-
-        '<b>اشتراک:</b> ' +
-
-        escape_(
-            planName
-        ) +
-
-        '</p>' +
-
-        '<p>' +
-
-        '<b>مبلغ:</b> ' +
-
-        Number(
-            amount
-        )
-            .toLocaleString(
-                'fa-IR'
-            ) +
-
-        ' تومان' +
-
-        '</p>' +
-
-        '<p>' +
-
-        '<b>زمان:</b> ' +
-
-        escape_(
-            createdAt.toLocaleString(
-                'fa-IR'
-            )
-        ) +
-
-        '</p>' +
-
-        '<p>' +
-
-        'فیش در این ایمیل پیوست شده است. ' +
-
-        'همچنین در Google Drive ذخیره شده است.' +
-
-        '</p>' +
-
-        '<p>' +
-
-        '<a href="' +
-
-        escape_(
-            receiptUrl
-        ) +
-
-        '">' +
-
-        'مشاهده فایل فیش' +
-
-        '</a>' +
-
-        '</p>' +
-
-        '<hr>' +
-
-        '<p>' +
-
-        'پس از بررسی فیش، ' +
-
-        'از پنل مدیر وضعیت درخواست را ' +
-
-        'تأیید یا رد کنید.' +
-
-        '</p>' +
-
-        '</div>'
-    );
+  return jsonResponse({
+    success: true,
+    testCodeApplied,
+    message: testCodeApplied
+      ? 'فیش دریافت شد و کد تست خصوصی نیز تأیید شد.'
+      : 'فیش با موفقیت برای بررسی ارسال شد.'
+  });
 }
 
+function sendReceiptEmail(data, amount, fileUrl, file) {
+  const adminEmail = getAdminEmail();
+  if (!adminEmail) return;
 
-/* =========================================================
-   ESCAPE
-========================================================= */
+  const subject = 'QuizDuo | فیش پرداخت جدید | ' + data.username;
+  const body = [
+    'یک فیش پرداخت جدید در QuizDuo ثبت شد.',
+    '',
+    'نام کاربری: ' + data.username,
+    'شماره تماس: ' + (data.phone || '-'),
+    'پلن: ' + (data.planName || data.plan),
+    'مبلغ: ' + amount.toLocaleString('fa-IR') + ' تومان',
+    'کد تخفیف: ' + (data.discountCode || '-'),
+    '',
+    'لینک فایل فیش در Google Drive:',
+    fileUrl,
+    '',
+    'وضعیت فعلی: در انتظار بررسی'
+  ].join('\n');
 
-function escape_(value) {
-
-    return String(
-        value
-    )
-        .replace(
-            /[&<>'"]/g,
-            c => ({
-
-                '&':
-                    '&amp;',
-
-                '<':
-                    '&lt;',
-
-                '>':
-                    '&gt;',
-
-                "'":
-                    '&#39;',
-
-                '"':
-                    '&quot;'
-
-            }[c])
-        );
+  GmailApp.sendEmail(adminEmail, subject, body, {
+    attachments: [file.getBlob()]
+  });
 }
 
+function getAdminEmail() {
+  const saved = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+  if (saved) return saved;
+  return Session.getEffectiveUser().getEmail() || '';
+}
 
-/* =========================================================
-   JSON RESPONSE
-========================================================= */
+function getOrCreateReceiptFolder() {
+  const folders = DriveApp.getFoldersByName(CONFIG.DRIVE_FOLDER_NAME);
+  return folders.hasNext() ? folders.next() : DriveApp.createFolder(CONFIG.DRIVE_FOLDER_NAME);
+}
 
-function json_(obj) {
+function getOrCreateSheet() {
+  const props = PropertiesService.getScriptProperties();
+  let spreadsheetId = props.getProperty('PAYMENTS_SPREADSHEET_ID');
+  let spreadsheet;
 
-    return ContentService
+  if (spreadsheetId) {
+    try {
+      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    } catch (error) {
+      spreadsheet = null;
+    }
+  }
 
-        .createTextOutput(
-            JSON.stringify(
-                obj
-            )
-        )
+  if (!spreadsheet) {
+    spreadsheet = SpreadsheetApp.create('QuizDuo Payments');
+    props.setProperty('PAYMENTS_SPREADSHEET_ID', spreadsheet.getId());
+  }
 
-        .setMimeType(
-            ContentService
-                .MimeType
-                .JSON
-        );
+  let sheet = spreadsheet.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) sheet = spreadsheet.insertSheet(CONFIG.SHEET_NAME);
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      'Timestamp', 'Username', 'Phone', 'Plan ID', 'Plan Name',
+      'Original Amount', 'Final Amount', 'Discount %', 'Discount Code',
+      'File Name', 'Receipt URL', 'Status'
+    ]);
+  }
+
+  return sheet;
+}
+
+function appendPaymentRow(row) {
+  getOrCreateSheet().appendRow(row);
+}
+
+function sanitizeFileName(value) {
+  return String(value || 'user').replace(/[\\/:*?"<>|]/g, '_').slice(0, 60);
+}
+
+function jsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function checkAdmin(password) {
+  return String(password || '') === CONFIG.ADMIN_PASSWORD;
+}
+
+function getPaymentsForAdmin(password) {
+  if (!checkAdmin(password)) throw new Error('رمز مدیریت اشتباه است.');
+
+  const sheet = getOrCreateSheet();
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+
+  return values.slice(1).map((row, index) => ({
+    rowNumber: index + 2,
+    timestamp: row[0] ? new Date(row[0]).toISOString() : '',
+    username: row[1] || '',
+    phone: row[2] || '',
+    planId: row[3] || '',
+    planName: row[4] || '',
+    originalAmount: row[5] || 0,
+    amount: row[6] || 0,
+    discountPercent: row[7] || 0,
+    discountCode: row[8] || '',
+    fileName: row[9] || '',
+    receiptUrl: row[10] || '',
+    status: row[11] || ''
+  }));
+}
+
+function updatePaymentStatus(password, rowNumber, status) {
+  if (!checkAdmin(password)) throw new Error('رمز مدیریت اشتباه است.');
+
+  const allowed = ['تأیید شد', 'رد شد', 'در انتظار بررسی'];
+  if (!allowed.includes(status)) throw new Error('وضعیت نامعتبر است.');
+
+  const sheet = getOrCreateSheet();
+  sheet.getRange(Number(rowNumber), 12).setValue(status);
+  return { success: true };
 }
