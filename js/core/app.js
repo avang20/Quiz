@@ -1,4 +1,3 @@
-```javascript
 import {
     createDefaultState,
     getUnlockedStage,
@@ -2602,4 +2601,4 @@ window.addEventListener(
     "DOMContentLoaded",
     () => new App().init()
 );
-```
+
