@@ -17,100 +17,90 @@ export const QUIZ_CONFIG = {
     stageXP: 10,
 
     failedStageHeartPenalty: 1
-
 };
 
 
-/* =========================================================
-   QUESTION NORMALIZER
-========================================================= */
+function normalizeQuestion(
+    raw,
+    fallbackStage = 1
+) {
 
-function normalizeQuestion(raw, fallbackStage = 1) {
-
-    if (!raw || typeof raw !== "object") {
+    if (
+        !raw ||
+        typeof raw !== "object"
+    ) {
         return null;
     }
 
 
-    /* -------------------------
-       QUESTION TEXT
-    ------------------------- */
-
-    const questionText =
+    let questionText =
         raw.question ??
         raw.questionText ??
-        raw.question_text ??
         raw.q ??
         raw.text ??
         raw.title ??
         raw.prompt ??
-        raw.description ??
+        raw.content ??
         "";
 
 
-    /* -------------------------
-       OPTIONS
-    ------------------------- */
+    if (
+        questionText &&
+        typeof questionText === "object"
+    ) {
+
+        questionText =
+            questionText.text ??
+            questionText.value ??
+            questionText.title ??
+            questionText.content ??
+            "";
+    }
+
 
     let options =
         raw.options ??
         raw.choices ??
         raw.answers ??
-        raw.answerOptions ??
-        raw.answer_options ??
+        raw.variants ??
         raw.o ??
         [];
 
 
     if (!Array.isArray(options)) {
 
-        if (
+        options =
             options &&
             typeof options === "object"
-        ) {
-
-            options = Object.values(options);
-
-        } else {
-
-            options = [];
-
-        }
-
+                ? Object.values(options)
+                : [];
     }
 
 
-    options = options.map(option => {
+    options =
+        options.map(option => {
 
-        if (
-            option &&
-            typeof option === "object"
-        ) {
+            if (
+                option &&
+                typeof option === "object"
+            ) {
 
-            return (
-                option.text ??
-                option.label ??
-                option.value ??
-                option.answer ??
-                option.title ??
-                ""
+                return String(
+                    option.text ??
+                    option.label ??
+                    option.value ??
+                    option.answer ??
+                    option.content ??
+                    ""
+                );
+            }
+
+
+            return String(
+                option ?? ""
             );
+        });
 
-        }
-
-        return option;
-
-    });
-
-
-    options = options.map(option =>
-        String(option ?? "").trim()
-    );
-
-
-    /* -------------------------
-       CORRECT ANSWER
-    ------------------------- */
 
     const rawAnswer =
         raw.answer ??
@@ -133,8 +123,6 @@ function normalizeQuestion(raw, fallbackStage = 1) {
         Number.isInteger(rawAnswer)
     ) {
 
-        /* 0-based */
-
         if (
             rawAnswer >= 0 &&
             rawAnswer < options.length
@@ -142,36 +130,28 @@ function normalizeQuestion(raw, fallbackStage = 1) {
 
             answer = rawAnswer;
 
-        }
-
-        /* 1-based */
-
-        else if (
+        } else if (
             rawAnswer > 0 &&
             rawAnswer <= options.length
         ) {
 
-            answer = rawAnswer - 1;
-
+            answer =
+                rawAnswer - 1;
         }
 
-    }
-
-
-    else if (
+    } else if (
         typeof rawAnswer === "string"
     ) {
 
-        const trimmed = rawAnswer.trim();
+        const trimmed =
+            rawAnswer.trim();
 
-        const numeric = Number(trimmed);
+
+        const numeric =
+            Number(trimmed);
 
 
-        if (
-            Number.isInteger(numeric)
-        ) {
-
-            /* 0-based */
+        if (Number.isInteger(numeric)) {
 
             if (
                 numeric >= 0 &&
@@ -180,79 +160,120 @@ function normalizeQuestion(raw, fallbackStage = 1) {
 
                 answer = numeric;
 
-            }
-
-            /* 1-based */
-
-            else if (
+            } else if (
                 numeric > 0 &&
                 numeric <= options.length
             ) {
 
-                answer = numeric - 1;
-
+                answer =
+                    numeric - 1;
             }
-
         }
 
 
-        /* Answer text */
+        if (
+            answer < 0 &&
+            /^[A-Za-z]$/.test(trimmed)
+        ) {
+
+            const letterIndex =
+                trimmed
+                    .toUpperCase()
+                    .charCodeAt(0) - 65;
+
+
+            if (
+                letterIndex >= 0 &&
+                letterIndex < options.length
+            ) {
+
+                answer =
+                    letterIndex;
+            }
+        }
+
 
         if (answer < 0) {
 
-            const normalizedAnswer =
+            const normalized =
                 trimmed.toLocaleLowerCase();
 
-            answer = options.findIndex(
-                option =>
-                    String(option)
-                        .trim()
-                        .toLocaleLowerCase() ===
-                    normalizedAnswer
-            );
 
+            answer =
+                options.findIndex(
+                    option =>
+                        String(option)
+                            .trim()
+                            .toLocaleLowerCase() ===
+                        normalized
+                );
         }
 
-    }
-
-
-    /* -------------------------
-       CORRECT OPTIONS
-    ------------------------- */
-
-    if (
-        answer < 0 &&
-        Array.isArray(raw.correctOptions)
+    } else if (
+        rawAnswer &&
+        typeof rawAnswer === "object"
     ) {
 
         const candidate =
-            raw.correctOptions[0];
+            rawAnswer.text ??
+            rawAnswer.label ??
+            rawAnswer.value ??
+            rawAnswer.answer;
 
-        answer = options.findIndex(
-            option =>
-                String(option).trim() ===
-                String(candidate).trim()
-        );
 
+        if (
+            candidate !== undefined
+        ) {
+
+            answer =
+                options.findIndex(
+                    option =>
+                        String(option)
+                            .trim() ===
+                        String(candidate)
+                            .trim()
+                );
+        }
     }
 
 
-    /* -------------------------
-       STAGE
-    ------------------------- */
+    if (answer < 0) {
 
-    const stageValue =
-        raw.stage ??
-        raw.stageNumber ??
-        raw.stage_number ??
-        raw.stageId ??
-        raw.stage_id ??
-        raw.level ??
-        fallbackStage;
+        const correctOptions =
+            raw.correctOptions ??
+            raw.correct_options;
+
+
+        if (
+            Array.isArray(correctOptions) &&
+            correctOptions.length
+        ) {
+
+            const candidate =
+                correctOptions[0];
+
+
+            answer =
+                options.findIndex(
+                    option =>
+                        String(option)
+                            .trim() ===
+                        String(candidate)
+                            .trim()
+                );
+        }
+    }
 
 
     const stage =
-        Number(stageValue) || fallbackStage;
+        Number(
+            raw.stage ??
+            raw.stageNumber ??
+            raw.stage_number ??
+            raw.level ??
+            raw.levelNumber ??
+            fallbackStage
+        ) || fallbackStage;
 
 
     return {
@@ -262,229 +283,77 @@ function normalizeQuestion(raw, fallbackStage = 1) {
         stage,
 
         question:
-            String(questionText).trim(),
+            String(questionText ?? ""),
 
         q:
-            String(questionText).trim(),
+            String(questionText ?? ""),
 
         options,
 
         answer,
 
         explanation:
-            raw.explanation ??
-            raw.explain ??
-            raw.description_explanation ??
-            ""
-
+            String(
+                raw.explanation ??
+                raw.explain ??
+                raw.description ??
+                ""
+            )
     };
-
 }
 
-
-/* =========================================================
-   EXTRACT QUESTIONS
-========================================================= */
-
-function extractQuestions(data) {
-
-    let rawQuestions = [];
-
-
-    /* -------------------------
-       JSON ARRAY
-    ------------------------- */
-
-    if (Array.isArray(data)) {
-
-        rawQuestions = data;
-
-    }
-
-
-    /* -------------------------
-       { questions: [...] }
-    ------------------------- */
-
-    else if (
-        data &&
-        Array.isArray(data.questions)
-    ) {
-
-        rawQuestions = data.questions;
-
-    }
-
-
-    /* -------------------------
-       { stages: [...] }
-    ------------------------- */
-
-    else if (
-        data &&
-        Array.isArray(data.stages)
-    ) {
-
-        data.stages.forEach(
-            stageBlock => {
-
-                if (
-                    !stageBlock ||
-                    typeof stageBlock !== "object"
-                ) {
-                    return;
-                }
-
-
-                const stageNumber =
-                    Number(
-                        stageBlock.stage ??
-                        stageBlock.id ??
-                        stageBlock.stageNumber ??
-                        stageBlock.stage_number ??
-                        1
-                    ) || 1;
-
-
-                let list =
-                    stageBlock.questions ??
-                    stageBlock.items ??
-                    stageBlock.data ??
-                    [];
-
-
-                if (!Array.isArray(list)) {
-                    list = [];
-                }
-
-
-                list.forEach(question => {
-
-                    if (
-                        question &&
-                        typeof question === "object"
-                    ) {
-
-                        rawQuestions.push({
-
-                            ...question,
-
-                            stage:
-                                question.stage ??
-                                question.stageNumber ??
-                                stageNumber
-
-                        });
-
-                    }
-
-                });
-
-            }
-        );
-
-    }
-
-
-    /* -------------------------
-       OBJECT OF STAGES
-       {
-         "1": [...],
-         "2": [...]
-       }
-    ------------------------- */
-
-    else if (
-        data &&
-        typeof data === "object"
-    ) {
-
-        Object.entries(data).forEach(
-            ([key, value]) => {
-
-                if (!Array.isArray(value)) {
-                    return;
-                }
-
-
-                const stageNumber =
-                    Number(key) || 1;
-
-
-                value.forEach(question => {
-
-                    if (
-                        question &&
-                        typeof question === "object"
-                    ) {
-
-                        rawQuestions.push({
-
-                            ...question,
-
-                            stage:
-                                question.stage ??
-                                stageNumber
-
-                        });
-
-                    }
-
-                });
-
-            }
-        );
-
-    }
-
-
-    return rawQuestions;
-
-}
-
-
-/* =========================================================
-   QUIZ ENGINE
-========================================================= */
 
 export class QuizEngine {
 
-    constructor(state, saveState) {
+    constructor(
+        state,
+        saveState
+    ) {
 
-        this.state = state;
+        this.state =
+            state;
 
-        this.saveState = saveState;
+        this.saveState =
+            saveState;
 
-        this.questions = [];
+        this.questions =
+            [];
 
-        this.selectedQuestions = [];
+        this.selectedQuestions =
+            [];
 
-        this.currentQuestion = 0;
+        this.currentQuestion =
+            0;
 
-        this.currentCategory = "general";
+        this.currentCategory =
+            "general";
 
-        this.currentStage = 1;
+        this.currentStage =
+            1;
 
-        this.correctAnswers = 0;
+        this.correctAnswers =
+            0;
 
-        this.wrongAnswers = 0;
+        this.wrongAnswers =
+            0;
 
-        this.combo = 0;
+        this.combo =
+            0;
 
-        this.finished = false;
+        this.finished =
+            false;
 
-        this.isReplay = false;
+        this.isReplay =
+            false;
 
-        this.stageRewardGiven = false;
-
+        this.stageRewardGiven =
+            false;
     }
 
 
-    /* =====================================================
-       LOAD CATEGORY
-    ===================================================== */
-
-    async loadCategory(category) {
+    async loadCategory(
+        category
+    ) {
 
         const response =
             await fetch(
@@ -500,7 +369,6 @@ export class QuizEngine {
             throw new Error(
                 `Could not load data/${category}.json`
             );
-
         }
 
 
@@ -508,8 +376,68 @@ export class QuizEngine {
             await response.json();
 
 
-        const rawQuestions =
-            extractQuestions(data);
+        let rawQuestions = [];
+
+
+        if (Array.isArray(data)) {
+
+            rawQuestions =
+                data;
+
+        } else if (
+            Array.isArray(
+                data.questions
+            )
+        ) {
+
+            rawQuestions =
+                data.questions;
+
+        } else if (
+            Array.isArray(data.items)
+        ) {
+
+            rawQuestions =
+                data.items;
+
+        } else if (
+            Array.isArray(data.stages)
+        ) {
+
+            data.stages.forEach(
+                stageBlock => {
+
+                    const stageNumber =
+                        Number(
+                            stageBlock.stage ??
+                            stageBlock.id ??
+                            1
+                        ) || 1;
+
+
+                    const list =
+                        Array.isArray(
+                            stageBlock.questions
+                        )
+                            ? stageBlock.questions
+                            : [];
+
+
+                    list.forEach(
+                        question => {
+
+                            rawQuestions.push({
+                                ...question,
+
+                                stage:
+                                    question.stage ??
+                                    stageNumber
+                            });
+                        }
+                    );
+                }
+            );
+        }
 
 
         this.questions =
@@ -524,40 +452,29 @@ export class QuizEngine {
                 .filter(
                     question =>
                         question &&
-                        question.question &&
-                        question.question.trim() &&
-                        Array.isArray(question.options) &&
-                        question.options.length > 0
+                        question.question
+                            .trim() &&
+                        question.options
+                            .length > 0
                 );
 
 
         this.currentCategory =
             category;
-
-
-        return this.questions;
-
     }
 
 
-    /* =====================================================
-       GET STAGE QUESTIONS
-    ===================================================== */
-
-    getStageQuestions(stage) {
+    getStageQuestions(
+        stage
+    ) {
 
         return this.questions.filter(
             question =>
                 Number(question.stage) ===
                 Number(stage)
         );
-
     }
 
-
-    /* =====================================================
-       START STAGE
-    ===================================================== */
 
     startStage(
         category,
@@ -574,26 +491,29 @@ export class QuizEngine {
         this.isReplay =
             replay;
 
-        this.currentQuestion = 0;
+        this.currentQuestion =
+            0;
 
-        this.correctAnswers = 0;
+        this.correctAnswers =
+            0;
 
-        this.wrongAnswers = 0;
+        this.wrongAnswers =
+            0;
 
-        this.combo = 0;
+        this.combo =
+            0;
 
-        this.finished = false;
+        this.finished =
+            false;
 
-        this.stageRewardGiven = false;
+        this.stageRewardGiven =
+            false;
 
 
         const stageQuestions =
             this.getStageQuestions(stage)
                 .filter(
                     question =>
-                        Number.isInteger(
-                            question.answer
-                        ) &&
                         question.answer >= 0
                 );
 
@@ -610,39 +530,26 @@ export class QuizEngine {
 
 
         return this.selectedQuestions;
-
     }
 
-
-    /* =====================================================
-       CURRENT QUESTION
-    ===================================================== */
 
     getCurrentQuestion() {
 
         return this.selectedQuestions[
             this.currentQuestion
         ];
-
     }
 
-
-    /* =====================================================
-       QUESTION COUNT
-    ===================================================== */
 
     getQuestionCount() {
 
         return this.selectedQuestions.length;
-
     }
 
 
-    /* =====================================================
-       ANSWER
-    ===================================================== */
-
-    answer(answerIndex) {
+    answer(
+        answerIndex
+    ) {
 
         const question =
             this.getCurrentQuestion();
@@ -657,9 +564,7 @@ export class QuizEngine {
                 correct: false,
 
                 passed: false
-
             };
-
         }
 
 
@@ -674,14 +579,11 @@ export class QuizEngine {
 
             this.combo++;
 
-        }
-
-        else {
+        } else {
 
             this.wrongAnswers++;
 
             this.combo = 0;
-
         }
 
 
@@ -702,10 +604,6 @@ export class QuizEngine {
         let newlyCompleted = false;
 
 
-        /* =================================================
-           STAGE FINISHED
-        ================================================= */
-
         if (finished) {
 
             const percentage =
@@ -719,10 +617,6 @@ export class QuizEngine {
                 percentage >=
                 QUIZ_CONFIG.passingPercentage;
 
-
-            /* -------------------------
-               PASSED
-            ------------------------- */
 
             if (passed) {
 
@@ -762,17 +656,11 @@ export class QuizEngine {
 
                     this.stageRewardGiven =
                         true;
-
                 }
 
-            }
-
-
-            /* -------------------------
-               FAILED
-            ------------------------- */
-
-            else if (!this.isReplay) {
+            } else if (
+                !this.isReplay
+            ) {
 
                 if (
                     this.state.hearts > 0
@@ -788,11 +676,8 @@ export class QuizEngine {
 
                     heartLost =
                         true;
-
                 }
-
             }
-
         }
 
 
@@ -817,9 +702,11 @@ export class QuizEngine {
 
             newlyCompleted,
 
-            replay: this.isReplay,
+            replay:
+                this.isReplay,
 
-            combo: this.combo,
+            combo:
+                this.combo,
 
             correctAnswers:
                 this.correctAnswers,
@@ -838,9 +725,6 @@ export class QuizEngine {
 
             explanation:
                 question.explanation || ""
-
         };
-
     }
-
 }
