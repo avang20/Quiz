@@ -1,168 +1,225 @@
 <!doctype html>
-
-<html
-    lang="fa"
-    dir="rtl"
->
+<html lang="fa" dir="rtl">
 
 <head>
 
-    <meta charset="utf-8">
+<meta charset="utf-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width,initial-scale=1"
-    >
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
 
-    <title>
-        QuizDuo Admin
-    </title>
+<title>QuizDuo Admin</title>
 
-    <style>
+<style>
 
-        body{
-            font-family:Arial,sans-serif;
-            background:#f5f7fb;
-            color:#172033;
-            margin:0;
-            padding:24px
-        }
+*{
+    box-sizing:border-box;
+}
 
-        .wrap{
-            max-width:1100px;
-            margin:auto
-        }
+body{
+    margin:0;
+    font-family:
+        Tahoma,
+        Arial,
+        sans-serif;
 
-        .card{
-            background:#fff;
-            border:1px solid #dfe5ef;
-            border-radius:18px;
-            padding:22px;
-            margin-bottom:18px;
-            box-shadow:0 10px 30px #18243a12
-        }
+    background:#f4f8f8;
 
-        input,
-        button{
-            font:inherit
-        }
+    color:#16252b;
+}
 
-        input{
-            padding:12px;
-            border:1px solid #ccd5e3;
-            border-radius:10px;
-            width:100%;
-            box-sizing:border-box;
-            margin:8px 0 12px
-        }
+.wrap{
+    max-width:1200px;
 
-        button{
-            border:0;
-            border-radius:10px;
-            padding:11px 16px;
-            cursor:pointer;
-            font-weight:700
-        }
+    margin:40px auto;
 
-        .primary{
-            background:#20a99d;
-            color:#fff
-        }
+    padding:0 20px;
+}
 
-        .approve{
-            background:#168a5b;
-            color:#fff
-        }
+.panel{
 
-        .reject{
-            background:#d94a5b;
-            color:#fff
-        }
+    background:#fff;
 
-        .muted{
-            color:#69758a
-        }
+    border:
+        1px solid #dbe7e8;
 
-        .hidden{
-            display:none
-        }
+    border-radius:18px;
 
-        .req{
-            border:1px solid #e1e6ef;
-            border-radius:16px;
-            padding:18px;
-            margin:12px 0;
-            background:#fff
-        }
+    padding:22px;
 
-        .actions{
-            display:flex;
-            gap:8px;
-            flex-wrap:wrap;
-            margin-top:14px
-        }
+    margin-bottom:20px;
 
-        .status{
-            display:inline-block;
-            padding:5px 9px;
-            border-radius:999px;
-            font-size:12px;
-            font-weight:700;
-            margin-right:7px
-        }
+    box-shadow:
+        0 10px 30px
+        rgba(20,50,55,.07);
+}
 
-        .pending{
-            background:#fff3cd;
-            color:#8a6500
-        }
+h1,
+h2{
+    margin-top:0;
+}
 
-        .approved{
-            background:#d9f7e8;
-            color:#087443
-        }
+input,
+button,
+select,
+textarea{
 
-        .rejected{
-            background:#fde0e5;
-            color:#a1263a
-        }
+    font:inherit;
+}
 
-        .info-grid{
-            display:grid;
-            grid-template-columns:repeat(2,1fr);
-            gap:8px;
-            margin-top:12px
-        }
+input{
 
-        .info-item{
-            padding:10px 12px;
-            border-radius:10px;
-            background:#f5f7fb
-        }
+    width:100%;
 
-        .info-item span{
-            display:block;
-            color:#69758a;
-            font-size:12px;
-            margin-bottom:3px
-        }
+    padding:12px;
 
-        a{
-            color:#5267d8
-        }
+    border:
+        1px solid #cbdcde;
 
-        @media(max-width:650px){
+    border-radius:10px;
 
-            body{
-                padding:12px
-            }
+    margin:8px 0;
+}
 
-            .info-grid{
-                grid-template-columns:1fr
-            }
+button{
 
-        }
+    border:0;
 
-    </style>
+    border-radius:10px;
+
+    padding:10px 14px;
+
+    cursor:pointer;
+}
+
+.primary{
+
+    background:#13a6a6;
+
+    color:#fff;
+}
+
+.secondary{
+
+    background:#e8f4f4;
+
+    color:#176b70;
+}
+
+.danger{
+
+    background:#ffe8e8;
+
+    color:#a32626;
+}
+
+.status{
+
+    padding:6px 9px;
+
+    border-radius:999px;
+
+    background:#eef4f4;
+
+    display:inline-block;
+}
+
+.hidden{
+
+    display:none;
+}
+
+.table-wrap{
+
+    overflow:auto;
+}
+
+table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+    min-width:900px;
+}
+
+th,
+td{
+
+    padding:12px;
+
+    border-bottom:
+        1px solid #e4eeee;
+
+    text-align:right;
+
+    vertical-align:top;
+}
+
+th{
+
+    background:#f5fafa;
+}
+
+.actions{
+
+    display:flex;
+
+    gap:6px;
+
+    flex-wrap:wrap;
+}
+
+.muted{
+
+    color:#6d7e82;
+}
+
+.receipt{
+
+    display:inline-block;
+
+    margin-top:6px;
+}
+
+body.dark{
+
+    background:#10171d;
+
+    color:#edf7f7;
+}
+
+body.dark .panel{
+
+    background:#182229;
+
+    border-color:#2b3b43;
+}
+
+body.dark input,
+body.dark select,
+body.dark textarea{
+
+    background:#10171d;
+
+    color:#edf7f7;
+
+    border-color:#3a4b55;
+}
+
+body.dark th{
+
+    background:#20323a;
+}
+
+body.dark td{
+
+    border-color:#2b3b43;
+}
+
+</style>
 
 </head>
 
@@ -172,72 +229,209 @@
 <div class="wrap">
 
 
-    <div
-        id="login"
-        class="card"
-    >
+<div class="panel">
 
-        <h1>
-            پنل مدیر QuizDuo
-        </h1>
+<h1>
+    QuizDuo Admin
+</h1>
 
-        <p class="muted">
-            برای بررسی و تأیید پرداخت‌ها وارد شوید.
-        </p>
-
-        <input
-            id="password"
-            type="password"
-            placeholder="رمز مدیر"
-        >
-
-        <button
-            class="primary"
-            onclick="login()"
-        >
-            ورود
-        </button>
-
-        <p id="loginMsg"></p>
-
-    </div>
+<p class="muted">
+    مدیریت فیش‌های پرداخت و پیام‌های پشتیبانی
+</p>
 
 
-    <div
-        id="panel"
-        class="hidden"
-    >
-
-        <div class="card">
-
-            <h1>
-                درخواست‌های اشتراک
-            </h1>
-
-            <p class="muted">
-                فیش را بررسی کن و سپس درخواست را تأیید یا رد کن.
-            </p>
-
-            <button
-                class="primary"
-                onclick="loadRequests()"
-            >
-                به‌روزرسانی
-            </button>
-
-        </div>
+<input
+    id="password"
+    type="password"
+    placeholder="رمز مدیریت"
+>
 
 
-        <div id="requests"></div>
+<div class="actions">
 
-    </div>
+<button
+    class="primary"
+    onclick="login()"
+>
+    ورود به مدیریت
+</button>
+
+
+<button
+    class="secondary"
+    onclick="toggleTheme()"
+>
+    روشن / تاریک
+</button>
+
+</div>
+
+
+<p id="loginMsg"></p>
+
+</div>
+
+
+<div
+    id="dashboard"
+    class="hidden"
+>
+
+
+<div class="panel">
+
+<div class="actions">
+
+<button
+    class="primary"
+    onclick="loadAll()"
+>
+    به‌روزرسانی
+</button>
+
+
+<button
+    class="danger"
+    onclick="logout()"
+>
+    خروج
+</button>
+
+</div>
+
+</div>
+
+
+<div class="panel">
+
+<h2>
+    💳 پرداخت‌ها
+</h2>
+
+
+<div class="table-wrap">
+
+<table>
+
+<thead>
+
+<tr>
+
+<th>
+    زمان
+</th>
+
+<th>
+    کاربر
+</th>
+
+<th>
+    تماس
+</th>
+
+<th>
+    پلن
+</th>
+
+<th>
+    مبلغ
+</th>
+
+<th>
+    فیش
+</th>
+
+<th>
+    وضعیت
+</th>
+
+<th>
+    عملیات
+</th>
+
+</tr>
+
+</thead>
+
+
+<tbody
+    id="paymentsBody"
+></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+<div class="panel">
+
+<h2>
+    🎫 پشتیبانی
+</h2>
+
+
+<div class="table-wrap">
+
+<table>
+
+<thead>
+
+<tr>
+
+<th>
+    زمان
+</th>
+
+<th>
+    کاربر
+</th>
+
+<th>
+    تماس
+</th>
+
+<th>
+    موضوع
+</th>
+
+<th>
+    پیام
+</th>
+
+<th>
+    وضعیت
+</th>
+
+<th>
+    عملیات
+</th>
+
+</tr>
+
+</thead>
+
+
+<tbody
+    id="supportBody"
+></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+</div>
 
 </div>
 
 
 <script>
 
-let token = '';
+let adminPassword = "";
 
 
 function login(){
@@ -245,35 +439,109 @@ function login(){
     const password =
         document
             .getElementById(
-                'password'
+                "password"
             )
             .value;
+
+
+    const msg =
+        document.getElementById(
+            "loginMsg"
+        );
+
+
+    if(!password){
+
+        msg.textContent =
+            "رمز مدیریت را وارد کنید.";
+
+        return;
+    }
+
+
+    adminPassword =
+        password;
 
 
     google.script.run
 
         .withSuccessHandler(
-            receivedToken => {
+            () => {
 
-                token =
-                    receivedToken;
-
-                document
-                    .getElementById(
-                        'login'
-                    )
-                    .classList
-                    .add('hidden');
+                msg.textContent =
+                    "ورود موفق بود.";
 
                 document
                     .getElementById(
-                        'panel'
+                        "dashboard"
                     )
                     .classList
-                    .remove('hidden');
+                    .remove("hidden");
 
-                loadRequests();
+                loadAll();
             }
+        )
+
+        .withFailureHandler(
+            error => {
+
+                adminPassword =
+                    "";
+
+                msg.textContent =
+                    error.message ||
+                    "رمز مدیریت اشتباه است.";
+            }
+        )
+
+        .getPaymentsForAdmin(
+            password
+        );
+}
+
+
+function logout(){
+
+    adminPassword =
+        "";
+
+    document
+        .getElementById(
+            "dashboard"
+        )
+        .classList
+        .add("hidden");
+
+
+    document
+        .getElementById(
+            "password"
+        )
+        .value = "";
+
+
+    document
+        .getElementById(
+            "loginMsg"
+        )
+        .textContent = "";
+}
+
+
+function loadAll(){
+
+    loadPayments();
+
+    loadSupport();
+}
+
+
+function loadPayments(){
+
+    google.script.run
+
+        .withSuccessHandler(
+            renderPayments
         )
 
         .withFailureHandler(
@@ -281,335 +549,446 @@ function login(){
 
                 document
                     .getElementById(
-                        'loginMsg'
+                        "paymentsBody"
                     )
-                    .textContent =
-                    error.message;
+                    .innerHTML =
+                    `<tr>
+                        <td colspan="8">
+                            ${escapeHtml(
+                                error.message ||
+                                "خطا"
+                            )}
+                        </td>
+                    </tr>`;
             }
         )
 
-        .adminLogin(
-            password
+        .getPaymentsForAdmin(
+            adminPassword
         );
 }
 
 
-function loadRequests(){
+function loadSupport(){
 
     google.script.run
 
         .withSuccessHandler(
-            render
+            renderSupport
         )
 
         .withFailureHandler(
-            error =>
-                alert(
-                    error.message
-                )
+            error => {
+
+                document
+                    .getElementById(
+                        "supportBody"
+                    )
+                    .innerHTML =
+                    `<tr>
+                        <td colspan="7">
+                            ${escapeHtml(
+                                error.message ||
+                                "خطا"
+                            )}
+                        </td>
+                    </tr>`;
+            }
         )
 
-        .adminList(
-            token
+        .getSupportForAdmin(
+            adminPassword
         );
 }
 
 
-function render(items){
+function renderPayments(rows){
 
-    const box =
+    const body =
         document.getElementById(
-            'requests'
+            "paymentsBody"
         );
 
 
-    if (
-        !items.length
-    ) {
+    if(!rows.length){
 
-        box.innerHTML =
-            '<div class="card">' +
-            'درخواستی ثبت نشده است.' +
-            '</div>';
+        body.innerHTML =
+            `<tr>
+                <td colspan="8">
+                    هنوز پرداختی ثبت نشده است.
+                </td>
+            </tr>`;
 
         return;
     }
 
 
-    box.innerHTML =
+    body.innerHTML =
+        rows
+            .map(
+                row => `
 
-        items
+<tr>
 
-            .map(item => `
+<td>
+    ${formatDate(
+        row.timestamp
+    )}
+</td>
 
-                <div class="req">
+<td>
+    ${escapeHtml(
+        row.username
+    )}
+</td>
 
-                    <div>
+<td>
+    ${escapeHtml(
+        row.phone || "-"
+    )}
+</td>
 
-                        <b>
-                            ${esc(
-                                item.requestId
-                            )}
-                        </b>
+<td>
+    ${escapeHtml(
+        row.planName ||
+        row.planId
+    )}
+</td>
 
-                        <span
-                            class="status ${esc(
-                                item.status
-                            )}"
-                        >
-                            ${statusText(
-                                item.status
-                            )}
-                        </span>
+<td>
+    ${Number(
+        row.amount || 0
+    ).toLocaleString(
+        "fa-IR"
+    )}
+    تومان
+</td>
 
-                    </div>
+<td>
 
+${
+    row.receiptUrl
 
-                    <div class="info-grid">
+        ? `<a
+            class="receipt"
+            href="${escapeAttribute(
+                row.receiptUrl
+            )}"
+            target="_blank"
+        >
+            مشاهده فیش
+        </a>`
 
-                        <div class="info-item">
+        : "-"
+}
 
-                            <span>
-                                نام کاربری
-                            </span>
+</td>
 
-                            <b>
-                                ${esc(
-                                    item.username
-                                )}
-                            </b>
+<td>
 
-                        </div>
+<span class="status">
 
+${escapeHtml(
+    row.status || "-"
+)}
 
-                        <div class="info-item">
+</span>
 
-                            <span>
-                                شماره تلفن
-                            </span>
+</td>
 
-                            <b dir="ltr">
-                                ${esc(
-                                    item.phone
-                                )}
-                            </b>
+<td>
 
-                        </div>
+<div class="actions">
 
-
-                        <div class="info-item">
-
-                            <span>
-                                اشتراک
-                            </span>
-
-                            <b>
-                                ${esc(
-                                    item.planName
-                                )}
-                            </b>
-
-                        </div>
-
-
-                        <div class="info-item">
-
-                            <span>
-                                مبلغ
-                            </span>
-
-                            <b>
-                                ${Number(
-                                    item.amount
-                                ).toLocaleString(
-                                    'fa-IR'
-                                )}
-                                تومان
-                            </b>
-
-                        </div>
-
-                    </div>
+<button
+    class="primary"
+    onclick="setPaymentStatus(
+        ${row.rowNumber},
+        'تأیید شد'
+    )"
+>
+    تأیید
+</button>
 
 
-                    <p>
-
-                        <b>
-                            زمان:
-                        </b>
-
-                        ${new Date(
-                            item.createdAt
-                        ).toLocaleString(
-                            'fa-IR'
-                        )}
-
-                    </p>
+<button
+    class="danger"
+    onclick="setPaymentStatus(
+        ${row.rowNumber},
+        'رد شد'
+    )"
+>
+    رد
+</button>
 
 
-                    <p>
+<button
+    class="secondary"
+    onclick="setPaymentStatus(
+        ${row.rowNumber},
+        'در انتظار بررسی'
+    )"
+>
+    انتظار
+</button>
 
-                        <a
-                            href="${esc(
-                                item.receiptUrl
-                            )}"
-                            target="_blank"
-                            rel="noopener"
-                        >
-                            📎 مشاهده فیش
-                        </a>
+</div>
 
-                    </p>
+</td>
 
+</tr>
 
-                    ${
-                        item.status ===
-                        'pending'
-
-                        ? `
-
-                            <div class="actions">
-
-                                <button
-                                    class="approve"
-                                    onclick="
-                                        setStatus(
-                                            '${esc(
-                                                item.requestId
-                                            )}',
-                                            'approved'
-                                        )
-                                    "
-                                >
-                                    ✓ تأیید پرداخت
-                                </button>
-
-
-                                <button
-                                    class="reject"
-                                    onclick="
-                                        setStatus(
-                                            '${esc(
-                                                item.requestId
-                                            )}',
-                                            'rejected'
-                                        )
-                                    "
-                                >
-                                    ✕ رد پرداخت
-                                </button>
-
-                            </div>
-
-                        `
-
-                        : ''
-
-                    }
-
-                </div>
-
-            `)
-
-            .join('');
+`
+            )
+            .join("");
 }
 
 
-function setStatus(
-    requestId,
+function renderSupport(rows){
+
+    const body =
+        document.getElementById(
+            "supportBody"
+        );
+
+
+    if(!rows.length){
+
+        body.innerHTML =
+            `<tr>
+                <td colspan="7">
+                    هنوز پیام پشتیبانی ثبت نشده است.
+                </td>
+            </tr>`;
+
+        return;
+    }
+
+
+    body.innerHTML =
+        rows
+            .map(
+                row => `
+
+<tr>
+
+<td>
+    ${formatDate(
+        row.timestamp
+    )}
+</td>
+
+<td>
+    ${escapeHtml(
+        row.username
+    )}
+</td>
+
+<td>
+    ${escapeHtml(
+        row.phone || "-"
+    )}
+</td>
+
+<td>
+    ${escapeHtml(
+        row.subject
+    )}
+</td>
+
+<td>
+    ${escapeHtml(
+        row.message
+    ).replace(
+        /\n/g,
+        "<br>"
+    )}
+</td>
+
+<td>
+
+<span class="status">
+
+${escapeHtml(
+    row.status || "-"
+)}
+
+</span>
+
+</td>
+
+<td>
+
+<div class="actions">
+
+<button
+    class="primary"
+    onclick="setSupportStatus(
+        ${row.rowNumber},
+        'پاسخ داده شد'
+    )"
+>
+    پاسخ داده شد
+</button>
+
+
+<button
+    class="secondary"
+    onclick="setSupportStatus(
+        ${row.rowNumber},
+        'در حال بررسی'
+    )"
+>
+    در حال بررسی
+</button>
+
+
+<button
+    class="danger"
+    onclick="setSupportStatus(
+        ${row.rowNumber},
+        'بسته شد'
+    )"
+>
+    بسته
+</button>
+
+</div>
+
+</td>
+
+</tr>
+
+`
+            )
+            .join("");
+}
+
+
+function setPaymentStatus(
+    rowNumber,
     status
 ){
 
-    const message =
-        status === 'approved'
-            ? 'آیا از تأیید این پرداخت مطمئن هستید؟'
-            : 'آیا می‌خواهید این پرداخت را رد کنید؟';
-
-
-    if (
-        !confirm(
-            message
-        )
-    ) {
-        return;
-    }
-
-
     google.script.run
 
         .withSuccessHandler(
-            loadRequests
+            loadPayments
         )
 
         .withFailureHandler(
             error =>
                 alert(
-                    error.message
+                    error.message ||
+                    "خطا"
                 )
         )
 
-        .adminSetStatus(
-            token,
-            requestId,
+        .updatePaymentStatus(
+            adminPassword,
+            rowNumber,
             status
         );
 }
 
 
-function statusText(
+function setSupportStatus(
+    rowNumber,
     status
 ){
 
-    if (
-        status === 'approved'
-    ) {
+    google.script.run
 
-        return 'تأیید شده';
-    }
+        .withSuccessHandler(
+            loadSupport
+        )
 
+        .withFailureHandler(
+            error =>
+                alert(
+                    error.message ||
+                    "خطا"
+                )
+        )
 
-    if (
-        status === 'rejected'
-    ) {
-
-        return 'رد شده';
-    }
-
-
-    return 'در انتظار بررسی';
+        .updateSupportStatus(
+            adminPassword,
+            rowNumber,
+            status
+        );
 }
 
 
-function esc(
+function toggleTheme(){
+
+    document.body
+        .classList
+        .toggle("dark");
+}
+
+
+function formatDate(value){
+
+    if(!value){
+        return "-";
+    }
+
+
+    try{
+
+        return new Date(
+            value
+        ).toLocaleString(
+            "fa-IR"
+        );
+
+    }catch{
+
+        return value;
+    }
+}
+
+
+function escapeHtml(value){
+
+    return String(
+        value ?? ""
+    )
+
+    .replaceAll(
+        "&",
+        "&amp;"
+    )
+
+    .replaceAll(
+        "<",
+        "&lt;"
+    )
+
+    .replaceAll(
+        ">",
+        "&gt;"
+    )
+
+    .replaceAll(
+        '"',
+        "&quot;"
+    )
+
+    .replaceAll(
+        "'",
+        "&#039;"
+    );
+}
+
+
+function escapeAttribute(
     value
 ){
 
-    return String(
+    return escapeHtml(
         value
-    )
-
-        .replace(
-            /[&<>'"]/g,
-            character =>
-                ({
-
-                    '&':
-                        '&amp;',
-
-                    '<':
-                        '&lt;',
-
-                    '>':
-                        '&gt;',
-
-                    "'":
-                        '&#39;',
-
-                    '"':
-                        '&quot;'
-
-                }[character])
-        );
+    );
 }
 
 </script>
