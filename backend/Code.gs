@@ -8,8 +8,14 @@ const CONFIG = {
 
   MAX_RECEIPT_BYTES: 5 * 1024 * 1024,
 
+  ADMIN_EMAIL: 'hvasei90@gmail.com',
   ADMIN_PASSWORD: 'CHANGE_THIS_ADMIN_PASSWORD'
 };
+
+
+/* =========================================================
+   SHEET HEADERS
+========================================================= */
 
 const PAYMENT_HEADERS = [
   'Timestamp',
@@ -36,7 +42,9 @@ const SUPPORT_HEADERS = [
   'Message',
   'Status',
   'Admin Reply',
-  'Reply Timestamp'
+  'Reply Timestamp',
+  'Conversation ID',
+  'Thread JSON'
 ];
 
 
@@ -45,117 +53,87 @@ const SUPPORT_HEADERS = [
 ========================================================= */
 
 function doGet(e) {
-  try {
-    const params = e && e.parameter ? e.parameter : {};
 
-    /* Admin panel */
-    if (params.page === 'admin') {
-      return HtmlService
-        .createTemplateFromFile('Admin')
-        .evaluate()
-        .setTitle('QuizDuo Admin')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
+  const page = e && e.parameter
+    ? e.parameter.page
+    : '';
 
-    /*
-      JSONP:
-      برای ارتباط پنل کاربر با Apps Script استفاده می‌شود
-      تا مشکل CORS / Failed to fetch برای support و userUpdates
-      ایجاد نشود.
-    */
+  if (page === 'admin') {
 
-    const action = String(params.action || '').trim();
-    const callback = String(params.callback || '').trim();
-
-    let result;
-
-    if (action === 'support') {
-      result = handleSupport({
-        username: params.username || '',
-        phone: params.phone || '',
-        subject: params.subject || '',
-        message: params.message || ''
-      });
-    }
-
-    else if (action === 'userUpdates') {
-      result = getUserUpdates({
-        username: params.username || ''
-      });
-    }
-
-    else {
-      result = {
-        success: true,
-        service: 'QuizDuo',
-        time: new Date().toISOString()
-      };
-    }
-
-    if (callback) {
-      return jsonpResponse(callback, result);
-    }
-
-    return jsonResponse(result);
-
-  } catch (error) {
-    return jsonResponse({
-      success: false,
-      message: 'خطای سرور: ' + error.message
-    });
+    return HtmlService
+      .createHtmlOutputFromFile('Admin')
+      .setTitle('QuizDuo Admin')
+      .setXFrameOptionsMode(
+        HtmlService.XFrameOptionsMode.ALLOWALL
+      );
   }
+
+  return jsonResponse({
+    success: true,
+    service: 'QuizDuo API',
+    time: new Date().toISOString()
+  });
 }
 
 
 /* =========================================================
-   POST
+   POST ROUTER
 ========================================================= */
 
 function doPost(e) {
-  try {
-    const body = e && e.postData && e.postData.contents;
 
-    if (!body) {
+  try {
+
+    if (!e || !e.postData || !e.postData.contents) {
+
       return jsonResponse({
         success: false,
         message: 'درخواست خالی است.'
       });
     }
 
-    const data = JSON.parse(body);
+    const data = JSON.parse(
+      e.postData.contents
+    );
 
-    if (data.action === 'payment') {
-      return handlePayment(data);
+    switch (data.action) {
+
+      case 'payment':
+        return handlePayment(data);
+
+      case 'validateDiscount':
+        return validateDiscount(data);
+
+      case 'support':
+        return handleSupport(data);
+
+      case 'supportUserReply':
+        return handleUserSupportReply(data);
+
+      case 'closeSupport':
+        return closeSupportConversation(data);
+
+      case 'userUpdates':
+        return getUserUpdates(data);
+
+      default:
+        return jsonResponse({
+          success: false,
+          message: 'عملیات ناشناخته است.'
+        });
     }
-
-    if (data.action === 'validateDiscount') {
-      return validateDiscount(data);
-    }
-
-    /*
-      برای سازگاری با نسخه‌های قدیمی:
-      support و userUpdates اگر با POST هم ارسال شوند
-      همچنان کار می‌کنند.
-    */
-    if (data.action === 'support') {
-      return handleSupport(data);
-    }
-
-    if (data.action === 'userUpdates') {
-      return getUserUpdates(data);
-    }
-
-    return jsonResponse({
-      success: false,
-      message: 'عملیات ناشناخته است.'
-    });
 
   } catch (error) {
+
     console.error(error);
 
     return jsonResponse({
       success: false,
-      message: 'خطای سرور: ' + error.message
+      message: 'خطای سرور: ' + (
+        error && error.message
+          ? error.message
+          : String(error)
+      )
     });
   }
 }
@@ -166,11 +144,14 @@ function doPost(e) {
 ========================================================= */
 
 function validateDiscount(data) {
-  const code = String(data.code || '')
-    .trim()
-    .toUpperCase();
 
-  const plan = String(data.plan || '');
+  const code = String(
+    data.code || ''
+  ).trim().toUpperCase();
+
+  const plan = String(
+    data.plan || ''
+  ).trim();
 
   const valid =
     code === CONFIG.PRIVATE_TEST_CODE &&
@@ -179,7 +160,9 @@ function validateDiscount(data) {
   return jsonResponse({
     success: true,
     testCodeApplied: valid,
-    amount: valid ? CONFIG.TEST_AMOUNT : null
+    amount: valid
+      ? CONFIG.TEST_AMOUNT
+      : null
   });
 }
 
@@ -195,30 +178,51 @@ function handlePayment(data) {
     !data.plan ||
     !data.receiptBase64
   ) {
+
     return jsonResponse({
       success: false,
       message: 'اطلاعات پرداخت کامل نیست.'
     });
   }
 
-  const base64 = String(data.receiptBase64);
+
+  const username = String(
+    data.username
+  ).trim();
+
+
+  const base64 = String(
+    data.receiptBase64
+  );
+
 
   const estimatedBytes =
     Math.floor(base64.length * 0.75);
 
-  if (estimatedBytes > CONFIG.MAX_RECEIPT_BYTES) {
+
+  if (
+    estimatedBytes >
+    CONFIG.MAX_RECEIPT_BYTES
+  ) {
+
     return jsonResponse({
       success: false,
       message: 'حجم فیش بیشتر از ۵ مگابایت است.'
     });
   }
 
+
   const planPrices = {
+
     monthly: 100000,
+
     quarterly: 270000,
+
     sixMonth: 480000,
+
     nineMonth: 660000
   };
+
 
   if (
     !Object.prototype.hasOwnProperty.call(
@@ -226,41 +230,67 @@ function handlePayment(data) {
       data.plan
     )
   ) {
+
     return jsonResponse({
       success: false,
       message: 'پلن نامعتبر است.'
     });
   }
 
+
   const originalAmount =
     Number(planPrices[data.plan]);
 
+
   let amount =
-    Number(data.amount || originalAmount);
+    Number(
+      data.amount || originalAmount
+    );
+
 
   let testCodeApplied = false;
 
+
   if (
-    String(data.discountCode || '')
-      .trim()
-      .toUpperCase() === CONFIG.PRIVATE_TEST_CODE &&
+    String(
+      data.discountCode || ''
+    ).trim().toUpperCase() ===
+    CONFIG.PRIVATE_TEST_CODE &&
     data.plan === 'nineMonth'
   ) {
+
     amount = CONFIG.TEST_AMOUNT;
+
     testCodeApplied = true;
   }
+
 
   const mimeType =
     data.mimeType ||
     data.fileMime ||
     'image/jpeg';
 
+
   const fileName =
     data.fileName ||
     ('receipt_' + Date.now() + '.jpg');
 
+
   const bytes =
     Utilities.base64Decode(base64);
+
+
+  if (
+    bytes.length >
+    CONFIG.MAX_RECEIPT_BYTES
+  ) {
+
+    return jsonResponse({
+      success: false,
+      message: 'حجم فیش بیشتر از ۵ مگابایت است.'
+    });
+  }
+
 
   const blob =
     Utilities.newBlob(
@@ -269,37 +299,57 @@ function handlePayment(data) {
       fileName
     );
 
+
   const folder =
     getOrCreateReceiptFolder();
+
 
   const savedFile =
     folder.createFile(blob);
 
+
   savedFile.setName(
     'QuizDuo_' +
-    sanitizeFileName(data.username) +
+    sanitizeFileName(username) +
     '_' +
     Date.now() +
     '_' +
     fileName
   );
 
+
   const fileUrl =
     savedFile.getUrl();
 
-  const timestamp = new Date();
+
+  const timestamp =
+    new Date();
+
 
   const row = [
+
     timestamp,
-    data.username,
+
+    username,
+
     data.phone || '',
+
     data.plan,
+
     data.planName || data.plan,
+
     originalAmount,
+
     amount,
-    Number(data.discountPercent || 0),
+
+    Number(
+      data.discountPercent || 0
+    ),
+
     data.discountCode || '',
+
     fileName,
+
     fileUrl,
 
     'در انتظار بررسی',
@@ -309,27 +359,47 @@ function handlePayment(data) {
     ''
   ];
 
+
   appendPaymentRow(row);
 
-  sendReceiptEmail(
-    data,
-    amount,
-    fileUrl,
-    savedFile
-  );
+
+  /*
+   * خیلی مهم:
+   * خطای ایمیل نباید باعث شکست ثبت فیش شود.
+   */
+
+  try {
+
+    sendReceiptEmail(
+      data,
+      amount,
+      fileUrl,
+      savedFile
+    );
+
+  } catch (emailError) {
+
+    console.error(
+      'Receipt email failed:',
+      emailError
+    );
+  }
+
 
   return jsonResponse({
+
     success: true,
+
     testCodeApplied,
-    message: testCodeApplied
-      ? 'فیش دریافت شد و کد تست خصوصی نیز تأیید شد.'
-      : 'فیش با موفقیت برای بررسی ارسال شد.'
+
+    message:
+      'فیش با موفقیت برای بررسی ارسال شد.'
   });
 }
 
 
 /* =========================================================
-   SUPPORT
+   SUPPORT - NEW CONVERSATION
 ========================================================= */
 
 function handleSupport(data) {
@@ -350,91 +420,388 @@ function handleSupport(data) {
       ''
     ).trim();
 
+
   if (
     !username ||
     username === 'بازیکن مهمان'
   ) {
-    return {
+
+    return jsonResponse({
       success: false,
       message:
         'برای ارسال درخواست پشتیبانی ابتدا وارد حساب شوید.'
-    };
+    });
   }
 
+
   if (!subject || !message) {
-    return {
+
+    return jsonResponse({
       success: false,
       message:
         'موضوع و پیام را وارد کنید.'
-    };
+    });
   }
+
 
   const sheet =
     getOrCreateSupportSheet();
 
-  const timestamp = new Date();
+
+  const conversationId =
+    createConversationId();
+
+
+  const now =
+    new Date();
+
+
+  const thread = [
+
+    {
+      sender: 'user',
+
+      text: message,
+
+      timestamp:
+        now.toISOString()
+    }
+
+  ];
+
 
   sheet.appendRow([
-    timestamp,
+
+    now,
+
     username,
+
     phone,
+
     subject,
+
     message,
-    'جدید',
+
+    'در حال بررسی',
+
     '',
-    ''
+
+    '',
+
+    conversationId,
+
+    JSON.stringify(thread)
   ]);
+
 
   const rowNumber =
     sheet.getLastRow();
 
+
+  /*
+   * ایمیل فقط اطلاع‌رسانی است.
+   * اگر Gmail مجوز نداشته باشد،
+   * تیکت همچنان ثبت می‌شود.
+   */
+
   let emailSent = false;
-  let emailError = '';
+
 
   try {
 
     const adminEmail =
       getAdminEmail();
 
+
     if (adminEmail) {
 
-      GmailApp.sendEmail(
-        adminEmail,
-        'QuizDuo | پیام پشتیبانی | ' + username,
+      MailApp.sendEmail({
 
-        [
-          'پیام جدیدی در پشتیبانی QuizDuo ثبت شد.',
-          '',
-          'کاربر: ' + username,
-          'شماره تماس: ' + (phone || '-'),
-          'موضوع: ' + subject,
-          '',
-          message,
-          '',
-          'شماره ردیف: ' + rowNumber
-        ].join('\n')
-      );
+        to: adminEmail,
+
+        subject:
+          'QuizDuo | پیام پشتیبانی | ' +
+          username,
+
+        htmlBody:
+          '<div dir="rtl">' +
+          '<h2>پیام جدید پشتیبانی QuizDuo</h2>' +
+          '<p><b>کاربر:</b> ' +
+          escapeHtml(username) +
+          '</p>' +
+          '<p><b>موضوع:</b> ' +
+          escapeHtml(subject) +
+          '</p>' +
+          '<p><b>پیام:</b></p>' +
+          '<p>' +
+          escapeHtml(message) +
+          '</p>' +
+          '</div>'
+      });
 
       emailSent = true;
     }
 
   } catch (error) {
-    emailError =
-      error.message ||
-      String(error);
+
+    console.error(
+      'Support email failed:',
+      error
+    );
   }
 
-  return {
+
+  return jsonResponse({
+
     success: true,
+
+    conversationId,
+
     rowNumber,
 
-    message: emailSent
-      ? 'درخواست پشتیبانی با موفقیت ارسال شد.'
-      : 'درخواست پشتیبانی ثبت شد.',
+    message:
+      'گفت‌وگوی پشتیبانی با موفقیت ایجاد شد.',
 
-    emailSent,
-    emailError
-  };
+    emailSent
+  });
+}
+
+
+/* =========================================================
+   SUPPORT - USER CONTINUE SAME CONVERSATION
+========================================================= */
+
+function handleUserSupportReply(data) {
+
+  const username =
+    String(data.username || '').trim();
+
+  const conversationId =
+    String(
+      data.conversationId || ''
+    ).trim();
+
+  const message =
+    String(
+      data.message ||
+      data.text ||
+      ''
+    ).trim();
+
+
+  if (
+    !username ||
+    username === 'بازیکن مهمان'
+  ) {
+
+    return jsonResponse({
+      success: false,
+      message: 'ابتدا وارد حساب شوید.'
+    });
+  }
+
+
+  if (!conversationId) {
+
+    return jsonResponse({
+      success: false,
+      message:
+        'شناسه گفت‌وگو ارسال نشده است.'
+    });
+  }
+
+
+  if (!message) {
+
+    return jsonResponse({
+      success: false,
+      message:
+        'متن پیام را وارد کنید.'
+    });
+  }
+
+
+  const sheet =
+    getOrCreateSupportSheet();
+
+
+  const rowNumber =
+    findSupportRow(
+      sheet,
+      username,
+      conversationId
+    );
+
+
+  if (!rowNumber) {
+
+    return jsonResponse({
+      success: false,
+      message:
+        'گفت‌وگو پیدا نشد.'
+    });
+  }
+
+
+  const status =
+    String(
+      sheet.getRange(
+        rowNumber,
+        7
+      ).getValue() || ''
+    );
+
+
+  if (status === 'بسته شد') {
+
+    return jsonResponse({
+      success: false,
+      message:
+        'این گفت‌وگو توسط شما به پایان رسیده است. برای ادامه یک درخواست جدید ایجاد کنید.'
+    });
+  }
+
+
+  const thread =
+    readThread(
+      sheet,
+      rowNumber
+    );
+
+
+  const now =
+    new Date();
+
+
+  thread.push({
+
+    sender: 'user',
+
+    text: message,
+
+    timestamp:
+      now.toISOString()
+  });
+
+
+  /*
+   * بعد از پیام جدید کاربر،
+   * وضعیت دوباره در حال بررسی می‌شود.
+   */
+
+  sheet.getRange(
+    rowNumber,
+    5
+  ).setValue(message);
+
+
+  sheet.getRange(
+    rowNumber,
+    6
+  ).setValue('در حال بررسی');
+
+
+  sheet.getRange(
+    rowNumber,
+    8
+  ).setValue('');
+
+
+  sheet.getRange(
+    rowNumber,
+    9
+  ).setValue(now);
+
+
+  sheet.getRange(
+    rowNumber,
+    10
+  ).setValue(
+    JSON.stringify(thread)
+  );
+
+
+  return jsonResponse({
+
+    success: true,
+
+    message:
+      'پیام شما در همان گفت‌وگو ثبت شد.'
+  });
+}
+
+
+/* =========================================================
+   SUPPORT - USER CLOSES CONVERSATION
+========================================================= */
+
+function closeSupportConversation(data) {
+
+  const username =
+    String(data.username || '').trim();
+
+  const conversationId =
+    String(
+      data.conversationId || ''
+    ).trim();
+
+
+  if (
+    !username ||
+    !conversationId
+  ) {
+
+    return jsonResponse({
+      success: false,
+      message:
+        'اطلاعات گفت‌وگو کامل نیست.'
+    });
+  }
+
+
+  const sheet =
+    getOrCreateSupportSheet();
+
+
+  const rowNumber =
+    findSupportRow(
+      sheet,
+      username,
+      conversationId
+    );
+
+
+  if (!rowNumber) {
+
+    return jsonResponse({
+      success: false,
+      message:
+        'گفت‌وگو پیدا نشد.'
+    });
+  }
+
+
+  sheet.getRange(
+    rowNumber,
+    6
+  ).setValue('بسته شد');
+
+
+  sheet.getRange(
+    rowNumber,
+    9
+  ).setValue(
+    new Date()
+  );
+
+
+  return jsonResponse({
+
+    success: true,
+
+    message:
+      'گفت‌وگو توسط شما به پایان رسید.'
+  });
 }
 
 
@@ -445,35 +812,46 @@ function handleSupport(data) {
 function getUserUpdates(data) {
 
   const username =
-    String(data.username || '').trim();
+    String(
+      data.username || ''
+    ).trim();
+
 
   if (
     !username ||
     username === 'بازیکن مهمان'
   ) {
-    return {
+
+    return jsonResponse({
+
       success: true,
+
       payments: [],
+
       support: []
-    };
+    });
   }
 
-  const payments =
-    getUserPaymentUpdates(username);
 
-  const support =
-    getUserSupportUpdates(username);
+  return jsonResponse({
 
-  return {
     success: true,
-    payments,
-    support
-  };
+
+    payments:
+      getUserPaymentUpdates(
+        username
+      ),
+
+    support:
+      getUserSupportUpdates(
+        username
+      )
+  });
 }
 
 
 /* =========================================================
-   USER PAYMENT DATA
+   USER PAYMENTS
 ========================================================= */
 
 function getUserPaymentUpdates(username) {
@@ -481,29 +859,30 @@ function getUserPaymentUpdates(username) {
   const sheet =
     getOrCreateSheet();
 
+
   const values =
-    sheet.getDataRange().getValues();
+    sheet.getDataRange()
+      .getValues();
+
 
   if (values.length <= 1) {
     return [];
   }
 
+
   return values
     .slice(1)
+
     .map((row, index) => ({
 
-      rowNumber: index + 2,
+      rowNumber:
+        index + 2,
 
       timestamp:
-        row[0]
-          ? new Date(row[0]).toISOString()
-          : '',
+        toISOStringSafe(row[0]),
 
       username:
         String(row[1] || ''),
-
-      phone:
-        row[2] || '',
 
       planId:
         row[3] || '',
@@ -522,21 +901,21 @@ function getUserPaymentUpdates(username) {
         row[12] || '',
 
       statusTimestamp:
-        row[13]
-          ? new Date(row[13]).toISOString()
-          : ''
-
+        toISOStringSafe(row[13])
     }))
-    .filter(item =>
-      item.username.toLowerCase() ===
-      username.toLowerCase()
+
+    .filter(
+      item =>
+        item.username.toLowerCase() ===
+        username.toLowerCase()
     )
+
     .reverse();
 }
 
 
 /* =========================================================
-   USER SUPPORT DATA
+   USER SUPPORT
 ========================================================= */
 
 function getUserSupportUpdates(username) {
@@ -544,448 +923,152 @@ function getUserSupportUpdates(username) {
   const sheet =
     getOrCreateSupportSheet();
 
+
   const values =
-    sheet.getDataRange().getValues();
+    sheet.getDataRange()
+      .getValues();
+
 
   if (values.length <= 1) {
     return [];
   }
 
+
   return values
     .slice(1)
-    .map((row, index) => ({
 
-      rowNumber: index + 2,
+    .map((row, index) => {
 
-      timestamp:
-        row[0]
-          ? new Date(row[0]).toISOString()
-          : '',
+      let thread =
+        parseThread(row[9]);
 
-      username:
-        String(row[1] || ''),
 
-      phone:
-        row[2] || '',
+      /*
+       * پشتیبانی‌های قدیمی که قبل از
+       * سیستم گفتگو ثبت شده‌اند.
+       */
 
-      subject:
-        row[3] || '',
+      if (!thread.length) {
 
-      message:
-        row[4] || '',
+        thread = [];
 
-      status:
-        row[5] || 'جدید',
+        if (row[4]) {
 
-      adminReply:
-        row[6] || '',
+          thread.push({
 
-      replyTimestamp:
-        row[7]
-          ? new Date(row[7]).toISOString()
-          : ''
+            sender: 'user',
 
-    }))
-    .filter(item =>
-      item.username.toLowerCase() ===
-      username.toLowerCase()
+            text:
+              String(row[4]),
+
+            timestamp:
+              toISOStringSafe(row[0])
+          });
+        }
+
+
+        if (row[6]) {
+
+          thread.push({
+
+            sender: 'admin',
+
+            text:
+              String(row[6]),
+
+            timestamp:
+              toISOStringSafe(row[7])
+          });
+        }
+      }
+
+
+      return {
+
+        rowNumber:
+          index + 2,
+
+        timestamp:
+          toISOStringSafe(row[0]),
+
+        username:
+          String(row[1] || ''),
+
+        phone:
+          row[2] || '',
+
+        subject:
+          row[3] || '',
+
+        message:
+          row[4] || '',
+
+        status:
+          row[5] ||
+          'در حال بررسی',
+
+        adminReply:
+          row[6] || '',
+
+        replyTimestamp:
+          toISOStringSafe(row[7]),
+
+        conversationId:
+          row[8] ||
+          ('legacy-' + (index + 2)),
+
+        thread
+      };
+    })
+
+    .filter(
+      item =>
+        item.username.toLowerCase() ===
+        username.toLowerCase()
     )
+
     .reverse();
 }
 
 
 /* =========================================================
-   EMAIL ADMIN
+   ADMIN - PAYMENTS
 ========================================================= */
 
-function sendReceiptEmail(
-  data,
-  amount,
-  fileUrl,
-  file
-) {
-
-  const adminEmail =
-    getAdminEmail();
-
-  if (!adminEmail) return;
-
-  const subject =
-    'QuizDuo | فیش پرداخت جدید | ' +
-    data.username;
-
-  const body = [
-
-    'یک فیش پرداخت جدید در QuizDuo ثبت شد.',
-    '',
-
-    'نام کاربری: ' +
-      data.username,
-
-    'شماره تماس: ' +
-      (data.phone || '-'),
-
-    'پلن: ' +
-      (data.planName || data.plan),
-
-    'مبلغ: ' +
-      amount.toLocaleString('fa-IR') +
-      ' تومان',
-
-    'کد تخفیف: ' +
-      (data.discountCode || '-'),
-
-    '',
-
-    'لینک فایل فیش در Google Drive:',
-    fileUrl,
-
-    '',
-
-    'وضعیت فعلی: در انتظار بررسی'
-
-  ].join('\n');
-
-  GmailApp.sendEmail(
-    adminEmail,
-    subject,
-    body,
-    {
-      attachments: [
-        file.getBlob()
-      ]
-    }
-  );
-}
-
-
-/* =========================================================
-   ADMIN EMAIL
-========================================================= */
-
-function getAdminEmail() {
-
-  const saved =
-    PropertiesService
-      .getScriptProperties()
-      .getProperty('ADMIN_EMAIL');
-
-  if (saved) return saved;
-
-  return (
-    Session
-      .getEffectiveUser()
-      .getEmail() || ''
-  );
-}
-
-
-/* =========================================================
-   DRIVE
-========================================================= */
-
-function getOrCreateReceiptFolder() {
-
-  const folders =
-    DriveApp.getFoldersByName(
-      CONFIG.DRIVE_FOLDER_NAME
-    );
-
-  return folders.hasNext()
-    ? folders.next()
-    : DriveApp.createFolder(
-        CONFIG.DRIVE_FOLDER_NAME
-      );
-}
-
-
-/* =========================================================
-   SPREADSHEET
-========================================================= */
-
-function getOrCreateSpreadsheet() {
-
-  const props =
-    PropertiesService
-      .getScriptProperties();
-
-  let spreadsheetId =
-    props.getProperty(
-      'PAYMENTS_SPREADSHEET_ID'
-    );
-
-  let spreadsheet;
-
-  if (spreadsheetId) {
-
-    try {
-
-      spreadsheet =
-        SpreadsheetApp.openById(
-          spreadsheetId
-        );
-
-    } catch (error) {
-
-      spreadsheet = null;
-
-    }
-  }
-
-  if (!spreadsheet) {
-
-    spreadsheet =
-      SpreadsheetApp.create(
-        'QuizDuo Payments'
-      );
-
-    props.setProperty(
-      'PAYMENTS_SPREADSHEET_ID',
-      spreadsheet.getId()
-    );
-  }
-
-  return spreadsheet;
-}
-
-
-/* =========================================================
-   PAYMENT SHEET
-========================================================= */
-
-function getOrCreateSheet() {
-
-  const spreadsheet =
-    getOrCreateSpreadsheet();
-
-  let sheet =
-    spreadsheet.getSheetByName(
-      CONFIG.SHEET_NAME
-    );
-
-  if (!sheet) {
-    sheet =
-      spreadsheet.insertSheet(
-        CONFIG.SHEET_NAME
-      );
-  }
-
-  ensureHeaders(
-    sheet,
-    PAYMENT_HEADERS
-  );
-
-  return sheet;
-}
-
-
-/* =========================================================
-   SUPPORT SHEET
-========================================================= */
-
-function getOrCreateSupportSheet() {
-
-  const spreadsheet =
-    getOrCreateSpreadsheet();
-
-  let sheet =
-    spreadsheet.getSheetByName(
-      CONFIG.SUPPORT_SHEET_NAME
-    );
-
-  if (!sheet) {
-    sheet =
-      spreadsheet.insertSheet(
-        CONFIG.SUPPORT_SHEET_NAME
-      );
-  }
-
-  ensureHeaders(
-    sheet,
-    SUPPORT_HEADERS
-  );
-
-  return sheet;
-}
-
-
-/* =========================================================
-   HEADERS
-========================================================= */
-
-function ensureHeaders(
-  sheet,
-  headers
-) {
-
-  const existingLastColumn =
-    sheet.getLastColumn();
-
-  const existing =
-    existingLastColumn > 0
-      ? sheet
-          .getRange(
-            1,
-            1,
-            1,
-            existingLastColumn
-          )
-          .getValues()[0]
-      : [];
-
-  let changed = false;
-
-  headers.forEach(
-    (header, index) => {
-
-      if (existing[index] !== header) {
-
-        sheet
-          .getRange(1, index + 1)
-          .setValue(header);
-
-        changed = true;
-      }
-    }
-  );
-
-  if (
-    changed ||
-    sheet.getLastRow() === 0
-  ) {
-    sheet.setFrozenRows(1);
-  }
-}
-
-
-/* =========================================================
-   APPEND PAYMENT
-========================================================= */
-
-function appendPaymentRow(row) {
-
-  getOrCreateSheet()
-    .appendRow(row);
-}
-
-
-/* =========================================================
-   FILE NAME
-========================================================= */
-
-function sanitizeFileName(value) {
-
-  return String(
-    value || 'user'
-  )
-    .replace(
-      /[\\/:*?"<>|]/g,
-      '_'
-    )
-    .slice(0, 60);
-}
-
-
-/* =========================================================
-   JSON
-========================================================= */
-
-function jsonResponse(data) {
-
-  return ContentService
-    .createTextOutput(
-      JSON.stringify(data)
-    )
-    .setMimeType(
-      ContentService.MimeType.JSON
-    );
-}
-
-
-/* =========================================================
-   JSONP
-========================================================= */
-
-function jsonpResponse(
-  callback,
-  data
-) {
-
-  /*
-    callback فقط باید یک identifier ساده باشد.
-    هیچ کد دلخواهی از کاربر اجرا نمی‌شود.
-  */
-
-  if (
-    !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(
-      callback
-    )
-  ) {
-
-    return jsonResponse({
-      success: false,
-      message: 'Callback نامعتبر است.'
-    });
-  }
-
-  return ContentService
-    .createTextOutput(
-      callback +
-      '(' +
-      JSON.stringify(data) +
-      ');'
-    )
-    .setMimeType(
-      ContentService.MimeType.JAVASCRIPT
-    );
-}
-
-
-/* =========================================================
-   ADMIN AUTH
-========================================================= */
-
-function checkAdmin(password) {
-
-  return String(password || '') ===
-    CONFIG.ADMIN_PASSWORD;
-}
-
-
-/* =========================================================
-   ADMIN PAYMENTS
-========================================================= */
-
-function getPaymentsForAdmin(
-  password
-) {
+function getPaymentsForAdmin(password) {
 
   if (!checkAdmin(password)) {
+
     throw new Error(
       'رمز مدیریت اشتباه است.'
     );
   }
 
+
   const sheet =
     getOrCreateSheet();
 
+
   const values =
-    sheet.getDataRange().getValues();
+    sheet.getDataRange()
+      .getValues();
+
 
   if (values.length <= 1) {
     return [];
   }
 
+
   return values
     .slice(1)
+
     .map((row, index) => ({
 
-      rowNumber: index + 2,
+      rowNumber:
+        index + 2,
 
       timestamp:
-        row[0]
-          ? new Date(row[0]).toISOString()
-          : '',
+        toISOStringSafe(row[0]),
 
       username:
         row[1] || '',
@@ -1025,17 +1108,15 @@ function getPaymentsForAdmin(
         row[12] || '',
 
       statusTimestamp:
-        row[13]
-          ? new Date(row[13]).toISOString()
-          : ''
-
+        toISOStringSafe(row[13])
     }))
+
     .reverse();
 }
 
 
 /* =========================================================
-   UPDATE PAYMENT STATUS
+   ADMIN - UPDATE PAYMENT
 ========================================================= */
 
 function updatePaymentStatus(
@@ -1045,97 +1126,102 @@ function updatePaymentStatus(
 ) {
 
   if (!checkAdmin(password)) {
+
     throw new Error(
       'رمز مدیریت اشتباه است.'
     );
   }
 
+
   const allowed = [
+
     'تأیید شد',
+
     'رد شد',
+
     'در انتظار بررسی'
   ];
 
+
   if (!allowed.includes(status)) {
+
     throw new Error(
       'وضعیت نامعتبر است.'
     );
   }
 
+
   const sheet =
     getOrCreateSheet();
+
 
   const row =
     Number(rowNumber);
 
-  if (
-    !Number.isInteger(row) ||
-    row < 2 ||
-    row > sheet.getLastRow()
-  ) {
-    throw new Error(
-      'ردیف پرداخت نامعتبر است.'
-    );
-  }
 
   const username =
     String(
-      sheet
-        .getRange(row, 2)
-        .getValue() || ''
+      sheet.getRange(
+        row,
+        2
+      ).getValue() || ''
     );
+
 
   const planId =
     String(
-      sheet
-        .getRange(row, 4)
-        .getValue() || ''
+      sheet.getRange(
+        row,
+        4
+      ).getValue() || ''
     );
+
 
   const planName =
     String(
-      sheet
-        .getRange(row, 5)
-        .getValue() || ''
+      sheet.getRange(
+        row,
+        5
+      ).getValue() || ''
     );
+
 
   const now =
     new Date();
 
+
   let userMessage = '';
 
-  /*
-    این پیام‌ها در پنل ADMIN نمایش داده نمی‌شوند.
-    آنها در ستون User Message ذخیره می‌شوند
-    و فقط getUserPaymentUpdates آنها را
-    برای همان username برمی‌گرداند.
-  */
 
   if (status === 'تأیید شد') {
 
     userMessage =
       'پرداخت شما تأیید شد و اشتراک شما فعال شد.';
 
-  }
-
-  else if (status === 'رد شد') {
+  } else if (status === 'رد شد') {
 
     userMessage =
       'پرداخت شما رد شد. در صورت بروز مشکل به آیدی @hv901 در بله پیام بدهید.';
-
   }
 
-  sheet
-    .getRange(row, 12)
-    .setValue(status);
 
-  sheet
-    .getRange(row, 13)
-    .setValue(userMessage);
+  sheet.getRange(
+    row,
+    12
+  ).setValue(status);
 
-  sheet
-    .getRange(row, 14)
-    .setValue(now);
+
+  sheet.getRange(
+    row,
+    13
+  ).setValue(userMessage);
+
+
+  sheet.getRange(
+    row,
+    14
+  ).setValue(now);
+
 
   return {
 
@@ -1155,70 +1241,121 @@ function updatePaymentStatus(
 
 
 /* =========================================================
-   ADMIN SUPPORT
+   ADMIN - SUPPORT LIST
 ========================================================= */
 
-function getSupportForAdmin(
-  password
-) {
+function getSupportForAdmin(password) {
 
   if (!checkAdmin(password)) {
+
     throw new Error(
       'رمز مدیریت اشتباه است.'
     );
   }
 
+
   const sheet =
     getOrCreateSupportSheet();
 
+
   const values =
-    sheet.getDataRange().getValues();
+    sheet.getDataRange()
+      .getValues();
+
 
   if (values.length <= 1) {
     return [];
   }
 
+
   return values
     .slice(1)
-    .map((row, index) => ({
 
-      rowNumber: index + 2,
+    .map((row, index) => {
 
-      timestamp:
-        row[0]
-          ? new Date(row[0]).toISOString()
-          : '',
+      let thread =
+        parseThread(row[9]);
 
-      username:
-        row[1] || '',
 
-      phone:
-        row[2] || '',
+      if (!thread.length) {
 
-      subject:
-        row[3] || '',
+        thread = [];
 
-      message:
-        row[4] || '',
+        if (row[4]) {
 
-      status:
-        row[5] || 'جدید',
+          thread.push({
 
-      adminReply:
-        row[6] || '',
+            sender: 'user',
 
-      replyTimestamp:
-        row[7]
-          ? new Date(row[7]).toISOString()
-          : ''
+            text:
+              String(row[4]),
 
-    }))
+            timestamp:
+              toISOStringSafe(row[0])
+          });
+        }
+
+
+        if (row[6]) {
+
+          thread.push({
+
+            sender: 'admin',
+
+            text:
+              String(row[6]),
+
+            timestamp:
+              toISOStringSafe(row[7])
+          });
+        }
+      }
+
+
+      return {
+
+        rowNumber:
+          index + 2,
+
+        timestamp:
+          toISOStringSafe(row[0]),
+
+        username:
+          row[1] || '',
+
+        phone:
+          row[2] || '',
+
+        subject:
+          row[3] || '',
+
+        message:
+          row[4] || '',
+
+        status:
+          row[5] ||
+          'در حال بررسی',
+
+        adminReply:
+          row[6] || '',
+
+        replyTimestamp:
+          toISOStringSafe(row[7]),
+
+        conversationId:
+          row[8] ||
+          ('legacy-' + (index + 2)),
+
+        thread
+      };
+    })
+
     .reverse();
 }
 
 
 /* =========================================================
-   REPLY SUPPORT
+   ADMIN - REPLY SUPPORT
 ========================================================= */
 
 function replyToSupport(
@@ -1229,70 +1366,130 @@ function replyToSupport(
 ) {
 
   if (!checkAdmin(password)) {
+
     throw new Error(
       'رمز مدیریت اشتباه است.'
     );
   }
 
+
   const text =
     String(reply || '').trim();
 
+
   if (!text) {
+
     throw new Error(
       'متن پاسخ را وارد کنید.'
     );
   }
 
+
+  const sheet =
+    getOrCreateSupportSheet();
+
+
+  const row =
+    Number(rowNumber);
+
+
+  const currentStatus =
+    String(
+      sheet.getRange(
+        row,
+        6
+      ).getValue() || ''
+    );
+
+
+  if (currentStatus === 'بسته شد') {
+
+    throw new Error(
+      'این گفت‌وگو توسط کاربر به پایان رسیده است.'
+    );
+  }
+
+
+  const thread =
+    readThread(
+      sheet,
+      row
+    );
+
+
+  const now =
+    new Date();
+
+
+  thread.push({
+
+    sender: 'admin',
+
+    text,
+
+    timestamp:
+      now.toISOString()
+  });
+
+
   const allowed = [
-    'جدید',
+
     'در حال بررسی',
-    'پاسخ داده شد',
-    'بسته شد'
+
+    'پاسخ داده شد'
   ];
+
 
   const finalStatus =
     allowed.includes(status)
       ? status
       : 'پاسخ داده شد';
 
-  const sheet =
-    getOrCreateSupportSheet();
 
-  const row =
-    Number(rowNumber);
+  sheet.getRange(
+    row,
+    6
+  ).setValue(finalStatus);
 
-  if (
-    !Number.isInteger(row) ||
-    row < 2 ||
-    row > sheet.getLastRow()
-  ) {
-    throw new Error(
-      'ردیف پشتیبانی نامعتبر است.'
-    );
-  }
 
-  sheet
-    .getRange(row, 6)
-    .setValue(finalStatus);
+  sheet.getRange(
+    row,
+    7
+  ).setValue(text);
 
-  sheet
-    .getRange(row, 7)
-    .setValue(text);
 
-  sheet
-    .getRange(row, 8)
-    .setValue(new Date());
+  sheet.getRange(
+    row,
+    8
+  ).setValue(now);
+
+
+  sheet.getRange(
+    row,
+    9
+  ).setValue(now);
+
+
+  sheet.getRange(
+    row,
+    10
+  ).setValue(
+    JSON.stringify(thread)
+  );
+
 
   return {
+
     success: true,
+
     message:
-      'پاسخ برای پنل کاربر ثبت شد.'
+      'پاسخ در همان گفت‌وگوی کاربر ثبت شد.'
   };
 }
 
 
 /* =========================================================
-   SUPPORT STATUS
+   ADMIN - SUPPORT STATUS
 ========================================================= */
 
 function updateSupportStatus(
@@ -1302,34 +1499,525 @@ function updateSupportStatus(
 ) {
 
   if (!checkAdmin(password)) {
+
     throw new Error(
       'رمز مدیریت اشتباه است.'
     );
   }
 
+
   const allowed = [
-    'جدید',
+
     'در حال بررسی',
+
     'پاسخ داده شد',
+
     'بسته شد'
   ];
 
+
   if (!allowed.includes(status)) {
+
     throw new Error(
       'وضعیت نامعتبر است.'
     );
   }
 
+
   const sheet =
     getOrCreateSupportSheet();
 
-  sheet
-    .getRange(Number(rowNumber), 6)
-    .setValue(status);
+
+  sheet.getRange(
+    Number(rowNumber),
+    6
+  ).setValue(status);
+
+
+  sheet.getRange(
+    Number(rowNumber),
+    9
+  ).setValue(
+    new Date()
+  );
+
 
   return {
     success: true
   };
+}
+
+
+/* =========================================================
+   EMAIL
+========================================================= */
+
+function sendReceiptEmail(
+  data,
+  amount,
+  fileUrl,
+  file
+) {
+
+  const adminEmail =
+    getAdminEmail();
+
+
+  if (!adminEmail) {
+    return;
+  }
+
+
+  /*
+   * اگر Gmail مجوز نداشته باشد،
+   * این تابع خطا می‌دهد ولی handlePayment
+   * آن را catch می‌کند و ثبت فیش باقی می‌ماند.
+   */
+
+  GmailApp.sendEmail(
+
+    adminEmail,
+
+    'QuizDuo | فیش پرداخت جدید | ' +
+    data.username,
+
+    [
+      'یک فیش پرداخت جدید در QuizDuo ثبت شد.',
+      '',
+      'نام کاربری: ' +
+        data.username,
+
+      'شماره تماس: ' +
+        (data.phone || '-'),
+
+      'پلن: ' +
+        (data.planName || data.plan),
+
+      'مبلغ: ' +
+        amount.toLocaleString('fa-IR') +
+        ' تومان',
+
+      'کد تخفیف: ' +
+        (data.discountCode || '-'),
+
+      '',
+
+      'لینک فایل فیش:',
+
+      fileUrl,
+
+      '',
+
+      'وضعیت فعلی: در انتظار بررسی'
+    ].join('\n'),
+
+    {
+      attachments: [
+        file.getBlob()
+      ]
+    }
+  );
+}
+
+
+/* =========================================================
+   ADMIN EMAIL
+========================================================= */
+
+function getAdminEmail() {
+
+  const saved =
+    PropertiesService
+      .getScriptProperties()
+      .getProperty('ADMIN_EMAIL');
+
+
+  if (saved) {
+    return saved;
+  }
+
+
+  return CONFIG.ADMIN_EMAIL;
+}
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function getOrCreateReceiptFolder() {
+
+  const folders =
+    DriveApp.getFoldersByName(
+      CONFIG.DRIVE_FOLDER_NAME
+    );
+
+
+  if (folders.hasNext()) {
+
+    return folders.next();
+  }
+
+
+  return DriveApp.createFolder(
+    CONFIG.DRIVE_FOLDER_NAME
+  );
+}
+
+
+function getOrCreateSpreadsheet() {
+
+  const props =
+    PropertiesService
+      .getScriptProperties();
+
+
+  let spreadsheetId =
+    props.getProperty(
+      'PAYMENTS_SPREADSHEET_ID'
+    );
+
+
+  let spreadsheet;
+
+
+  if (spreadsheetId) {
+
+    try {
+
+      spreadsheet =
+        SpreadsheetApp.openById(
+          spreadsheetId
+        );
+
+    } catch (error) {
+
+      spreadsheet = null;
+    }
+  }
+
+
+  if (!spreadsheet) {
+
+    spreadsheet =
+      SpreadsheetApp.create(
+        'QuizDuo Payments'
+      );
+
+
+    props.setProperty(
+      'PAYMENTS_SPREADSHEET_ID',
+      spreadsheet.getId()
+    );
+  }
+
+
+  return spreadsheet;
+}
+
+
+function getOrCreateSheet() {
+
+  const spreadsheet =
+    getOrCreateSpreadsheet();
+
+
+  let sheet =
+    spreadsheet.getSheetByName(
+      CONFIG.SHEET_NAME
+    );
+
+
+  if (!sheet) {
+
+    sheet =
+      spreadsheet.insertSheet(
+        CONFIG.SHEET_NAME
+      );
+  }
+
+
+  ensureHeaders(
+    sheet,
+    PAYMENT_HEADERS
+  );
+
+
+  return sheet;
+}
+
+
+function getOrCreateSupportSheet() {
+
+  const spreadsheet =
+    getOrCreateSpreadsheet();
+
+
+  let sheet =
+    spreadsheet.getSheetByName(
+      CONFIG.SUPPORT_SHEET_NAME
+    );
+
+
+  if (!sheet) {
+
+    sheet =
+      spreadsheet.insertSheet(
+        CONFIG.SUPPORT_SHEET_NAME
+      );
+  }
+
+
+  ensureHeaders(
+    sheet,
+    SUPPORT_HEADERS
+  );
+
+
+  return sheet;
+}
+
+
+function ensureHeaders(
+  sheet,
+  headers
+) {
+
+  const existingLastColumn =
+    sheet.getLastColumn();
+
+
+  const existing =
+    existingLastColumn > 0
+
+      ? sheet
+          .getRange(
+            1,
+            1,
+            1,
+            existingLastColumn
+          )
+          .getValues()[0]
+
+      : [];
+
+
+  headers.forEach(
+    (header, index) => {
+
+      if (
+        existing[index] !==
+        header
+      ) {
+
+        sheet
+          .getRange(
+            1,
+            index + 1
+          )
+          .setValue(header);
+      }
+    }
+  );
+
+
+  sheet.setFrozenRows(1);
+}
+
+
+function appendPaymentRow(row) {
+
+  getOrCreateSheet()
+    .appendRow(row);
+}
+
+
+function createConversationId() {
+
+  return (
+    'QD-' +
+    Date.now() +
+    '-' +
+    Math.random()
+      .toString(36)
+      .slice(2, 8)
+      .toUpperCase()
+  );
+}
+
+
+function findSupportRow(
+  sheet,
+  username,
+  conversationId
+) {
+
+  const values =
+    sheet.getDataRange()
+      .getValues();
+
+
+  for (
+    let i = 1;
+    i < values.length;
+    i++
+  ) {
+
+    const rowUsername =
+      String(
+        values[i][1] || ''
+      ).toLowerCase();
+
+
+    const rowConversation =
+      String(
+        values[i][8] || ''
+      );
+
+
+    if (
+      rowUsername ===
+      username.toLowerCase() &&
+      rowConversation ===
+      conversationId
+    ) {
+
+      return i + 1;
+    }
+  }
+
+
+  return null;
+}
+
+
+function readThread(
+  sheet,
+  rowNumber
+) {
+
+  const raw =
+    sheet
+      .getRange(
+        rowNumber,
+        10
+      )
+      .getValue();
+
+
+  return parseThread(raw);
+}
+
+
+function parseThread(raw) {
+
+  if (!raw) {
+    return [];
+  }
+
+
+  try {
+
+    const parsed =
+      JSON.parse(String(raw));
+
+
+    return Array.isArray(parsed)
+      ? parsed
+      : [];
+
+  } catch (error) {
+
+    return [];
+  }
+}
+
+
+function toISOStringSafe(value) {
+
+  if (!value) {
+    return '';
+  }
+
+
+  try {
+
+    return new Date(value)
+      .toISOString();
+
+  } catch (error) {
+
+    return String(value);
+  }
+}
+
+
+function sanitizeFileName(value) {
+
+  return String(
+    value || 'user'
+  )
+    .replace(
+      /[\\/:*?"<>|]/g,
+      '_'
+    )
+    .slice(0, 60);
+}
+
+
+function escapeHtml(value) {
+
+  return String(value || '')
+
+    .replace(
+      /&/g,
+      '&amp;'
+    )
+
+    .replace(
+      /</g,
+      '&lt;'
+    )
+
+    .replace(
+      />/g,
+      '&gt;'
+    )
+
+    .replace(
+      /"/g,
+      '&quot;'
+    )
+
+    .replace(
+      /'/g,
+      '&#039;'
+    );
+}
+
+
+function jsonResponse(data) {
+
+  return ContentService
+
+    .createTextOutput(
+      JSON.stringify(data)
+    )
+
+    .setMimeType(
+      ContentService.MimeType.JSON
+    );
+}
+
+
+/* =========================================================
+   ADMIN AUTH
+========================================================= */
+
+function checkAdmin(password) {
+
+  return String(password || '') ===
+    CONFIG.ADMIN_PASSWORD;
 }
 
 
@@ -1339,9 +2027,9 @@ function updateSupportStatus(
 
 function testEmail() {
 
-  GmailApp.sendEmail({
+  MailApp.sendEmail({
 
-    to: getAdminEmail(),
+    to: CONFIG.ADMIN_EMAIL,
 
     subject:
       'QuizDuo Test Email',
