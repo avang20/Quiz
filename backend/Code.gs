@@ -1,4 +1,3 @@
-```javascript
 const CONFIG = {
   SHEET_NAME: 'Payments',
   SUPPORT_SHEET_NAME: 'Support',
@@ -12,7 +11,7 @@ const CONFIG = {
   MAX_RECEIPT_BYTES: 5 * 1024 * 1024,
 
   // رمز ورود پنل ادمین را اینجا عوض کن.
-  ADMIN_PASSWORD: 'Farz2_avang20'
+  ADMIN_PASSWORD: 'CHANGE_THIS_ADMIN_PASSWORD'
 };
 
 
@@ -1124,4 +1123,4 @@ function testEmail() {
     'ارسال ایمیل از Google Apps Script با موفقیت انجام شد.'
   );
 }
-```
+
