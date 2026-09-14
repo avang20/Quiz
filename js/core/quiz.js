@@ -1,19 +1,28 @@
 import { shuffle } from "./utils.js";
-import { addXP, markStageCompleted, isStageCompleted } from "./state.js";
+import {
+    addXP,
+    markStageCompleted,
+    isStageCompleted
+} from "./state.js";
+
 
 export const QUIZ_CONFIG = {
+
     questionsPerStage: 2,
+
     passingPercentage: 0.5,
+
     questionTime: 20,
+
     stageXP: 10,
+
     failedStageHeartPenalty: 1
+
 };
 
 
 /* =========================================================
-   QUESTION NORMALIZATION
-   هدف:
-   پشتیبانی از ساختارهای مختلف JSON بدون نمایش undefined
+   QUESTION NORMALIZER
 ========================================================= */
 
 function normalizeQuestion(raw, fallbackStage = 1) {
@@ -22,37 +31,36 @@ function normalizeQuestion(raw, fallbackStage = 1) {
         return null;
     }
 
-    /* ---------- متن سوال ---------- */
+
+    /* -------------------------
+       QUESTION TEXT
+    ------------------------- */
 
     const questionText =
         raw.question ??
+        raw.questionText ??
+        raw.question_text ??
         raw.q ??
         raw.text ??
         raw.title ??
         raw.prompt ??
-        raw.questionText ??
         raw.description ??
         "";
 
-    /* ---------- گزینه‌ها ---------- */
+
+    /* -------------------------
+       OPTIONS
+    ------------------------- */
 
     let options =
         raw.options ??
         raw.choices ??
         raw.answers ??
+        raw.answerOptions ??
+        raw.answer_options ??
         raw.o ??
-        raw.variants ??
         [];
 
-    /*
-        اگر options به شکل object باشد:
-        {
-            a: "...",
-            b: "...",
-            c: "...",
-            d: "..."
-        }
-    */
 
     if (!Array.isArray(options)) {
 
@@ -60,19 +68,17 @@ function normalizeQuestion(raw, fallbackStage = 1) {
             options &&
             typeof options === "object"
         ) {
+
             options = Object.values(options);
+
         } else {
+
             options = [];
+
         }
+
     }
 
-    /*
-        گزینه‌هایی که خودشان object هستند:
-
-        { text: "..." }
-        { label: "..." }
-        { value: "..." }
-    */
 
     options = options.map(option => {
 
@@ -89,209 +95,164 @@ function normalizeQuestion(raw, fallbackStage = 1) {
                 option.title ??
                 ""
             );
+
         }
 
         return option;
-    });
 
-    /*
-        همه گزینه‌ها را به String تبدیل می‌کنیم
-        تا هیچ‌وقت undefined در HTML چاپ نشود.
-    */
-
-    options = options.map(option => {
-
-        if (
-            option === null ||
-            option === undefined
-        ) {
-            return "";
-        }
-
-        return String(option);
     });
 
 
-    /* ---------- پاسخ صحیح ---------- */
+    options = options.map(option =>
+        String(option ?? "").trim()
+    );
 
-    let rawAnswer =
+
+    /* -------------------------
+       CORRECT ANSWER
+    ------------------------- */
+
+    const rawAnswer =
         raw.answer ??
         raw.correctAnswer ??
+        raw.correct_answer ??
         raw.correct ??
         raw.answerIndex ??
+        raw.answer_index ??
         raw.correctIndex ??
+        raw.correct_index ??
         raw.correctOption ??
-        raw.correctChoice;
+        raw.correct_option;
+
 
     let answer = -1;
 
-
-    /*
-        حالت 1:
-        answer = 0
-        answer = 1
-        ...
-    */
 
     if (
         typeof rawAnswer === "number" &&
         Number.isInteger(rawAnswer)
     ) {
 
+        /* 0-based */
+
         if (
             rawAnswer >= 0 &&
             rawAnswer < options.length
         ) {
+
             answer = rawAnswer;
+
         }
 
-        /*
-            پشتیبانی از answer = 1 برای گزینه اول
-        */
+        /* 1-based */
 
         else if (
             rawAnswer > 0 &&
             rawAnswer <= options.length
         ) {
+
             answer = rawAnswer - 1;
+
         }
+
     }
 
 
-    /*
-        حالت 2:
-        answer = "2"
-        answer = "1"
-    */
-
-    else if (typeof rawAnswer === "string") {
+    else if (
+        typeof rawAnswer === "string"
+    ) {
 
         const trimmed = rawAnswer.trim();
 
-        if (trimmed !== "") {
+        const numeric = Number(trimmed);
 
-            const numeric = Number(trimmed);
 
-            if (Number.isInteger(numeric)) {
+        if (
+            Number.isInteger(numeric)
+        ) {
 
-                if (
-                    numeric >= 0 &&
-                    numeric < options.length
-                ) {
-                    answer = numeric;
-                }
+            /* 0-based */
 
-                else if (
-                    numeric > 0 &&
-                    numeric <= options.length
-                ) {
-                    answer = numeric - 1;
-                }
+            if (
+                numeric >= 0 &&
+                numeric < options.length
+            ) {
+
+                answer = numeric;
+
             }
 
+            /* 1-based */
 
-            /*
-                اگر answer متن خود گزینه باشد:
+            else if (
+                numeric > 0 &&
+                numeric <= options.length
+            ) {
 
-                answer: "توکیو"
-            */
+                answer = numeric - 1;
 
-            if (answer < 0) {
+            }
 
-                const normalizedAnswer =
-                    trimmed.toLocaleLowerCase();
+        }
 
-                answer = options.findIndex(option =>
+
+        /* Answer text */
+
+        if (answer < 0) {
+
+            const normalizedAnswer =
+                trimmed.toLocaleLowerCase();
+
+            answer = options.findIndex(
+                option =>
                     String(option)
                         .trim()
                         .toLocaleLowerCase() ===
                     normalizedAnswer
-                );
-            }
+            );
+
         }
+
     }
 
 
-    /*
-        حالت 3:
-        correctOptions: ["توکیو"]
-    */
+    /* -------------------------
+       CORRECT OPTIONS
+    ------------------------- */
 
     if (
         answer < 0 &&
-        Array.isArray(raw.correctOptions) &&
-        raw.correctOptions.length > 0
+        Array.isArray(raw.correctOptions)
     ) {
 
         const candidate =
             raw.correctOptions[0];
 
-        answer = options.findIndex(option =>
-            String(option).trim() ===
-            String(candidate).trim()
-        );
-    }
-
-
-    /*
-        حالت 4:
-        correct: {
-            index: 2
-        }
-    */
-
-    if (
-        answer < 0 &&
-        raw.correct &&
-        typeof raw.correct === "object"
-    ) {
-
-        const correctObject = raw.correct;
-
-        if (
-            Number.isInteger(correctObject.index)
-        ) {
-
-            const index = correctObject.index;
-
-            if (
-                index >= 0 &&
-                index < options.length
-            ) {
-                answer = index;
-            }
-        }
-
-        else if (correctObject.text) {
-
-            answer = options.findIndex(option =>
+        answer = options.findIndex(
+            option =>
                 String(option).trim() ===
-                String(correctObject.text).trim()
-            );
-        }
+                String(candidate).trim()
+        );
+
     }
 
 
-    /* ---------- مرحله ---------- */
+    /* -------------------------
+       STAGE
+    ------------------------- */
 
     const stageValue =
         raw.stage ??
         raw.stageNumber ??
-        raw.level ??
+        raw.stage_number ??
         raw.stageId ??
+        raw.stage_id ??
+        raw.level ??
         fallbackStage;
+
 
     const stage =
         Number(stageValue) || fallbackStage;
-
-
-    /* ---------- توضیح ---------- */
-
-    const explanation =
-        raw.explanation ??
-        raw.explain ??
-        raw.descriptionAnswer ??
-        "";
 
 
     return {
@@ -301,18 +262,184 @@ function normalizeQuestion(raw, fallbackStage = 1) {
         stage,
 
         question:
-            String(questionText || "").trim(),
+            String(questionText).trim(),
 
         q:
-            String(questionText || "").trim(),
+            String(questionText).trim(),
 
         options,
 
         answer,
 
         explanation:
-            String(explanation || "")
+            raw.explanation ??
+            raw.explain ??
+            raw.description_explanation ??
+            ""
+
     };
+
+}
+
+
+/* =========================================================
+   EXTRACT QUESTIONS
+========================================================= */
+
+function extractQuestions(data) {
+
+    let rawQuestions = [];
+
+
+    /* -------------------------
+       JSON ARRAY
+    ------------------------- */
+
+    if (Array.isArray(data)) {
+
+        rawQuestions = data;
+
+    }
+
+
+    /* -------------------------
+       { questions: [...] }
+    ------------------------- */
+
+    else if (
+        data &&
+        Array.isArray(data.questions)
+    ) {
+
+        rawQuestions = data.questions;
+
+    }
+
+
+    /* -------------------------
+       { stages: [...] }
+    ------------------------- */
+
+    else if (
+        data &&
+        Array.isArray(data.stages)
+    ) {
+
+        data.stages.forEach(
+            stageBlock => {
+
+                if (
+                    !stageBlock ||
+                    typeof stageBlock !== "object"
+                ) {
+                    return;
+                }
+
+
+                const stageNumber =
+                    Number(
+                        stageBlock.stage ??
+                        stageBlock.id ??
+                        stageBlock.stageNumber ??
+                        stageBlock.stage_number ??
+                        1
+                    ) || 1;
+
+
+                let list =
+                    stageBlock.questions ??
+                    stageBlock.items ??
+                    stageBlock.data ??
+                    [];
+
+
+                if (!Array.isArray(list)) {
+                    list = [];
+                }
+
+
+                list.forEach(question => {
+
+                    if (
+                        question &&
+                        typeof question === "object"
+                    ) {
+
+                        rawQuestions.push({
+
+                            ...question,
+
+                            stage:
+                                question.stage ??
+                                question.stageNumber ??
+                                stageNumber
+
+                        });
+
+                    }
+
+                });
+
+            }
+        );
+
+    }
+
+
+    /* -------------------------
+       OBJECT OF STAGES
+       {
+         "1": [...],
+         "2": [...]
+       }
+    ------------------------- */
+
+    else if (
+        data &&
+        typeof data === "object"
+    ) {
+
+        Object.entries(data).forEach(
+            ([key, value]) => {
+
+                if (!Array.isArray(value)) {
+                    return;
+                }
+
+
+                const stageNumber =
+                    Number(key) || 1;
+
+
+                value.forEach(question => {
+
+                    if (
+                        question &&
+                        typeof question === "object"
+                    ) {
+
+                        rawQuestions.push({
+
+                            ...question,
+
+                            stage:
+                                question.stage ??
+                                stageNumber
+
+                        });
+
+                    }
+
+                });
+
+            }
+        );
+
+    }
+
+
+    return rawQuestions;
+
 }
 
 
@@ -349,6 +476,7 @@ export class QuizEngine {
         this.isReplay = false;
 
         this.stageRewardGiven = false;
+
     }
 
 
@@ -366,227 +494,49 @@ export class QuizEngine {
                 }
             );
 
+
         if (!response.ok) {
 
             throw new Error(
                 `Could not load data/${category}.json`
             );
+
         }
 
 
         const data =
             await response.json();
 
-        let rawQuestions = [];
 
+        const rawQuestions =
+            extractQuestions(data);
 
-        /* -------------------------------------------------
-           حالت 1:
-
-           [
-               {...},
-               {...}
-           ]
-        ------------------------------------------------- */
-
-        if (Array.isArray(data)) {
-
-            rawQuestions = data;
-        }
-
-
-        /* -------------------------------------------------
-           حالت 2:
-
-           {
-               questions: [...]
-           }
-        ------------------------------------------------- */
-
-        else if (
-            Array.isArray(data.questions)
-        ) {
-
-            rawQuestions =
-                data.questions;
-        }
-
-
-        /* -------------------------------------------------
-           حالت 3:
-
-           {
-               stages: [
-                   {
-                       stage: 1,
-                       questions: [...]
-                   }
-               ]
-           }
-        ------------------------------------------------- */
-
-        else if (
-            Array.isArray(data.stages)
-        ) {
-
-            data.stages.forEach(
-                stageBlock => {
-
-                    if (
-                        !stageBlock ||
-                        typeof stageBlock !== "object"
-                    ) {
-                        return;
-                    }
-
-                    const stageNumber =
-                        Number(
-                            stageBlock.stage ??
-                            stageBlock.id ??
-                            stageBlock.level ??
-                            1
-                        ) || 1;
-
-
-                    const list =
-                        Array.isArray(
-                            stageBlock.questions
-                        )
-                            ? stageBlock.questions
-                            : [];
-
-
-                    list.forEach(question => {
-
-                        if (
-                            question &&
-                            typeof question === "object"
-                        ) {
-
-                            rawQuestions.push({
-
-                                ...question,
-
-                                stage:
-                                    question.stage ??
-                                    question.stageNumber ??
-                                    stageNumber
-                            });
-                        }
-                    });
-                }
-            );
-        }
-
-
-        /* -------------------------------------------------
-           حالت 4:
-
-           {
-               "1": [...],
-               "2": [...]
-           }
-
-           برای ساختارهای stage-based ساده
-        ------------------------------------------------- */
-
-        else if (
-            data &&
-            typeof data === "object"
-        ) {
-
-            Object.entries(data)
-                .forEach(([key, value]) => {
-
-                    if (!Array.isArray(value)) {
-                        return;
-                    }
-
-                    const stageNumber =
-                        Number(key);
-
-                    if (
-                        !Number.isInteger(
-                            stageNumber
-                        )
-                    ) {
-                        return;
-                    }
-
-                    value.forEach(question => {
-
-                        if (
-                            question &&
-                            typeof question === "object"
-                        ) {
-
-                            rawQuestions.push({
-
-                                ...question,
-
-                                stage:
-                                    question.stage ??
-                                    stageNumber
-                            });
-                        }
-                    });
-                });
-        }
-
-
-        /* -------------------------------------------------
-           نرمال‌سازی همه سوال‌ها
-        ------------------------------------------------- */
 
         this.questions =
             rawQuestions
-
-                .map(question =>
-                    normalizeQuestion(
-                        question,
-                        1
-                    )
-                )
-
-                .filter(question => {
-
-                    if (!question) {
-                        return false;
-                    }
-
-                    if (
-                        !question.question ||
-                        !question.question.trim()
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        !Array.isArray(
-                            question.options
+                .map(
+                    question =>
+                        normalizeQuestion(
+                            question,
+                            1
                         )
-                    ) {
-                        return false;
-                    }
-
-                    /*
-                        حداقل یک گزینه غیرخالی
-                    */
-
-                    const hasOption =
-                        question.options.some(
-                            option =>
-                                String(option)
-                                    .trim()
-                                    .length > 0
-                        );
-
-                    return hasOption;
-                });
+                )
+                .filter(
+                    question =>
+                        question &&
+                        question.question &&
+                        question.question.trim() &&
+                        Array.isArray(question.options) &&
+                        question.options.length > 0
+                );
 
 
         this.currentCategory =
             category;
+
+
+        return this.questions;
+
     }
 
 
@@ -601,6 +551,7 @@ export class QuizEngine {
                 Number(question.stage) ===
                 Number(stage)
         );
+
     }
 
 
@@ -637,37 +588,29 @@ export class QuizEngine {
 
 
         const stageQuestions =
-            this.getStageQuestions(stage);
-
-
-        /*
-            سوال‌هایی که پاسخ صحیح معتبر دارند
-        */
-
-        const validQuestions =
-            stageQuestions.filter(
-                question =>
-                    Number.isInteger(
-                        question.answer
-                    ) &&
-                    question.answer >= 0 &&
-                    question.answer <
-                        question.options.length
-            );
+            this.getStageQuestions(stage)
+                .filter(
+                    question =>
+                        Number.isInteger(
+                            question.answer
+                        ) &&
+                        question.answer >= 0
+                );
 
 
         this.selectedQuestions =
-            shuffle(validQuestions)
+            shuffle(stageQuestions)
                 .slice(
                     0,
                     Math.min(
                         QUIZ_CONFIG.questionsPerStage,
-                        validQuestions.length
+                        stageQuestions.length
                     )
                 );
 
 
         return this.selectedQuestions;
+
     }
 
 
@@ -680,6 +623,7 @@ export class QuizEngine {
         return this.selectedQuestions[
             this.currentQuestion
         ];
+
     }
 
 
@@ -690,6 +634,7 @@ export class QuizEngine {
     getQuestionCount() {
 
         return this.selectedQuestions.length;
+
     }
 
 
@@ -711,31 +656,10 @@ export class QuizEngine {
 
                 correct: false,
 
-                passed: false,
+                passed: false
 
-                earnedXP: 0,
-
-                heartLost: false,
-
-                newlyCompleted: false,
-
-                replay: this.isReplay,
-
-                combo: this.combo,
-
-                correctAnswers:
-                    this.correctAnswers,
-
-                wrongAnswers:
-                    this.wrongAnswers,
-
-                total:
-                    this.selectedQuestions.length,
-
-                percentage: 0,
-
-                explanation: ""
             };
+
         }
 
 
@@ -749,6 +673,7 @@ export class QuizEngine {
             this.correctAnswers++;
 
             this.combo++;
+
         }
 
         else {
@@ -756,6 +681,7 @@ export class QuizEngine {
             this.wrongAnswers++;
 
             this.combo = 0;
+
         }
 
 
@@ -777,7 +703,7 @@ export class QuizEngine {
 
 
         /* =================================================
-           پایان مرحله
+           STAGE FINISHED
         ================================================= */
 
         if (finished) {
@@ -794,9 +720,9 @@ export class QuizEngine {
                 QUIZ_CONFIG.passingPercentage;
 
 
-            /* ---------------------------------------------
-               مرحله قبول شده
-            --------------------------------------------- */
+            /* -------------------------
+               PASSED
+            ------------------------- */
 
             if (passed) {
 
@@ -807,10 +733,6 @@ export class QuizEngine {
                         this.currentStage
                     );
 
-
-                /*
-                    فقط بار اول XP و مرحله بعدی
-                */
 
                 if (
                     !this.isReplay &&
@@ -834,19 +756,21 @@ export class QuizEngine {
                     );
 
 
-                    newlyCompleted = true;
+                    newlyCompleted =
+                        true;
+
 
                     this.stageRewardGiven =
                         true;
+
                 }
+
             }
 
 
-            /* ---------------------------------------------
-               مرحله رد شده
-
-               فقط یک قلب برای کل مرحله
-            --------------------------------------------- */
+            /* -------------------------
+               FAILED
+            ------------------------- */
 
             else if (!this.isReplay) {
 
@@ -861,9 +785,14 @@ export class QuizEngine {
                             QUIZ_CONFIG.failedStageHeartPenalty
                         );
 
-                    heartLost = true;
+
+                    heartLost =
+                        true;
+
                 }
+
             }
+
         }
 
 
@@ -888,11 +817,9 @@ export class QuizEngine {
 
             newlyCompleted,
 
-            replay:
-                this.isReplay,
+            replay: this.isReplay,
 
-            combo:
-                this.combo,
+            combo: this.combo,
 
             correctAnswers:
                 this.correctAnswers,
@@ -911,6 +838,9 @@ export class QuizEngine {
 
             explanation:
                 question.explanation || ""
+
         };
+
     }
+
 }
