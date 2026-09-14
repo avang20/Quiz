@@ -16,7 +16,6 @@ import {
 } from "./storage.js";
 
 import {
-    updateStreak,
     escapeHTML
 } from "./utils.js";
 
@@ -27,6 +26,7 @@ import {
 
 const APPS_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFkK02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXkIvzVyuxzJiZQ/exec";
+
 
 const ACCOUNT_NUMBER =
     "5022291615132519";
@@ -69,22 +69,27 @@ const subscriptionPlans = {
 
 
 const discountCodes = {
+
     QUIZDUO10: 10,
+
     WELCOME15: 15,
+
     STUDENT10: 10
 };
 
 
-const money =
-    value =>
-        Number(value || 0)
-            .toLocaleString("fa-IR") +
-        " تومان";
+const money = value =>
+    Number(value || 0)
+        .toLocaleString("fa-IR") +
+    " تومان";
 
 
 function normalizeQuestionForUI(question) {
 
-    if (!question) return null;
+    if (!question) {
+        return null;
+    }
+
 
     const text =
         question.question ??
@@ -94,6 +99,7 @@ function normalizeQuestionForUI(question) {
         question.prompt ??
         "";
 
+
     let options =
         question.options ??
         question.choices ??
@@ -101,13 +107,18 @@ function normalizeQuestionForUI(question) {
         question.o ??
         [];
 
+
     if (!Array.isArray(options)) {
+
         options =
             options &&
             typeof options === "object"
+
                 ? Object.values(options)
+
                 : [];
     }
+
 
     options =
         options.map(option => {
@@ -126,8 +137,10 @@ function normalizeQuestionForUI(question) {
                 );
             }
 
+
             return option;
         });
+
 
     return {
         ...question,
@@ -144,8 +157,11 @@ class App {
         const defaultState =
             createDefaultState();
 
+
         const username =
-            getCurrentUser() || "guest";
+            getCurrentUser() ||
+            "guest";
+
 
         this.state =
             loadState(
@@ -153,10 +169,12 @@ class App {
                 username
             );
 
+
         this.state.username =
             username === "guest"
                 ? "بازیکن مهمان"
                 : username;
+
 
         this.quiz =
             new QuizEngine(
@@ -164,44 +182,68 @@ class App {
                 () => this.persist()
             );
 
-        this.authRegister = false;
 
-        this.selectedPlan = null;
+        this.authRegister =
+            false;
 
-        this.discountPercent = 0;
 
-        this.testFixedAmount = null;
+        this.selectedPlan =
+            null;
 
-        this.paymentFile = null;
+
+        this.discountPercent =
+            0;
+
+
+        this.testFixedAmount =
+            null;
+
+
+        this.paymentFile =
+            null;
+
 
         this.lastServerUpdates = {
+
             payments: [],
+
             support: []
         };
 
-        this.serverSyncTimer = null;
+
+        this.serverSyncTimer =
+            null;
     }
 
 
     persist() {
 
         saveState(
+
             this.state,
-            this.state.username === "بازیکن مهمان"
+
+            this.state.username ===
+            "بازیکن مهمان"
+
                 ? "guest"
+
                 : this.state.username
         );
+
 
         if (
             this.state.username !==
             "بازیکن مهمان"
         ) {
+
             updateLeaderboard(
                 this.state
             );
         }
 
+
         this.renderProfile();
+
         this.renderQuizStats();
     }
 
@@ -227,7 +269,9 @@ class App {
 
 
         document
-            .getElementById("themeToggle")
+            .getElementById(
+                "themeToggle"
+            )
             ?.addEventListener(
                 "click",
                 () => this.toggleTheme()
@@ -235,7 +279,9 @@ class App {
 
 
         document
-            .getElementById("authButton")
+            .getElementById(
+                "authButton"
+            )
             ?.addEventListener(
                 "click",
                 () => this.go("auth")
@@ -243,23 +289,30 @@ class App {
 
 
         this.initAuth();
+
         this.initQuiz();
+
         this.initSubscription();
+
         this.initChat();
+
         this.initSupport();
 
         this.loadTheme();
 
         this.renderProfile();
+
         this.renderQuizStats();
 
         this.go("home");
 
         this.syncServerUpdates();
 
+
         this.serverSyncTimer =
             window.setInterval(
-                () => this.syncServerUpdates(),
+                () =>
+                    this.syncServerUpdates(),
                 20000
             );
     }
@@ -269,13 +322,14 @@ class App {
 
         document
             .querySelectorAll(".page")
-            .forEach(
-                p =>
-                    p.classList.remove("active")
+            .forEach(p =>
+                p.classList.remove("active")
             );
+
 
         const target =
             document.getElementById(page);
+
 
         if (target) {
             target.classList.add("active");
@@ -299,6 +353,8 @@ class App {
 
         if (page === "subscription") {
 
+            this.ensureUserPanels();
+
             this.renderPaymentState();
 
             this.syncServerUpdates();
@@ -306,6 +362,8 @@ class App {
 
 
         if (page === "support") {
+
+            this.ensureUserPanels();
 
             this.syncServerUpdates();
         }
@@ -320,23 +378,26 @@ class App {
 
     toggleTheme() {
 
-        document.body.classList.toggle(
-            "dark"
-        );
+        document.body
+            .classList
+            .toggle("dark");
+
 
         const theme =
-            document.body.classList.contains(
-                "dark"
-            )
+            document.body.classList.contains("dark")
                 ? "dark"
                 : "light";
 
-        this.state.theme = theme;
+
+        this.state.theme =
+            theme;
+
 
         localStorage.setItem(
             "quizduo_theme",
             theme
         );
+
 
         this.persist();
     }
@@ -351,17 +412,22 @@ class App {
             ) ||
             "light";
 
-        document.body.classList.toggle(
-            "dark",
-            theme === "dark"
-        );
+
+        document.body
+            .classList
+            .toggle(
+                "dark",
+                theme === "dark"
+            );
     }
 
 
     initAuth() {
 
         document
-            .getElementById("toggleAuth")
+            .getElementById(
+                "toggleAuth"
+            )
             .addEventListener(
                 "click",
                 () => {
@@ -369,43 +435,61 @@ class App {
                     this.authRegister =
                         !this.authRegister;
 
+
                     document
-                        .getElementById("authTitle")
+                        .getElementById(
+                            "authTitle"
+                        )
                         .textContent =
                         this.authRegister
                             ? "ساخت حساب جدید"
                             : "ورود";
 
+
                     document
-                        .getElementById("authSubmit")
+                        .getElementById(
+                            "authSubmit"
+                        )
                         .textContent =
                         this.authRegister
                             ? "ثبت‌نام"
                             : "ورود";
 
+
                     document
-                        .getElementById("toggleAuth")
+                        .getElementById(
+                            "toggleAuth"
+                        )
                         .textContent =
                         this.authRegister
                             ? "ورود به حساب"
                             : "ساخت حساب جدید";
 
+
                     document
-                        .getElementById("phoneField")
-                        .classList.toggle(
+                        .getElementById(
+                            "phoneField"
+                        )
+                        .classList
+                        .toggle(
                             "hidden",
                             !this.authRegister
                         );
 
+
                     document
-                        .getElementById("authMsg")
+                        .getElementById(
+                            "authMsg"
+                        )
                         .textContent = "";
                 }
             );
 
 
         document
-            .getElementById("authBack")
+            .getElementById(
+                "authBack"
+            )
             .addEventListener(
                 "click",
                 () => this.go("home")
@@ -413,7 +497,9 @@ class App {
 
 
         document
-            .getElementById("authSubmit")
+            .getElementById(
+                "authSubmit"
+            )
             .addEventListener(
                 "click",
                 () => this.submitAuth()
@@ -425,24 +511,35 @@ class App {
 
         const name =
             document
-                .getElementById("authName")
+                .getElementById(
+                    "authName"
+                )
                 .value
                 .trim();
+
 
         const password =
             document
-                .getElementById("authPassword")
+                .getElementById(
+                    "authPassword"
+                )
                 .value;
+
 
         const phone =
             document
-                .getElementById("authPhone")
+                .getElementById(
+                    "authPhone"
+                )
                 .value
                 .trim();
 
+
         const msg =
             document
-                .getElementById("authMsg");
+                .getElementById(
+                    "authMsg"
+                );
 
 
         if (
@@ -459,6 +556,7 @@ class App {
 
         const users =
             getUsers();
+
 
         const existing =
             users.find(
@@ -493,15 +591,23 @@ class App {
 
 
             users.push({
+
                 username: name,
+
                 password,
+
                 phone,
-                createdAt: Date.now()
+
+                createdAt:
+                    Date.now()
             });
+
 
             saveUsers(users);
 
+
             setCurrentUser(name);
+
 
             this.state =
                 loadState(
@@ -509,17 +615,18 @@ class App {
                     name
                 );
 
+
             this.state.username =
                 name;
 
+
             this.persist();
+
 
             msg.textContent =
                 "حساب با موفقیت ساخته شد.";
 
-        }
-
-        else {
+        } else {
 
             if (
                 !existing ||
@@ -537,16 +644,20 @@ class App {
                 existing.username
             );
 
+
             this.state =
                 loadState(
                     createDefaultState(),
                     existing.username
                 );
 
+
             this.state.username =
                 existing.username;
 
+
             this.persist();
+
 
             msg.textContent =
                 "ورود موفق بود.";
@@ -554,13 +665,7 @@ class App {
 
 
         setTimeout(
-            () => {
-
-                this.go("home");
-
-                this.syncServerUpdates();
-
-            },
+            () => this.go("home"),
             450
         );
     }
@@ -582,19 +687,21 @@ class App {
                             .querySelectorAll(
                                 "[data-category-tab]"
                             )
-                            .forEach(
-                                b =>
-                                    b.classList.remove(
-                                        "active"
-                                    )
+                            .forEach(b =>
+                                b.classList.remove(
+                                    "active"
+                                )
                             );
+
 
                         btn.classList.add(
                             "active"
                         );
 
+
                         this.quiz.currentCategory =
                             btn.dataset.categoryTab;
+
 
                         this.renderStages();
                     }
@@ -610,8 +717,10 @@ class App {
                 "stages"
             );
 
+
         const category =
             this.quiz.currentCategory;
+
 
         box.innerHTML =
             `<div class="panel loading">
@@ -625,11 +734,13 @@ class App {
                 category
             );
 
+
             const unlocked =
                 getUnlockedStage(
                     this.state,
                     category
                 );
+
 
             const maxStage =
                 Math.max(
@@ -639,6 +750,7 @@ class App {
                             Number(q.stage) || 1
                     )
                 );
+
 
             box.innerHTML = "";
 
@@ -652,6 +764,7 @@ class App {
                 const available =
                     i <= unlocked;
 
+
                 const completed =
                     isStageCompleted(
                         this.state,
@@ -659,23 +772,36 @@ class App {
                         i
                     );
 
+
                 const questions =
-                    this.quiz.getStageQuestions(i);
+                    this.quiz.getStageQuestions(
+                        i
+                    );
+
 
                 const card =
                     document.createElement(
                         "article"
                     );
 
-                card.className =
-                    `stage-card panel
-                    ${available ? "" : "locked"}
-                    ${completed ? "completed" : ""}`;
 
-                card.innerHTML =
-                    `<div class="stage-number">
+                card.className =
+                    `stage-card panel ${
+                        available
+                            ? ""
+                            : "locked"
+                    } ${
+                        completed
+                            ? "completed"
+                            : ""
+                    }`;
+
+
+                card.innerHTML = `
+                    <div class="stage-number">
                         ${i}
                     </div>
+
                     <div>
                         <h3>
                             مرحله ${i}
@@ -687,6 +813,7 @@ class App {
                                         : "🔒"
                             }
                         </h3>
+
                         <p>
                             ${
                                 questions.length
@@ -694,7 +821,8 @@ class App {
                                     : "این مرحله هنوز سوالی ندارد."
                             }
                         </p>
-                    </div>`;
+                    </div>
+                `;
 
 
                 if (
@@ -713,18 +841,22 @@ class App {
                 box.appendChild(card);
             }
 
+
             document
-                .getElementById("quizBox")
-                .classList.add("hidden");
+                .getElementById(
+                    "quizBox"
+                )
+                .classList
+                .add("hidden");
 
-        }
-
-        catch (error) {
+        } catch (error) {
 
             box.innerHTML =
                 `<div class="panel error">
                     خطا در بارگذاری سوال‌ها:
-                    ${escapeHTML(error.message)}
+                    ${escapeHTML(
+                        error.message
+                    )}
                 </div>`;
         }
     }
@@ -734,6 +866,7 @@ class App {
 
         const category =
             this.quiz.currentCategory;
+
 
         const completed =
             isStageCompleted(
@@ -750,13 +883,17 @@ class App {
                     "شما قبلاً امتیاز این مرحله را کسب کرده‌اید. آیا مایلید دوباره این مرحله را بازی کنید؟\n\nبازی کردن در این مرحله نه از شما قلب کم می‌کند و نه XP اضافه می‌کند."
                 );
 
-            if (!replay) return;
+
+            if (!replay) {
+                return;
+            }
         }
 
 
         if (
             !this.quiz.questions.length ||
-            this.quiz.currentCategory !== category
+            this.quiz.currentCategory !==
+            category
         ) {
 
             await this.quiz.loadCategory(
@@ -772,6 +909,7 @@ class App {
                 completed
             );
 
+
         this.renderQuestion(
             questions[0]
         );
@@ -784,6 +922,7 @@ class App {
             document.getElementById(
                 "quizBox"
             );
+
 
         const normalized =
             normalizeQuestionForUI(
@@ -821,19 +960,24 @@ class App {
         );
 
 
-        box.innerHTML =
-            `<div class="quiz-top">
+        box.innerHTML = `
+
+            <div class="quiz-top">
+
                 <span>
                     مرحله ${this.quiz.currentStage}
                 </span>
 
                 <span>
-                    سوال
-                    ${this.quiz.currentQuestion + 1}
+                    سوال ${
+                        this.quiz.currentQuestion + 1
+                    }
                     از
                     ${this.quiz.getQuestionCount()}
                 </span>
+
             </div>
+
 
             <h3>
                 ${escapeHTML(
@@ -841,29 +985,30 @@ class App {
                 )}
             </h3>
 
+
             <div class="options">
 
-                ${
-                    options
-                        .map(
-                            (option, index) =>
-                                `<button
-                                    class="option"
-                                    data-i="${index}">
-                                    ${escapeHTML(
-                                        String(option)
-                                    )}
-                                </button>`
-                        )
-                        .join("")
-                }
+                ${options.map(
+                    (option, index) => `
+                        <button
+                            class="option"
+                            data-i="${index}"
+                        >
+                            ${escapeHTML(
+                                String(option)
+                            )}
+                        </button>
+                    `
+                ).join("")}
 
             </div>
 
+
             <div
                 id="quizFeedback"
-                class="quiz-feedback">
-            </div>`;
+                class="quiz-feedback"
+            ></div>
+        `;
 
 
         box
@@ -896,10 +1041,12 @@ class App {
         const result =
             this.quiz.answer(index);
 
+
         const box =
             document.getElementById(
                 "quizBox"
             );
+
 
         box
             .querySelectorAll(
@@ -919,9 +1066,11 @@ class App {
 
         feedback.innerHTML =
             result.correct
+
                 ? `<div class="success">
                     ✓ پاسخ درست بود!
                    </div>`
+
                 : `<div class="error">
                     ✗ پاسخ درست نبود.
                    </div>`;
@@ -942,6 +1091,7 @@ class App {
 
             feedback.innerHTML +=
                 result.passed
+
                     ? `<div class="result-good">
                         🎉 مرحله را با موفقیت تمام کردی!
                         ${
@@ -964,7 +1114,8 @@ class App {
             feedback.innerHTML +=
                 `<button
                     id="quizNext"
-                    class="primary full">
+                    class="primary full"
+                >
                     ادامه
                 </button>`;
 
@@ -977,14 +1128,13 @@ class App {
                 () =>
                     this.renderStages();
 
-        }
-
-        else {
+        } else {
 
             feedback.innerHTML +=
                 `<button
                     id="quizNext"
-                    class="primary full">
+                    class="primary full"
+                >
                     سوال بعدی
                 </button>`;
 
@@ -1002,6 +1152,7 @@ class App {
 
 
         this.renderQuizStats();
+
         this.renderProfile();
     }
 
@@ -1013,6 +1164,7 @@ class App {
                 "quizStats"
             );
 
+
         if (el) {
 
             el.textContent =
@@ -1023,14 +1175,19 @@ class App {
 
     renderProfile() {
 
-        const s = this.state;
+        const s =
+            this.state;
+
 
         const name =
             document.getElementById(
                 "profileName"
             );
 
-        if (!name) return;
+
+        if (!name) {
+            return;
+        }
 
 
         name.textContent =
@@ -1066,16 +1223,34 @@ class App {
             ) - 1;
 
 
+        const status =
+            s.subscriptionStatus ===
+            "active"
+
+                ? (
+                    s.subscriptionPlan ===
+                    "nineMonth"
+                        ? "Premium 👑"
+                        : "اشتراکی"
+                  )
+
+                : (
+                    s.subscription ===
+                    "premium"
+                        ? "Premium 👑"
+                        : s.subscription ===
+                          "paid"
+                            ? "اشتراکی"
+                            : "رایگان"
+                  );
+
+
         document
             .getElementById(
                 "subscriptionStatus"
             )
             .textContent =
-            s.subscription === "premium"
-                ? "Premium 👑"
-                : s.subscription === "paid"
-                    ? "اشتراکی"
-                    : "رایگان";
+            status;
 
 
         document
@@ -1083,8 +1258,11 @@ class App {
                 "authButton"
             )
             .textContent =
-            s.username === "بازیکن مهمان"
+            s.username ===
+            "بازیکن مهمان"
+
                 ? "ورود / ثبت‌نام"
+
                 : s.username;
     }
 
@@ -1094,48 +1272,64 @@ class App {
         const board =
             getLeaderboard();
 
+
         const body =
             document.getElementById(
                 "leaderBody"
             );
 
+
         const rows =
             board.length
+
                 ? board
-                : [{
-                    username:
-                        "هنوز داده‌ای وجود ندارد",
-                    xp: 0,
-                    generalStage: 1,
-                    funStage: 1
-                }];
+
+                : [
+                    {
+                        username:
+                            "هنوز داده‌ای وجود ندارد",
+
+                        xp: 0,
+
+                        generalStage: 1,
+
+                        funStage: 1
+                    }
+                  ];
 
 
         body.innerHTML =
-            rows
-                .map(
-                    (item, index) =>
-                        `<tr>
-                            <td>${index + 1}</td>
-                            <td>
-                                ${escapeHTML(
-                                    item.username
-                                )}
-                            </td>
-                            <td>
-                                ${item.xp || 0}
-                            </td>
-                            <td>
-                                ${
-                                    Math.max(
-                                        item.generalStage || 1,
-                                        item.funStage || 1
-                                    ) - 1
-                                }
-                            </td>
-                        </tr>`
-                )
-                .join("");
+            rows.map(
+                (item, index) => `
+
+                    <tr>
+
+                        <td>
+                            ${index + 1}
+                        </td>
+
+                        <td>
+                            ${escapeHTML(
+                                item.username
+                            )}
+                        </td>
+
+                        <td>
+                            ${item.xp || 0}
+                        </td>
+
+                        <td>
+                            ${
+                                Math.max(
+                                    item.generalStage || 1,
+                                    item.funStage || 1
+                                ) - 1
+                            }
+                        </td>
+
+                    </tr>
+                `
+            ).join("");
     }
 
 
@@ -1163,7 +1357,8 @@ class App {
             )
             .addEventListener(
                 "click",
-                () => this.applyDiscount()
+                () =>
+                    this.applyDiscount()
             );
 
 
@@ -1178,9 +1373,8 @@ class App {
                         .getElementById(
                             "paymentPanel"
                         )
-                        .classList.add(
-                            "hidden"
-                        )
+                        .classList
+                        .add("hidden")
             );
 
 
@@ -1196,13 +1390,16 @@ class App {
                         event.target.files[0] ||
                         null;
 
+
                     document
                         .getElementById(
                             "fileName"
                         )
                         .textContent =
                         this.paymentFile
+
                             ? this.paymentFile.name
+
                             : "فایلی انتخاب نشده است";
                 }
             );
@@ -1214,7 +1411,8 @@ class App {
             )
             .addEventListener(
                 "click",
-                () => this.submitPayment()
+                () =>
+                    this.submitPayment()
             );
     }
 
@@ -1226,11 +1424,16 @@ class App {
         }
 
 
-        this.selectedPlan = id;
+        this.selectedPlan =
+            id;
 
-        this.discountPercent = 0;
 
-        this.testFixedAmount = null;
+        this.discountPercent =
+            0;
+
+
+        this.testFixedAmount =
+            null;
 
 
         document
@@ -1244,9 +1447,8 @@ class App {
             .getElementById(
                 "paymentPanel"
             )
-            .classList.remove(
-                "hidden"
-            );
+            .classList
+            .remove("hidden");
 
 
         document
@@ -1254,7 +1456,8 @@ class App {
                 "selectedPlanTitle"
             )
             .textContent =
-            subscriptionPlans[id].name;
+            subscriptionPlans[id]
+                .name;
 
 
         document
@@ -1263,7 +1466,8 @@ class App {
             )
             .textContent =
             money(
-                subscriptionPlans[id].price
+                subscriptionPlans[id]
+                    .price
             );
 
 
@@ -1313,6 +1517,7 @@ class App {
                 .trim()
                 .toUpperCase();
 
+
         const msg =
             document
                 .getElementById(
@@ -1327,9 +1532,11 @@ class App {
 
         if (!code) {
 
-            this.testFixedAmount = null;
+            this.testFixedAmount =
+                null;
 
-            this.discountPercent = 0;
+            this.discountPercent =
+                0;
 
             msg.textContent =
                 "کدی وارد نشده است.";
@@ -1342,13 +1549,16 @@ class App {
 
         if (discountCodes[code]) {
 
-            this.testFixedAmount = null;
+            this.testFixedAmount =
+                null;
 
             this.discountPercent =
                 discountCodes[code];
 
+
             msg.textContent =
                 `کد با ${this.discountPercent}٪ تخفیف اعمال شد.`;
+
 
             this.updateFinalPrice();
 
@@ -1362,34 +1572,17 @@ class App {
 
         try {
 
-            const response =
-                await fetch(
-                    APPS_SCRIPT_URL,
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "text/plain;charset=utf-8"
-                        },
-
-                        body:
-                            JSON.stringify({
-                                action:
-                                    "validateDiscount",
-                                code,
-                                plan:
-                                    this.selectedPlan
-                            })
-                    }
-                );
-
-
-            const text =
-                await response.text();
-
             const data =
-                JSON.parse(text);
+                await this.serverRequest({
+
+                    action:
+                        "validateDiscount",
+
+                    code,
+
+                    plan:
+                        this.selectedPlan
+                });
 
 
             if (
@@ -1398,37 +1591,46 @@ class App {
             ) {
 
                 this.testFixedAmount =
-                    Number(data.amount);
+                    Number(
+                        data.amount
+                    );
 
-                this.discountPercent = 0;
+
+                this.discountPercent =
+                    0;
+
 
                 msg.textContent =
                     "کد تست خصوصی تأیید شد؛ مبلغ نهایی ۱۰۰٬۰۰۰ تومان است.";
 
-            }
+            } else {
 
-            else {
+                this.testFixedAmount =
+                    null;
 
-                this.testFixedAmount = null;
+                this.discountPercent =
+                    0;
 
-                this.discountPercent = 0;
 
                 msg.textContent =
                     "کد تخفیف معتبر نیست.";
             }
 
-        }
-
-        catch (error) {
+        } catch (error) {
 
             console.error(error);
 
-            this.testFixedAmount = null;
 
-            this.discountPercent = 0;
+            this.testFixedAmount =
+                null;
+
+
+            this.discountPercent =
+                0;
+
 
             msg.textContent =
-                "بررسی کد انجام نشد؛ اتصال Google Apps Script را بررسی کنید.";
+                "بررسی کد انجام نشد.";
         }
 
 
@@ -1442,10 +1644,12 @@ class App {
             return;
         }
 
+
         const base =
             subscriptionPlans[
                 this.selectedPlan
             ].price;
+
 
         const final =
             this.testFixedAmount ??
@@ -1453,9 +1657,11 @@ class App {
                 base *
                 (
                     1 -
-                    this.discountPercent / 100
+                    this.discountPercent /
+                    100
                 )
             );
+
 
         document
             .getElementById(
@@ -1548,10 +1754,12 @@ class App {
                     this.paymentFile
                 );
 
+
             const plan =
                 subscriptionPlans[
                     this.selectedPlan
                 ];
+
 
             const enteredCode =
                 document
@@ -1561,6 +1769,7 @@ class App {
                     .value
                     .trim()
                     .toUpperCase();
+
 
             const normalAmount =
                 this.testFixedAmount ??
@@ -1574,49 +1783,45 @@ class App {
                 );
 
 
-            const payload = {
-
-                action: "payment",
-
-                username:
-                    this.state.username,
-
-                phone:
-                    this.getRegisteredPhone(),
-
-                plan:
-                    this.selectedPlan,
-
-                planName:
-                    plan.name,
-
-                amount:
-                    normalAmount,
-
-                originalAmount:
-                    plan.price,
-
-                discountPercent:
-                    this.discountPercent,
-
-                discountCode:
-                    enteredCode,
-
-                fileName:
-                    this.paymentFile.name,
-
-                mimeType:
-                    this.paymentFile.type,
-
-                receiptBase64:
-                    base64
-            };
-
-
             const data =
-                await this.serverRequest(
-                    payload
-                );
+                await this.serverRequest({
+
+                    action:
+                        "payment",
+
+                    username:
+                        this.state.username,
+
+                    phone:
+                        this.getRegisteredPhone(),
+
+                    plan:
+                        this.selectedPlan,
+
+                    planName:
+                        plan.name,
+
+                    amount:
+                        normalAmount,
+
+                    originalAmount:
+                        plan.price,
+
+                    discountPercent:
+                        this.discountPercent,
+
+                    discountCode:
+                        enteredCode,
+
+                    fileName:
+                        this.paymentFile.name,
+
+                    mimeType:
+                        this.paymentFile.type,
+
+                    receiptBase64:
+                        base64
+                });
 
 
             if (!data.success) {
@@ -1629,11 +1834,7 @@ class App {
 
 
             msg.textContent =
-                data.message ||
-                "فیش با موفقیت برای بررسی ارسال شد.";
-
-
-            this.syncServerUpdates();
+                "فیش با موفقیت ارسال شد و در انتظار بررسی است.";
 
 
             document
@@ -1651,20 +1852,23 @@ class App {
                 "فایلی انتخاب نشده است";
 
 
-            this.paymentFile = null;
+            this.paymentFile =
+                null;
 
-        }
 
-        catch (error) {
+            await this.syncServerUpdates();
 
-            console.error(error);
+        } catch (error) {
+
+            console.error(
+                "Payment error:",
+                error
+            );
+
 
             msg.textContent =
-                error.message &&
-                error.message !==
-                    "Failed to fetch"
-                    ? error.message
-                    : "ارسال فیش انجام نشد. اتصال Google Apps Script را بررسی کنید.";
+                error.message ||
+                "ارسال فیش انجام نشد.";
         }
     }
 
@@ -1682,6 +1886,7 @@ class App {
                     ).toLowerCase()
             );
 
+
         return user?.phone || "";
     }
 
@@ -1694,16 +1899,20 @@ class App {
                 const reader =
                     new FileReader();
 
-                reader.onload =
-                    () =>
-                        resolve(
-                            String(
-                                reader.result
-                            ).split(",")[1] || ""
-                        );
+
+                reader.onload = () =>
+                    resolve(
+                        String(
+                            reader.result
+                        )
+                            .split(",")[1] ||
+                        ""
+                    );
+
 
                 reader.onerror =
                     reject;
+
 
                 reader.readAsDataURL(
                     file
@@ -1717,6 +1926,7 @@ class App {
 
         this.loadChat();
 
+
         document
             .getElementById(
                 "sendChat"
@@ -1726,25 +1936,32 @@ class App {
                 () => {
 
                     const input =
-                        document.getElementById(
-                            "chatInput"
-                        );
+                        document
+                            .getElementById(
+                                "chatInput"
+                            );
+
 
                     const text =
                         input.value.trim();
 
-                    if (!text) return;
+
+                    if (!text) {
+                        return;
+                    }
 
 
                     const arr =
                         JSON.parse(
                             localStorage.getItem(
                                 "quizduo_chat"
-                            ) || "[]"
+                            ) ||
+                            "[]"
                         );
 
 
                     arr.push({
+
                         username:
                             this.state.username,
 
@@ -1763,6 +1980,7 @@ class App {
 
                     input.value = "";
 
+
                     this.loadChat();
                 }
             );
@@ -1775,71 +1993,136 @@ class App {
             JSON.parse(
                 localStorage.getItem(
                     "quizduo_chat"
-                ) || "[]"
+                ) ||
+                "[]"
             );
 
 
-        document
-            .getElementById(
+        const messages =
+            document.getElementById(
                 "messages"
-            )
-            .innerHTML =
-            arr
-                .map(
-                    message =>
-                        `<div class="chat-message">
-                            <b>
-                                ${escapeHTML(
-                                    message.username
-                                )}
-                            </b>
-                            <p>
-                                ${escapeHTML(
-                                    message.text
-                                )}
-                            </p>
-                        </div>`
-                )
-                .join("");
+            );
+
+
+        if (!messages) {
+            return;
+        }
+
+
+        messages.innerHTML =
+            arr.map(
+                message => `
+
+                    <div class="chat-message">
+
+                        <b>
+                            ${escapeHTML(
+                                message.username
+                            )}
+                        </b>
+
+                        <p>
+                            ${escapeHTML(
+                                message.text
+                            )}
+                        </p>
+
+                    </div>
+                `
+            ).join("");
     }
 
 
     initSupport() {
 
-        document
-            .getElementById(
+        const send =
+            document.getElementById(
                 "supportSend"
-            )
-            .addEventListener(
-                "click",
-                () => this.submitSupport()
             );
 
-        this.ensureUserUpdatesPanel();
+
+        if (send) {
+
+            send.addEventListener(
+                "click",
+                () =>
+                    this.submitSupport()
+            );
+        }
+
+
+        this.ensureUserPanels();
+
+
+        document.addEventListener(
+            "click",
+            event => {
+
+                const replyButton =
+                    event.target.closest(
+                        "[data-support-reply]"
+                    );
+
+
+                if (replyButton) {
+
+                    this.sendSupportReply(
+                        replyButton.dataset
+                            .supportReply
+                    );
+
+                    return;
+                }
+
+
+                const closeButton =
+                    event.target.closest(
+                        "[data-support-close]"
+                    );
+
+
+                if (closeButton) {
+
+                    this.closeSupport(
+                        closeButton.dataset
+                            .supportClose
+                    );
+                }
+
+
+                const refresh =
+                    event.target.closest(
+                        "#refreshUserUpdates"
+                    );
+
+
+                if (refresh) {
+
+                    this.syncServerUpdates();
+                }
+            }
+        );
     }
 
 
-    ensureUserUpdatesPanel() {
+    ensureUserPanels() {
 
-        const supportPanel =
-            document.querySelector(
-                "#support .panel"
+        const support =
+            document.getElementById(
+                "support"
             );
 
-        const subscriptionPanel =
+
+        const subscription =
             document.getElementById(
                 "subscription"
             );
 
 
-        if (!supportPanel) {
-            return;
-        }
-
-
         if (
+            support &&
             !document.getElementById(
-                "userUpdatesPanel"
+                "supportConversationsPanel"
             )
         ) {
 
@@ -1848,65 +2131,63 @@ class App {
                     "div"
                 );
 
+
             panel.id =
-                "userUpdatesPanel";
+                "supportConversationsPanel";
+
 
             panel.className =
                 "panel user-updates-panel";
 
 
-            panel.innerHTML =
-                `<div class="section-heading">
+            panel.innerHTML = `
+
+                <div class="section-heading">
 
                     <div>
+
                         <span class="eyebrow">
-                            اعلان‌ها
+                            گفتگوهای من
                         </span>
 
                         <h3>
-                            وضعیت درخواست‌ها
+                            وضعیت پشتیبانی
                         </h3>
+
                     </div>
 
                     <button
                         id="refreshUserUpdates"
-                        class="secondary">
+                        class="secondary"
+                    >
                         به‌روزرسانی
                     </button>
 
                 </div>
 
-                <div id="userUpdatesContent">
+                <div
+                    id="supportConversationsContent"
+                >
                     <p class="message">
-                        برای مشاهده آخرین وضعیت،
-                        وارد حساب شوید.
+                        برای مشاهده گفتگوها وارد حساب شوید.
                     </p>
-                </div>`;
+                </div>
+            `;
 
 
-            supportPanel.parentNode
-                .insertBefore(
-                    panel,
-                    supportPanel
-                );
-
-
-            document
-                .getElementById(
-                    "refreshUserUpdates"
+            support.insertBefore(
+                panel,
+                support.querySelector(
+                    ".panel"
                 )
-                ?.addEventListener(
-                    "click",
-                    () =>
-                        this.syncServerUpdates()
-                );
+            );
         }
 
 
         if (
-            subscriptionPanel &&
+            subscription &&
             !document.getElementById(
-                "subscriptionUserUpdates"
+                "subscriptionPaymentsPanel"
             )
         ) {
 
@@ -1915,40 +2196,50 @@ class App {
                     "div"
                 );
 
+
             panel.id =
-                "subscriptionUserUpdates";
+                "subscriptionPaymentsPanel";
+
 
             panel.className =
                 "panel user-updates-panel";
 
 
-            panel.innerHTML =
-                `<div class="section-heading">
+            panel.innerHTML = `
+
+                <div class="section-heading">
 
                     <div>
+
                         <span class="eyebrow">
-                            اعلان‌های اشتراک
+                            گزارش اشتراک
                         </span>
 
                         <h3>
-                            آخرین وضعیت پرداخت
+                            پرداخت‌های من
                         </h3>
+
                     </div>
 
                 </div>
 
-                <div id="subscriptionUpdatesContent">
+                <div
+                    id="subscriptionPaymentsContent"
+                >
                     <p class="message">
                         در حال بررسی...
                     </p>
-                </div>`;
+                </div>
+            `;
 
 
-            subscriptionPanel
-                .insertBefore(
-                    panel,
-                    subscriptionPanel.firstChild
-                );
+            subscription.insertBefore(
+                panel,
+                subscription.querySelector(
+                    ".subscription-hero"
+                )?.nextSibling ||
+                subscription.firstChild
+            );
         }
     }
 
@@ -1963,6 +2254,7 @@ class App {
                 .value
                 .trim();
 
+
         const text =
             document
                 .getElementById(
@@ -1970,6 +2262,7 @@ class App {
                 )
                 .value
                 .trim();
+
 
         const msg =
             document
@@ -2006,21 +2299,22 @@ class App {
         try {
 
             const data =
-                await this.jsonpRequest(
-                    "support",
-                    {
-                        username:
-                            this.state.username,
+                await this.serverRequest({
 
-                        phone:
-                            this.getRegisteredPhone(),
+                    action:
+                        "support",
 
-                        subject,
+                    username:
+                        this.state.username,
 
-                        message:
-                            text
-                    }
-                );
+                    phone:
+                        this.getRegisteredPhone(),
+
+                    subject,
+
+                    message:
+                        text
+                });
 
 
             if (!data.success) {
@@ -2048,19 +2342,18 @@ class App {
 
             msg.textContent =
                 data.message ||
-                "درخواست پشتیبانی با موفقیت ارسال شد.";
+                "گفت‌وگو ایجاد شد.";
 
 
             await this.syncServerUpdates();
 
-        }
-
-        catch (error) {
+        } catch (error) {
 
             console.error(
                 "Support error:",
                 error
             );
+
 
             msg.textContent =
                 error.message ||
@@ -2069,193 +2362,202 @@ class App {
     }
 
 
-    serverRequest(payload) {
+    async sendSupportReply(
+        conversationId
+    ) {
 
-        return fetch(
-            APPS_SCRIPT_URL,
-            {
-                method: "POST",
+        const textarea =
+            document.querySelector(
+                `[data-support-input="${CSS.escape(
+                    conversationId
+                )}"]`
+            );
 
-                headers: {
-                    "Content-Type":
-                        "text/plain;charset=utf-8"
-                },
 
-                body:
-                    JSON.stringify(payload)
+        if (!textarea) {
+            return;
+        }
+
+
+        const message =
+            textarea.value.trim();
+
+
+        if (!message) {
+            return;
+        }
+
+
+        textarea.disabled =
+            true;
+
+
+        try {
+
+            const data =
+                await this.serverRequest({
+
+                    action:
+                        "supportUserReply",
+
+                    username:
+                        this.state.username,
+
+                    conversationId,
+
+                    message
+                });
+
+
+            if (!data.success) {
+
+                throw new Error(
+                    data.message ||
+                    "ارسال پیام ناموفق بود."
+                );
             }
-        )
-            .then(
-                response =>
-                    response.text()
-            )
-            .then(text => {
-
-                let data;
-
-                try {
-
-                    data =
-                        JSON.parse(text);
-
-                } catch {
-
-                    throw new Error(
-                        "پاسخ نامعتبر از سامانه دریافت شد."
-                    );
-                }
 
 
-                if (
-                    !data.success &&
-                    data.message
-                ) {
-
-                    throw new Error(
-                        data.message
-                    );
-                }
+            textarea.value = "";
 
 
-                return data;
-            });
+            await this.syncServerUpdates();
+
+        } catch (error) {
+
+            alert(
+                error.message ||
+                "ارسال پیام ناموفق بود."
+            );
+
+        } finally {
+
+            textarea.disabled =
+                false;
+        }
     }
 
 
-    jsonpRequest(
-        action,
-        params = {}
+    async closeSupport(
+        conversationId
     ) {
 
-        return new Promise(
-            (resolve, reject) => {
-
-                const callbackName =
-                    "__quizduo_cb_" +
-                    Date.now() +
-                    "_" +
-                    Math.floor(
-                        Math.random() * 100000
-                    );
+        const ok =
+            confirm(
+                "آیا مطمئن هستید که می‌خواهید این گفت‌وگو را به پایان برسانید؟ بعد از اتمام، امکان ارسال پیام جدید در همین گفت‌وگو وجود ندارد."
+            );
 
 
-                const query =
-                    new URLSearchParams();
+        if (!ok) {
+            return;
+        }
 
 
-                query.set(
-                    "action",
-                    action
+        try {
+
+            const data =
+                await this.serverRequest({
+
+                    action:
+                        "closeSupport",
+
+                    username:
+                        this.state.username,
+
+                    conversationId
+                });
+
+
+            if (!data.success) {
+
+                throw new Error(
+                    data.message ||
+                    "اتمام گفت‌وگو ناموفق بود."
                 );
-
-                query.set(
-                    "callback",
-                    callbackName
-                );
-
-
-                Object.entries(params)
-                    .forEach(
-                        ([key, value]) => {
-
-                            query.set(
-                                key,
-                                String(
-                                    value ?? ""
-                                )
-                            );
-                        }
-                    );
-
-
-                const script =
-                    document.createElement(
-                        "script"
-                    );
-
-
-                let finished = false;
-
-
-                const cleanup =
-                    () => {
-
-                        finished = true;
-
-                        delete window[
-                            callbackName
-                        ];
-
-                        script.remove();
-
-                        clearTimeout(
-                            timeout
-                        );
-                    };
-
-
-                const timeout =
-                    setTimeout(
-                        () => {
-
-                            if (finished) {
-                                return;
-                            }
-
-                            cleanup();
-
-                            reject(
-                                new Error(
-                                    "اتصال به سامانه پشتیبانی برقرار نشد. Web App را بررسی کنید."
-                                )
-                            );
-
-                        },
-                        15000
-                    );
-
-
-                window[callbackName] =
-                    data => {
-
-                        if (finished) {
-                            return;
-                        }
-
-                        cleanup();
-
-                        resolve(data);
-                    };
-
-
-                script.onerror =
-                    () => {
-
-                        if (finished) {
-                            return;
-                        }
-
-                        cleanup();
-
-                        reject(
-                            new Error(
-                                "ارتباط با سامانه پشتیبانی برقرار نشد."
-                            )
-                        );
-                    };
-
-
-                script.src =
-                    APPS_SCRIPT_URL +
-                    "?" +
-                    query.toString();
-
-
-                document
-                    .head
-                    .appendChild(script);
             }
-        );
+
+
+            await this.syncServerUpdates();
+
+        } catch (error) {
+
+            alert(
+                error.message ||
+                "اتمام گفت‌وگو ناموفق بود."
+            );
+        }
+    }
+
+
+    async serverRequest(payload) {
+
+        let response;
+
+
+        try {
+
+            response =
+                await fetch(
+                    APPS_SCRIPT_URL,
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "text/plain;charset=utf-8"
+                        },
+
+                        body:
+                            JSON.stringify(
+                                payload
+                            )
+                    }
+                );
+
+        } catch (networkError) {
+
+            console.error(
+                "Network error:",
+                networkError
+            );
+
+
+            throw new Error(
+                "ارتباط با سامانه برقرار نشد. مطمئن شوید Web App در Apps Script با دسترسی «Anyone» منتشر شده و لینک /exec صحیح است."
+            );
+        }
+
+
+        const text =
+            await response.text();
+
+
+        let data;
+
+
+        try {
+
+            data =
+                JSON.parse(text);
+
+        } catch {
+
+            throw new Error(
+                "پاسخ نامعتبر از سامانه دریافت شد."
+            );
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.message ||
+                "خطای ارتباط با سامانه."
+            );
+        }
+
+
+        return data;
     }
 
 
@@ -2266,7 +2568,7 @@ class App {
             "بازیکن مهمان"
         ) {
 
-            this.renderUserUpdates();
+            this.renderUserPanels();
 
             return;
         }
@@ -2275,13 +2577,14 @@ class App {
         try {
 
             const data =
-                await this.jsonpRequest(
-                    "userUpdates",
-                    {
-                        username:
-                            this.state.username
-                    }
-                );
+                await this.serverRequest({
+
+                    action:
+                        "userUpdates",
+
+                    username:
+                        this.state.username
+                });
 
 
             if (!data.success) {
@@ -2311,13 +2614,9 @@ class App {
             };
 
 
-            /*
-              فقط وقتی پرداخت تأیید شده باشد
-              اشتراک کاربر فعال می‌شود.
-            */
-
             const approved =
-                this.lastServerUpdates.payments
+                this.lastServerUpdates
+                    .payments
                     .find(
                         p =>
                             p.status ===
@@ -2327,37 +2626,32 @@ class App {
 
             if (approved) {
 
-                const plan =
-                    approved.planId;
-
-                const isPremium =
-                    plan === "nineMonth";
-
                 const changed =
                     this.state.subscriptionPlan !==
-                        plan ||
+                        approved.planId ||
+
                     this.state.subscriptionStatus !==
-                        "active" ||
-                    this.state.subscription !==
-                        (
-                            isPremium
-                                ? "premium"
-                                : "paid"
-                        );
+                        "active";
 
 
                 this.state.subscriptionStatus =
                     "active";
 
+
                 this.state.subscriptionPlan =
-                    plan;
+                    approved.planId;
+
 
                 this.state.subscriptionName =
                     approved.planName;
 
+
                 this.state.subscription =
-                    isPremium
+                    approved.planId ===
+                    "nineMonth"
+
                         ? "premium"
+
                         : "paid";
 
 
@@ -2367,41 +2661,38 @@ class App {
             }
 
 
-            this.renderUserUpdates();
+            this.renderUserPanels();
 
-        }
+            this.renderProfile();
 
-        catch (error) {
+        } catch (error) {
 
             console.error(
                 "User update sync failed:",
                 error
             );
 
-            this.renderUserUpdates(
+
+            this.renderUserPanels(
                 error
             );
         }
     }
 
 
-    renderUserUpdates(
-        error = null
-    ) {
+    renderUserPanels(error = null) {
 
-        this.ensureUserUpdatesPanel();
+        this.ensureUserPanels();
 
 
-        const paymentUpdates =
+        const payments =
             this.lastServerUpdates
-                ?.payments ||
-            [];
+                ?.payments || [];
 
 
-        const supportUpdates =
+        const support =
             this.lastServerUpdates
-                ?.support ||
-            [];
+                ?.support || [];
 
 
         const formatDate =
@@ -2410,6 +2701,7 @@ class App {
                 if (!value) {
                     return "";
                 }
+
 
                 try {
 
@@ -2421,233 +2713,413 @@ class App {
 
                 } catch {
 
-                    return value;
+                    return String(value);
                 }
             };
 
 
-        /*
-          اعلان‌های پرداخت
-        */
-
-        const paymentHtml =
-            paymentUpdates
-                .slice(0, 8)
-                .map(item => {
-
-                    const cls =
-                        item.status ===
-                        "تأیید شد"
-
-                            ? "success"
-
-                            : item.status ===
-                              "رد شد"
-
-                                ? "danger"
-
-                                : "pending";
-
-
-                    return `
-                        <div
-                            class="user-update-item ${cls}">
-
-                            <b>
-                                💳
-                                ${escapeHTML(
-                                    item.planName ||
-                                    item.planId
-                                )}
-                            </b>
-
-                            <span>
-                                ${escapeHTML(
-                                    item.status
-                                )}
-                            </span>
-
-                            ${
-                                item.userMessage
-                                    ? `
-                                        <p>
-                                            ${escapeHTML(
-                                                item.userMessage
-                                            )}
-                                        </p>
-                                      `
-                                    : ""
-                            }
-
-                            <small>
-                                ${escapeHTML(
-                                    formatDate(
-                                        item.statusTimestamp ||
-                                        item.timestamp
-                                    )
-                                )}
-                            </small>
-
-                        </div>
-                    `;
-                })
-                .join("");
-
-
-        /*
-          پاسخ‌های پشتیبانی
-        */
-
-        const supportHtml =
-            supportUpdates
-                .slice(0, 8)
-                .map(item => {
-
-                    return `
-                        <div
-                            class="user-update-item ${
-                                item.adminReply
-                                    ? "success"
-                                    : "pending"
-                            }">
-
-                            <b>
-                                🎫
-                                ${escapeHTML(
-                                    item.subject ||
-                                    "پشتیبانی"
-                                )}
-                            </b>
-
-                            <span>
-                                ${escapeHTML(
-                                    item.status ||
-                                    "جدید"
-                                )}
-                            </span>
-
-                            <div class="support-user-message">
-
-                                <strong>
-                                    پیام شما:
-                                </strong>
-
-                                <p>
-                                    ${escapeHTML(
-                                        item.message
-                                    )}
-                                </p>
-
-                            </div>
-
-                            ${
-                                item.adminReply
-                                    ? `
-                                        <div
-                                            class="support-admin-reply">
-
-                                            <strong>
-                                                پاسخ پشتیبانی:
-                                            </strong>
-
-                                            <p>
-                                                ${escapeHTML(
-                                                    item.adminReply
-                                                )}
-                                            </p>
-
-                                        </div>
-                                      `
-                                    : `
-                                        <p>
-                                            درخواست شما ثبت شده
-                                            و منتظر پاسخ پشتیبانی است.
-                                        </p>
-                                      `
-                            }
-
-                            <small>
-                                ${escapeHTML(
-                                    formatDate(
-                                        item.replyTimestamp ||
-                                        item.timestamp
-                                    )
-                                )}
-                            </small>
-
-                        </div>
-                    `;
-                })
-                .join("");
-
-
-        const content =
+        const paymentContent =
             document.getElementById(
-                "userUpdatesContent"
+                "subscriptionPaymentsContent"
             );
 
 
-        if (content) {
+        if (paymentContent) {
 
             if (
                 error &&
-                !paymentHtml &&
-                !supportHtml
+                !payments.length
             ) {
 
-                content.innerHTML =
+                paymentContent.innerHTML =
                     `<p class="message">
                         اتصال به سامانه برقرار نشد.
-                        بعداً دوباره تلاش کنید.
                     </p>`;
 
-            }
-
-            else if (
-                !paymentHtml &&
-                !supportHtml
+            } else if (
+                !payments.length
             ) {
 
-                content.innerHTML =
+                paymentContent.innerHTML =
                     `<p class="message">
-                        هنوز اعلان یا پاسخ جدیدی ندارید.
+                        هنوز فیشی برای این حساب ثبت نشده است.
                     </p>`;
 
-            }
+            } else {
 
-            else {
+                paymentContent.innerHTML =
+                    payments
+                        .map(
+                            item => {
 
-                content.innerHTML =
-                    paymentHtml +
-                    supportHtml;
+                                let statusClass =
+                                    "pending";
+
+
+                                if (
+                                    item.status ===
+                                    "تأیید شد"
+                                ) {
+
+                                    statusClass =
+                                        "success";
+                                }
+
+
+                                if (
+                                    item.status ===
+                                    "رد شد"
+                                ) {
+
+                                    statusClass =
+                                        "danger";
+                                }
+
+
+                                const duration =
+                                    item.planName ||
+                                    this.getPlanDuration(
+                                        item.planId
+                                    );
+
+
+                                return `
+
+                                    <article
+                                        class="user-update-card payment-update-card ${statusClass}"
+                                    >
+
+                                        <div class="update-card-top">
+
+                                            <div>
+
+                                                <span class="eyebrow">
+                                                    اشتراک
+                                                </span>
+
+                                                <h3>
+                                                    ${escapeHTML(
+                                                        duration
+                                                    )}
+                                                </h3>
+
+                                            </div>
+
+                                            <span class="status-badge">
+                                                ${escapeHTML(
+                                                    item.status
+                                                )}
+                                            </span>
+
+                                        </div>
+
+
+                                        <div class="update-card-info">
+
+                                            <span>
+                                                💰
+                                                ${money(
+                                                    item.amount
+                                                )}
+                                            </span>
+
+                                            <span>
+                                                🕒
+                                                ${escapeHTML(
+                                                    formatDate(
+                                                        item.timestamp
+                                                    )
+                                                )}
+                                            </span>
+
+                                        </div>
+
+
+                                        ${
+                                            item.userMessage
+                                                ? `
+                                                    <div class="update-card-message">
+                                                        ${escapeHTML(
+                                                            item.userMessage
+                                                        )}
+                                                    </div>
+                                                  `
+                                                : ""
+                                        }
+
+                                    </article>
+                                `;
+                            }
+                        )
+                        .join("");
             }
         }
 
 
-        const subscriptionContent =
+        const supportContent =
             document.getElementById(
-                "subscriptionUpdatesContent"
+                "supportConversationsContent"
             );
 
 
-        if (subscriptionContent) {
+        if (supportContent) {
 
-            if (!paymentHtml) {
+            if (
+                error &&
+                !support.length
+            ) {
 
-                subscriptionContent.innerHTML =
+                supportContent.innerHTML =
                     `<p class="message">
-                        هنوز وضعیت پرداختی
-                        برای این حساب ثبت نشده است.
+                        اتصال به سامانه برقرار نشد.
                     </p>`;
 
-            }
+            } else if (
+                !support.length
+            ) {
 
-            else {
+                supportContent.innerHTML =
+                    `<p class="message">
+                        هنوز گفت‌وگوی پشتیبانی ندارید.
+                    </p>`;
 
-                subscriptionContent.innerHTML =
-                    paymentHtml;
+            } else {
+
+                supportContent.innerHTML =
+                    support
+                        .map(
+                            conversation =>
+                                this.renderSupportConversation(
+                                    conversation,
+                                    formatDate
+                                )
+                        )
+                        .join("");
             }
         }
+    }
+
+
+    renderSupportConversation(
+        conversation,
+        formatDate
+    ) {
+
+        const thread =
+            Array.isArray(
+                conversation.thread
+            )
+                ? conversation.thread
+                : [];
+
+
+        const status =
+            conversation.status ||
+            "در حال بررسی";
+
+
+        const closed =
+            status === "بسته شد";
+
+
+        const messagesHtml =
+            thread
+                .map(
+                    item => `
+
+                        <div
+                            class="support-message ${
+                                item.sender ===
+                                "admin"
+                                    ? "admin-message"
+                                    : "user-message"
+                            }"
+                        >
+
+                            <div class="support-message-author">
+
+                                ${
+                                    item.sender ===
+                                    "admin"
+                                        ? "پشتیبانی QuizDuo"
+                                        : "شما"
+                                }
+
+                            </div>
+
+                            <div class="support-message-text">
+
+                                ${escapeHTML(
+                                    item.text || ""
+                                )}
+
+                            </div>
+
+                            <small>
+
+                                ${escapeHTML(
+                                    formatDate(
+                                        item.timestamp
+                                    )
+                                )}
+
+                            </small>
+
+                        </div>
+                    `
+                )
+                .join("");
+
+
+        const shortText =
+            conversation.message
+                ? String(
+                    conversation.message
+                  ).slice(0, 120)
+                : "";
+
+
+        return `
+
+            <article
+                class="user-update-card support-conversation-card"
+            >
+
+                <div class="update-card-top">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            گفت‌وگوی پشتیبانی
+                        </span>
+
+                        <h3>
+                            ${escapeHTML(
+                                conversation.subject ||
+                                "بدون موضوع"
+                            )}
+                        </h3>
+
+                    </div>
+
+
+                    <span class="status-badge">
+
+                        ${escapeHTML(
+                            status
+                        )}
+
+                    </span>
+
+                </div>
+
+
+                <p class="support-summary">
+
+                    ${escapeHTML(
+                        shortText
+                    )}
+
+                    ${
+                        String(
+                            conversation.message || ""
+                        ).length > 120
+                            ? "..."
+                            : ""
+                    }
+
+                </p>
+
+
+                <div class="support-thread">
+
+                    ${
+                        messagesHtml ||
+                        `<p class="message">
+                            هنوز پیامی ثبت نشده است.
+                         </p>`
+                    }
+
+                </div>
+
+
+                ${
+                    closed
+
+                        ? `
+
+                            <div class="closed-conversation">
+
+                                این گفت‌وگو توسط شما به پایان رسیده است.
+
+                            </div>
+
+                          `
+
+                        : `
+
+                            <div class="support-reply-box">
+
+                                <textarea
+                                    data-support-input="${escapeHTML(
+                                        conversation.conversationId
+                                    )}"
+                                    placeholder="پیام بعدی خود را در همین گفت‌وگو بنویسید..."
+                                ></textarea>
+
+
+                                <div class="support-actions">
+
+                                    <button
+                                        class="primary"
+                                        data-support-reply="${escapeHTML(
+                                            conversation.conversationId
+                                        )}"
+                                    >
+                                        ارسال پیام
+                                    </button>
+
+
+                                    <button
+                                        class="secondary"
+                                        data-support-close="${escapeHTML(
+                                            conversation.conversationId
+                                        )}"
+                                    >
+                                        اتمام گفت‌وگو
+                                    </button>
+
+                                </div>
+
+                            </div>
+                          `
+                }
+
+            </article>
+        `;
+    }
+
+
+    getPlanDuration(planId) {
+
+        const names = {
+
+            monthly:
+                "۱ ماهه",
+
+            quarterly:
+                "۳ ماهه",
+
+            sixMonth:
+                "۶ ماهه",
+
+            nineMonth:
+                "۹ ماهه"
+        };
+
+
+        return names[planId] ||
+            "اشتراک";
     }
 }
 
