@@ -26,7 +26,9 @@ export const DEFAULT_STATE = {
         start: null,
         expiry: null
     },
-    welcomeSeen: false
+    welcomeSeen: false,
+    registrationCelebrationSeen: false,
+    subscriptionCelebrationSeen: false
 };
 
 export function createDefaultState() {
