@@ -104,7 +104,35 @@ function doPost(e) {
   }
 }
 
-/* =========================================================    DISCOUNT ========================================================= */  function validateDiscount(data) {   const code = String(data.code || '').trim().toUpperCase();   const plan = String(data.plan || '');    const valid =     code === CONFIG.PRIVATE_TEST_CODE &&     plan === 'nineMonth';    return jsonResponse({     success: true,     testCodeApplied: valid,     amount: valid ? CONFIG.TEST_AMOUNT : null   }); }   /* =========================================================    PAYMENT ========================================================= */  function handlePayment(data) {    if (     !data.username ||     !data.plan ||     !data.receiptBase64   ) {     return jsonResponse({       success: false,       message: 'اطلاعات پرداخت کامل نیست.'     });   }    const base64 = String(data.receiptBase64);    const estimatedBytes =     Math.floor(base64.length * 0.75);    if (estimatedBytes > CONFIG.MAX_RECEIPT_BYTES) {     return jsonResponse({       success: false,       message: 'حجم فیش بیشتر از ۵ مگابایت است.'     });   }    const planPrices = {     monthly: 100000,     quarterly: 270000,     sixMonth: 480000,     nineMonth: 660000   };    if (     !Object.prototype.hasOwnProperty.call(       planPrices,       data.plan     )   ) {     return jsonResponse({       success: false,       message: 'پلن نامعتبر است.'     });   }    const originalAmount =     Number(planPrices[data.plan]);    let amount =     Number(data.amount || originalAmount);    let testCodeApplied = false;    if (     String(data.discountCode || '')       .trim()       .toUpperCase() === CONFIG.PRIVATE_TEST_CODE &&     data.plan === 'nineMonth'   ) {     amount = CONFIG.TEST_AMOUNT;     testCodeApplied = true;   }    const mimeType =     data.mimeType ||     data.fileMime ||     'image/jpeg';    const fileName =     data.fileName ||     ('receipt_' + Date.now() + '.jpg');    const bytes =     Utilities.base64Decode(base64);    const blob =     Utilities.newBlob(       bytes,       mimeType,       fileName     );    const folder =     getOrCreateReceiptFolder();    const savedFile =     folder.createFile(blob);    savedFile.setName(     'QuizDuo_' +     sanitizeFileName(data.username) +     '_' +     Date.now() +     '_' +     fileName   );    const fileUrl =     savedFile.getUrl();    const timestamp =     new Date();    const row = [     timestamp,     data.username,     data.phone || '',     data.plan,     data.planName || data.plan,     originalAmount,     amount,     Number(data.discountPercent || 0),     data.discountCode || '',     fileName,     fileUrl,     'در انتظار بررسی',     '',     ''   ];    appendPaymentRow(row);    sendReceiptEmail(     data,     amount,     fileUrl,     savedFile   );    return jsonResponse({     success: true,     testCodeApplied,     message: testCodeApplied       ? 'فیش دریافت شد و کد تست خصوصی نیز تأیید شد.'       : 'فیش با موفقیت برای بررسی ارسال شد.'   }); }   /* =========================================================    SUPPORT - USER MESSAGE ========================================================= */  function handleSupport(data) {
+/* =========================================================    DISCOUNT ========================================================= */  function validateDiscount(data) {   const code = String(data.code || '').trim().toUpperCase();   const plan = String(data.plan || '');    const valid =     code === CONFIG.PRIVATE_TEST_CODE &&     plan === 'nineMonth';    return jsonResponse({     success: true,     testCodeApplied: valid,     amount: valid ? CONFIG.TEST_AMOUNT : null   }); }   /* =========================================================    PAYMENT ========================================================= */  function handlePayment(data) {    if (     !data.username ||     !data.plan ||     !data.receiptBase64   ) {     return jsonResponse({       success: false,       message: 'اطلاعات پرداخت کامل نیست.'     });   }    const base64 = String(data.receiptBase64);    const estimatedBytes =     Math.floor(base64.length * 0.75);    if (estimatedBytes > CONFIG.MAX_RECEIPT_BYTES) {     return jsonResponse({       success: false,       message: 'حجم فیش بیشتر از ۵ مگابایت است.'     });   }    const planPrices = {     monthly: 100000,     quarterly: 270000,     sixMonth: 480000,     nineMonth: 660000   };    if (     !Object.prototype.hasOwnProperty.call(       planPrices,       data.plan     )   ) {     return jsonResponse({       success: false,       message: 'پلن نامعتبر است.'     });   }    const originalAmount =     Number(planPrices[data.plan]);    let amount =     Number(data.amount || originalAmount);    let testCodeApplied = false;    if (     String(data.discountCode || '')       .trim()       .toUpperCase() === CONFIG.PRIVATE_TEST_CODE &&     data.plan === 'nineMonth'   ) {     amount = CONFIG.TEST_AMOUNT;     testCodeApplied = true;   }    const mimeType =     data.mimeType ||     data.fileMime ||     'image/jpeg';    const fileName =     data.fileName ||     ('receipt_' + Date.now() + '.jpg');    const bytes =     Utilities.base64Decode(base64);    const blob =     Utilities.newBlob(       bytes,       mimeType,       fileName     );    const folder =     getOrCreateReceiptFolder();    const savedFile =     folder.createFile(blob);    savedFile.setName(     'QuizDuo_' +     sanitizeFileName(data.username) +     '_' +     Date.now() +     '_' +     fileName   );    const fileUrl =     savedFile.getUrl();    const timestamp =     new Date();    const row = [     timestamp,     data.username,     data.phone || '',     data.plan,     data.planName || data.plan,     originalAmount,     amount,     Number(data.discountPercent || 0),     data.discountCode || '',     fileName,     fileUrl,     'در انتظار بررسی',     '',     ''   ];    appendPaymentRow(row);
+
+    let emailSent = false;
+    let emailError = '';
+
+    try {
+      sendReceiptEmail(
+        data,
+        amount,
+        fileUrl,
+        savedFile
+      );
+      emailSent = true;
+    } catch (error) {
+      emailError = error && error.message
+        ? error.message
+        : String(error);
+      console.warn('Receipt email was not sent:', emailError);
+    }
+
+    return jsonResponse({
+      success: true,
+      testCodeApplied,
+      emailSent,
+      emailError,
+      message: testCodeApplied
+        ? 'فیش دریافت شد و کد تست خصوصی نیز تأیید شد.'
+        : 'فیش با موفقیت برای بررسی ارسال شد.'
+    }); }   /* =========================================================    SUPPORT - USER MESSAGE ========================================================= */  function handleSupport(data) {
   const username = String(data.username || '').trim();
   const phone = String(data.phone || '').trim();
   const subject = String(data.subject || '').trim();
