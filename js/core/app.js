@@ -32,15 +32,15 @@ import {
 
 /* =========================================================
    CONFIG
-========================================================= */
+   ========================================================= */
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFkK02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXkIvzVyuxzJiZQ/exec";
+  "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFKk02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXkIvzVyuxzJiZQ/exec";
 
 
 /* =========================================================
    STATE
-========================================================= */
+   ========================================================= */
 
 const savedUsername =
   getCurrentUser() || "guest";
@@ -71,21 +71,22 @@ let discountCodeUsed =
 
 /* =========================================================
    QUIZ ENGINE
-========================================================= */
+   ========================================================= */
 
 const quiz =
   new QuizEngine(
     state,
-    () => saveState(
-      state,
-      state.username || "guest"
-    )
+    () =>
+      saveState(
+        state,
+        state.username || "guest"
+      )
   );
 
 
 /* =========================================================
    HELPERS
-========================================================= */
+   ========================================================= */
 
 const $ = (
   selector,
@@ -102,11 +103,9 @@ const $$ = (
 
 
 function formatNumber(value) {
-
   return Number(
     value || 0
   ).toLocaleString("fa-IR");
-
 }
 
 
@@ -114,12 +113,10 @@ function toast(
   message,
   type = ""
 ) {
-
   let container =
     $(".toast-container");
 
   if (!container) {
-
     container =
       document.createElement("div");
 
@@ -156,7 +153,6 @@ function showMessage(
   text,
   type = ""
 ) {
-
   if (!element) return;
 
   element.textContent =
@@ -169,31 +165,28 @@ function showMessage(
 
 /* =========================================================
    AUTH COMPATIBILITY
-========================================================= */
+   ========================================================= */
 
 function getUsername() {
-
   return (
     state.username ||
     "بازیکن مهمان"
   );
-
 }
 
 
 function isLoggedIn() {
-
   return (
     !!state.username &&
     state.username !==
-      "بازیکن مهمان"
+      "بازیکن مهمان" &&
+    state.username !==
+      "guest"
   );
-
 }
 
 
 function requireLogin() {
-
   if (isLoggedIn()) {
     return true;
   }
@@ -212,20 +205,17 @@ function requireLogin() {
 function normalizeUsername(
   value
 ) {
-
   return String(
     value || ""
   )
     .trim()
     .toLowerCase();
-
 }
 
 
 function openAuth(
   mode = "login"
 ) {
-
   authMode =
     mode;
 
@@ -241,9 +231,7 @@ function openAuth(
   const phoneField =
     $("#phoneField");
 
-
   if (mode === "register") {
-
     if (title)
       title.textContent =
         "ساخت حساب";
@@ -259,9 +247,7 @@ function openAuth(
     phoneField?.classList.remove(
       "hidden"
     );
-
   } else {
-
     if (title)
       title.textContent =
         "ورود";
@@ -285,14 +271,13 @@ function openAuth(
 
 /* =========================================================
    LOCAL AUTH
-========================================================= */
+   ========================================================= */
 
 function registerUser(
   name,
   phone,
   password
 ) {
-
   const users =
     getUsers();
 
@@ -300,7 +285,6 @@ function registerUser(
     normalizeUsername(name);
 
   if (!normalized || !password) {
-
     throw new Error(
       "نام کاربری و رمز عبور الزامی است."
     );
@@ -315,14 +299,12 @@ function registerUser(
     );
 
   if (exists) {
-
     throw new Error(
       "این نام کاربری قبلاً ثبت شده است."
     );
   }
 
   const user = {
-
     id:
       `user_${Date.now()}`,
 
@@ -350,7 +332,6 @@ function loginUser(
   name,
   password
 ) {
-
   const normalized =
     normalizeUsername(name);
 
@@ -361,12 +342,10 @@ function loginUser(
       ) === normalized &&
       user.password === password
   );
-
 }
 
 
 async function handleAuthSubmit() {
-
   const name =
     $("#authName")
       ?.value
@@ -384,9 +363,7 @@ async function handleAuthSubmit() {
   const message =
     $("#authMsg");
 
-
   if (!name || !password) {
-
     showMessage(
       message,
       "نام کاربری و رمز عبور را وارد کنید.",
@@ -396,19 +373,14 @@ async function handleAuthSubmit() {
     return;
   }
 
-
   try {
-
     let user;
-
 
     if (
       authMode ===
       "register"
     ) {
-
       if (!phone) {
-
         showMessage(
           message,
           "شماره تماس را وارد کنید.",
@@ -430,9 +402,7 @@ async function handleAuthSubmit() {
         "حساب با موفقیت ساخته شد.",
         "success"
       );
-
     } else {
-
       user =
         loginUser(
           name,
@@ -440,7 +410,6 @@ async function handleAuthSubmit() {
         );
 
       if (!user) {
-
         showMessage(
           message,
           "نام کاربری یا رمز عبور اشتباه است.",
@@ -456,7 +425,6 @@ async function handleAuthSubmit() {
         "success"
       );
     }
-
 
     state.username =
       user.name;
@@ -490,7 +458,6 @@ async function handleAuthSubmit() {
     );
 
   } catch (error) {
-
     showMessage(
       message,
       error.message ||
@@ -502,7 +469,6 @@ async function handleAuthSubmit() {
 
 
 function logout() {
-
   logoutUser();
 
   state.username =
@@ -535,19 +501,17 @@ function logout() {
 
 /* =========================================================
    NAVIGATION
-========================================================= */
+   ========================================================= */
 
 function navigate(
   pageId
 ) {
-
   const page =
     document.getElementById(
       pageId
     );
 
   if (!page) return;
-
 
   $$(".page").forEach(
     section =>
@@ -556,57 +520,45 @@ function navigate(
       )
   );
 
-
   page.classList.add(
     "active"
   );
 
-
   $$(".main-nav button").forEach(
     button => {
-
       button.classList.toggle(
         "active",
         button.dataset.page ===
           pageId
       );
-
     }
   );
-
 
   if (
     pageId === "quiz"
   ) {
-
     renderStages();
 
   } else if (
     pageId === "profile"
   ) {
-
     renderProfile();
 
   } else if (
     pageId === "leaderboard"
   ) {
-
     renderLeaderboard();
 
   } else if (
     pageId === "subscription"
   ) {
-
     renderSubscription();
 
   } else if (
     pageId === "chat"
   ) {
-
     renderChat();
-
   }
-
 
   window.scrollTo({
     top: 0,
@@ -615,12 +567,27 @@ function navigate(
 }
 
 
+/*
+ * سازگاری با index.html قدیمی
+ *
+ * دکمه‌های index.html از این استفاده می‌کنند:
+ *
+ * QuizDuo.showPage("home")
+ *
+ * بنابراین showPage باید به navigate وصل باشد.
+ */
+function showPage(
+  pageId
+) {
+  navigate(pageId);
+}
+
+
 /* =========================================================
    SUBSCRIPTION
-========================================================= */
+   ========================================================= */
 
 const PLANS = {
-
   monthly: {
     id: "monthly",
     title: "اشتراک ماهانه",
@@ -645,47 +612,38 @@ const PLANS = {
     price: 660000,
     premium: true
   }
-
 };
 
 
 function isSubscriptionActive() {
-
   const subscription =
     state.subscription;
-
 
   if (
     typeof subscription ===
     "string"
   ) {
-
     return (
       subscription ===
       "active"
     );
   }
 
-
   if (
     !subscription ||
     typeof subscription !==
       "object"
   ) {
-
     return false;
   }
-
 
   if (
     subscription.active ===
     true
   ) {
-
     if (
       !subscription.expiryDate
     ) {
-
       return true;
     }
 
@@ -702,7 +660,6 @@ function isSubscriptionActive() {
     );
   }
 
-
   return (
     subscription.status ===
       "active" ||
@@ -713,16 +670,13 @@ function isSubscriptionActive() {
 
 
 function hasFullAccess() {
-
   return isSubscriptionActive();
-
 }
 
 
 function canAccessStage(
   stage
 ) {
-
   /*
    * مرحله ۱ برای همه رایگان است.
    * مرحله ۲ به بعد فقط با اشتراک تأییدشده.
@@ -731,7 +685,6 @@ function canAccessStage(
   if (
     Number(stage) === 1
   ) {
-
     return true;
   }
 
@@ -741,14 +694,12 @@ function canAccessStage(
 
 /* =========================================================
    QUIZ DATA
-========================================================= */
+   ========================================================= */
 
 async function loadCategory(
   category
 ) {
-
   try {
-
     await quiz.loadCategory(
       category
     );
@@ -756,7 +707,6 @@ async function loadCategory(
     return true;
 
   } catch (error) {
-
     console.error(
       error
     );
@@ -773,10 +723,9 @@ async function loadCategory(
 
 /* =========================================================
    STAGES
-========================================================= */
+   ========================================================= */
 
 async function renderStages() {
-
   const container =
     $("#stages");
 
@@ -784,13 +733,11 @@ async function renderStages() {
     return;
   }
 
-
   container.innerHTML = `
     <div class="panel loading">
       در حال بارگذاری مراحل...
     </div>
   `;
-
 
   const loaded =
     await loadCategory(
@@ -798,7 +745,6 @@ async function renderStages() {
     );
 
   if (!loaded) {
-
     container.innerHTML = `
       <div class="panel">
         امکان بارگذاری سوالات وجود ندارد.
@@ -808,13 +754,10 @@ async function renderStages() {
     return;
   }
 
-
   const questions =
     quiz.questions || [];
 
-
   if (!questions.length) {
-
     container.innerHTML = `
       <div class="panel">
         برای این بخش هنوز سوالی ثبت نشده است.
@@ -824,34 +767,28 @@ async function renderStages() {
     return;
   }
 
-
   const stages = [
     ...new Set(
-      questions
-        .map(
-          question =>
-            Number(
-              question.stage
-            ) || 1
-        )
+      questions.map(
+        question =>
+          Number(
+            question.stage
+          ) || 1
+      )
     )
   ].sort(
     (a, b) => a - b
   );
 
-
   container.innerHTML =
     "";
 
-
   stages.forEach(
     stage => {
-
       const stageQuestions =
         quiz.getStageQuestions(
           stage
         );
-
 
       const completed =
         isStageCompleted(
@@ -860,18 +797,15 @@ async function renderStages() {
           stage
         );
 
-
       const unlocked =
         canAccessStage(
           stage
         );
 
-
       const card =
         document.createElement(
           "article"
         );
-
 
       card.className =
         [
@@ -886,9 +820,7 @@ async function renderStages() {
           .filter(Boolean)
           .join(" ");
 
-
       card.innerHTML = `
-
         <span class="stage-lock">
           ${
             unlocked
@@ -900,7 +832,6 @@ async function renderStages() {
         </span>
 
         <div>
-
           <div class="stage-number">
             ${stage}
           </div>
@@ -915,7 +846,6 @@ async function renderStages() {
             )}
             سؤال
           </p>
-
         </div>
 
         <button
@@ -934,24 +864,19 @@ async function renderStages() {
               : "🔒 نیاز به اشتراک"
           }
         </button>
-
       `;
-
 
       const button =
         $("button", card);
 
-
       button?.addEventListener(
         "click",
         () => {
-
           if (
             !canAccessStage(
               stage
             )
           ) {
-
             toast(
               "برای مرحله ۲ به بعد اشتراک تأییدشده لازم است.",
               "warning"
@@ -964,7 +889,6 @@ async function renderStages() {
             return;
           }
 
-
           startStage(
             currentCategory,
             stage,
@@ -973,13 +897,11 @@ async function renderStages() {
         }
       );
 
-
       container.appendChild(
         card
       );
     }
   );
-
 
   updateQuizStats();
 }
@@ -987,41 +909,34 @@ async function renderStages() {
 
 /* =========================================================
    CATEGORY
-========================================================= */
+   ========================================================= */
 
 function setCategory(
   category
 ) {
-
   if (
     category !==
       "general" &&
     category !==
       "fun"
   ) {
-
     return;
   }
 
-
   currentCategory =
     category;
-
 
   $$(
     "[data-category-tab]"
   ).forEach(
     button => {
-
       button.classList.toggle(
         "active",
         button.dataset.categoryTab ===
           category
       );
-
     }
   );
-
 
   renderStages();
 }
@@ -1029,20 +944,18 @@ function setCategory(
 
 /* =========================================================
    QUIZ
-========================================================= */
+   ========================================================= */
 
 async function startStage(
   category,
   stage,
   replay = false
 ) {
-
   if (
     !canAccessStage(
       stage
     )
   ) {
-
     toast(
       "این مرحله قفل است.",
       "warning"
@@ -1051,13 +964,11 @@ async function startStage(
     return;
   }
 
-
   currentCategory =
     category;
 
   currentStage =
     stage;
-
 
   const loaded =
     await loadCategory(
@@ -1068,7 +979,6 @@ async function startStage(
     return;
   }
 
-
   const questions =
     quiz.startStage(
       category,
@@ -1076,11 +986,9 @@ async function startStage(
       replay
     );
 
-
   if (
     !questions.length
   ) {
-
     toast(
       "این مرحله سؤال قابل اجرا ندارد.",
       "error"
@@ -1089,20 +997,16 @@ async function startStage(
     return;
   }
 
-
   const box =
     $("#quizBox");
 
   if (!box) return;
 
-
   box.classList.remove(
     "hidden"
   );
 
-
   renderQuestion();
-
 
   box.scrollIntoView({
     behavior: "smooth",
@@ -1112,31 +1016,24 @@ async function startStage(
 
 
 function renderQuestion() {
-
   const box =
     $("#quizBox");
 
   if (!box) return;
 
-
   const question =
     quiz.getCurrentQuestion();
 
-
   if (!question) {
-
     finishQuiz();
     return;
   }
 
-
   const number =
     quiz.currentQuestion + 1;
 
-
   const total =
     quiz.getQuestionCount();
-
 
   const progress =
     Math.round(
@@ -1145,15 +1042,12 @@ function renderQuestion() {
         100
     );
 
-
   box.innerHTML = `
-
     <div class="quiz-question">
 
       <div class="section-heading">
 
         <div>
-
           <span class="eyebrow">
             مرحله ${currentStage}
           </span>
@@ -1162,7 +1056,6 @@ function renderQuestion() {
             سؤال ${number}
             از ${total}
           </h3>
-
         </div>
 
         <span class="quiz-score">
@@ -1174,20 +1067,17 @@ function renderQuestion() {
 
       </div>
 
-
       <div class="quiz-progress">
         <div
           style="width:${progress}%"
         ></div>
       </div>
 
-
       <h3>
         ${escapeHTML(
           question.question
         )}
       </h3>
-
 
       <div class="quiz-options">
 
@@ -1199,7 +1089,9 @@ function renderQuestion() {
                 data-option-index="${index}"
               >
                 ${escapeHTML(
-                  option
+                  typeof option === "object"
+                    ? option.text ?? option.label ?? option.value ?? ""
+                    : option
                 )}
               </button>
             `
@@ -1208,12 +1100,10 @@ function renderQuestion() {
 
       </div>
 
-
       <div
         id="answerFeedback"
         class="message"
       ></div>
-
 
       <div class="quiz-footer">
 
@@ -1236,11 +1126,9 @@ function renderQuestion() {
     </div>
   `;
 
-
   $$(".quiz-option", box)
     .forEach(
       button => {
-
         button.addEventListener(
           "click",
           () =>
@@ -1251,16 +1139,13 @@ function renderQuestion() {
               )
             )
         );
-
       }
     );
-
 
   $("#exitQuiz")
     ?.addEventListener(
       "click",
       () => {
-
         box.classList.add(
           "hidden"
         );
@@ -1274,10 +1159,8 @@ function renderQuestion() {
 function answerQuestion(
   index
 ) {
-
   const buttons =
     $$(".quiz-option");
-
 
   buttons.forEach(
     button =>
@@ -1285,21 +1168,17 @@ function answerQuestion(
         true
   );
 
-
   const result =
     quiz.answer(
       index
     );
 
-
   const feedback =
     $("#answerFeedback");
-
 
   if (
     result.correct
   ) {
-
     buttons[index]
       ?.classList.add(
         "correct"
@@ -1312,7 +1191,6 @@ function answerQuestion(
     );
 
   } else {
-
     buttons[index]
       ?.classList.add(
         "wrong"
@@ -1322,7 +1200,6 @@ function answerQuestion(
       result.correctAnswers !==
       undefined
     ) {
-
       const question =
         quiz.selectedQuestions[
           quiz.currentQuestion - 1
@@ -1331,31 +1208,37 @@ function answerQuestion(
       if (
         question
       ) {
-
         buttons[
           question.answer
         ]?.classList.add(
           "correct"
         );
 
+        const correctOption =
+          question.options[
+            question.answer
+          ];
+
+        const correctText =
+          typeof correctOption === "object"
+            ? correctOption.text ??
+              correctOption.label ??
+              correctOption.value ??
+              "نامشخص"
+            : correctOption;
+
         showMessage(
           feedback,
-          `❌ پاسخ نادرست بود. پاسخ درست: ${
-            question.options[
-              question.answer
-            ] || "نامشخص"
-          }`,
+          `❌ پاسخ نادرست بود. پاسخ درست: ${correctText}`,
           "error"
         );
       }
     }
   }
 
-
   if (
     result.explanation
   ) {
-
     const explanation =
       document.createElement(
         "p"
@@ -1372,27 +1255,19 @@ function answerQuestion(
     );
   }
 
-
   updateUI();
-
 
   setTimeout(
     () => {
-
       if (
         result.finished
       ) {
-
         finishQuiz(
           result
         );
-
       } else {
-
         renderQuestion();
-
       }
-
     },
     900
   );
@@ -1402,38 +1277,31 @@ function answerQuestion(
 function finishQuiz(
   result = null
 ) {
-
   const box =
     $("#quizBox");
 
   if (!box) return;
 
-
   const passed =
     result?.passed ?? true;
-
 
   if (
     result?.newlyCompleted
   ) {
-
     toast(
       `مرحله ${currentStage} با موفقیت تکمیل شد!`,
       "success"
     );
   }
 
-
   if (
     result?.heartLost
   ) {
-
     toast(
       "به دلیل رد شدن مرحله، یک قلب کم شد.",
       "warning"
     );
   }
-
 
   saveState(
     state,
@@ -1441,9 +1309,7 @@ function finishQuiz(
       "guest"
   );
 
-
   box.innerHTML = `
-
     <div class="access-denied">
 
       <span class="lock">
@@ -1500,12 +1366,10 @@ function finishQuiz(
     </div>
   `;
 
-
   $("#backToStages")
     ?.addEventListener(
       "click",
       () => {
-
         box.classList.add(
           "hidden"
         );
@@ -1514,16 +1378,13 @@ function finishQuiz(
       }
     );
 
-
   updateUI();
-
 
   if (
     state.username &&
     state.username !==
       "بازیکن مهمان"
   ) {
-
     syncProgress();
   }
 }
@@ -1531,15 +1392,13 @@ function finishQuiz(
 
 /* =========================================================
    QUIZ STATS
-========================================================= */
+   ========================================================= */
 
 function updateQuizStats() {
-
   const element =
     $("#quizStats");
 
   if (!element) return;
-
 
   const completed =
     state[
@@ -1549,14 +1408,12 @@ function updateQuizStats() {
         : "completedFunStages"
     ];
 
-
   const count =
     Array.isArray(
       completed
     )
       ? completed.length
       : 0;
-
 
   const total =
     quiz.questions?.length
@@ -1570,7 +1427,6 @@ function updateQuizStats() {
         )
       : 0;
 
-
   element.textContent =
     `تکمیل‌شده: ${formatNumber(
       count
@@ -1582,10 +1438,9 @@ function updateQuizStats() {
 
 /* =========================================================
    PROFILE
-========================================================= */
+   ========================================================= */
 
 function renderProfile() {
-
   const name =
     $("#dashboardName");
 
@@ -1604,11 +1459,9 @@ function renderProfile() {
   const fun =
     $("#dashboardFunStage");
 
-
   if (name)
     name.textContent =
       getUsername();
-
 
   if (xp)
     xp.textContent =
@@ -1616,13 +1469,11 @@ function renderProfile() {
         state.xp
       );
 
-
   if (hearts)
     hearts.textContent =
       formatNumber(
         state.hearts
       );
-
 
   if (streak)
     streak.textContent =
@@ -1630,20 +1481,27 @@ function renderProfile() {
         state.streak
       );
 
-
   if (general)
     general.textContent =
       formatNumber(
-        state.generalStage - 1
+        Math.max(
+          0,
+          Number(
+            state.generalStage || 1
+          ) - 1
+        )
       );
-
 
   if (fun)
     fun.textContent =
       formatNumber(
-        state.funStage - 1
+        Math.max(
+          0,
+          Number(
+            state.funStage || 1
+          ) - 1
+        )
       );
-
 
   const badge =
     $("#dashboardAccessBadge");
@@ -1657,11 +1515,9 @@ function renderProfile() {
   const sub =
     $("#dashboardSubscription");
 
-
   if (
     isSubscriptionActive()
   ) {
-
     badge?.classList.remove(
       "free"
     );
@@ -1687,7 +1543,6 @@ function renderProfile() {
         "همه مراحل برای شما باز هستند.";
 
   } else {
-
     badge?.classList.add(
       "free"
     );
@@ -1717,24 +1572,20 @@ function renderProfile() {
 
 /* =========================================================
    LEADERBOARD
-========================================================= */
+   ========================================================= */
 
 function renderLeaderboard() {
-
   const body =
     $("#leaderBody");
 
   if (!body) return;
 
-
   const users =
     getUsers();
-
 
   const entries =
     users.map(
       user => {
-
         const saved =
           loadState(
             createDefaultState(),
@@ -1764,11 +1615,18 @@ function renderLeaderboard() {
       }
     );
 
-
+  /*
+   * اگر کاربر فعلی داخل getUsers نبود،
+   * فقط یک بار به جدول اضافه می‌شود.
+   */
   if (
-    isLoggedIn()
+    isLoggedIn() &&
+    !entries.some(
+      entry =>
+        entry.name ===
+        state.username
+    )
   ) {
-
     entries.push({
       name:
         state.username,
@@ -1791,15 +1649,12 @@ function renderLeaderboard() {
     });
   }
 
-
   entries.sort(
     (a, b) =>
       b.xp - a.xp
   );
 
-
   if (!entries.length) {
-
     body.innerHTML = `
       <tr>
         <td colspan="4">
@@ -1810,7 +1665,6 @@ function renderLeaderboard() {
 
     return;
   }
-
 
   body.innerHTML =
     entries
@@ -1858,14 +1712,12 @@ function renderLeaderboard() {
 
 /* =========================================================
    SUBSCRIPTION UI
-========================================================= */
+   ========================================================= */
 
 function renderSubscription() {
-
   $$(".select-plan")
     .forEach(
       button => {
-
         const plan =
           PLANS[
             button.dataset.plan
@@ -1877,27 +1729,22 @@ function renderSubscription() {
           plan.premium
             ? "انتخاب Premium"
             : "انتخاب";
-
       }
     );
-
 }
 
 
 function selectPlan(
   planId
 ) {
-
   if (!requireLogin()) {
     return;
   }
-
 
   const plan =
     PLANS[planId];
 
   if (!plan) return;
-
 
   selectedPlan =
     plan;
@@ -1908,14 +1755,12 @@ function selectPlan(
   discountCodeUsed =
     "";
 
-
   const panel =
     $("#paymentPanel");
 
   panel?.classList.remove(
     "hidden"
   );
-
 
   const title =
     $("#selectedPlanTitle");
@@ -1925,7 +1770,6 @@ function selectPlan(
 
   const final =
     $("#finalPrice");
-
 
   if (title)
     title.textContent =
@@ -1947,21 +1791,18 @@ function selectPlan(
 
 /* =========================================================
    PAYMENT
-========================================================= */
+   ========================================================= */
 
 function fileToBase64(
   file
 ) {
-
   return new Promise(
     (resolve, reject) => {
-
       const reader =
         new FileReader();
 
       reader.onload =
         () => {
-
           const result =
             String(
               reader.result || ""
@@ -1991,14 +1832,11 @@ function fileToBase64(
 
 
 async function submitPayment() {
-
   if (!requireLogin()) {
     return;
   }
 
-
   if (!selectedPlan) {
-
     toast(
       "ابتدا یک پلن انتخاب کنید.",
       "warning"
@@ -2007,14 +1845,11 @@ async function submitPayment() {
     return;
   }
 
-
   const file =
     $("#paymentFile")
       ?.files?.[0];
 
-
   if (!file) {
-
     showMessage(
       $("#paymentMessage"),
       "تصویر فیش پرداخت را انتخاب کنید.",
@@ -2024,12 +1859,10 @@ async function submitPayment() {
     return;
   }
 
-
   if (
     file.size >
     5 * 1024 * 1024
   ) {
-
     showMessage(
       $("#paymentMessage"),
       "حجم تصویر نباید بیشتر از ۵ مگابایت باشد.",
@@ -2039,14 +1872,11 @@ async function submitPayment() {
     return;
   }
 
-
   try {
-
     const base64 =
       await fileToBase64(
         file
       );
-
 
     const response =
       await postJSON({
@@ -2090,11 +1920,9 @@ async function submitPayment() {
           base64
       });
 
-
     if (
       response?.success
     ) {
-
       showMessage(
         $("#paymentMessage"),
         response.message ||
@@ -2107,14 +1935,15 @@ async function submitPayment() {
         "success"
       );
 
-      $("#paymentFile").value =
-        "";
+      if ($("#paymentFile"))
+        $("#paymentFile").value =
+          "";
 
-      $("#fileName").textContent =
-        "فایلی انتخاب نشده است";
+      if ($("#fileName"))
+        $("#fileName").textContent =
+          "فایلی انتخاب نشده است";
 
     } else {
-
       showMessage(
         $("#paymentMessage"),
         response?.message ||
@@ -2124,7 +1953,6 @@ async function submitPayment() {
     }
 
   } catch (error) {
-
     console.error(
       error
     );
@@ -2140,23 +1968,19 @@ async function submitPayment() {
 
 /* =========================================================
    CHAT
-========================================================= */
+   ========================================================= */
 
 function renderChat() {
-
   const box =
     $("#messages");
 
   if (!box) return;
 
-
   const messages =
     state.chatMessages ||
     [];
 
-
   if (!messages.length) {
-
     box.innerHTML = `
       <div class="muted">
         هنوز پیامی وجود ندارد.
@@ -2165,7 +1989,6 @@ function renderChat() {
 
     return;
   }
-
 
   box.innerHTML =
     messages
@@ -2183,11 +2006,9 @@ function renderChat() {
 
 
 async function sendChatMessage() {
-
   if (!requireLogin()) {
     return;
   }
-
 
   const input =
     $("#chatInput");
@@ -2195,20 +2016,16 @@ async function sendChatMessage() {
   const text =
     input?.value.trim();
 
-
   if (!text) return;
-
 
   if (
     !Array.isArray(
       state.chatMessages
     )
   ) {
-
     state.chatMessages =
       [];
   }
-
 
   state.chatMessages.push({
     id:
@@ -2223,21 +2040,17 @@ async function sendChatMessage() {
       new Date().toISOString()
   });
 
-
   saveState(
     state,
     state.username
   );
-
 
   input.value =
     "";
 
   renderChat();
 
-
   try {
-
     await postJSON({
       action:
         "supportUserReply",
@@ -2252,7 +2065,6 @@ async function sendChatMessage() {
     });
 
   } catch (error) {
-
     console.warn(
       error
     );
@@ -2262,14 +2074,12 @@ async function sendChatMessage() {
 
 /* =========================================================
    SUPPORT
-========================================================= */
+   ========================================================= */
 
 async function sendSupport() {
-
   if (!requireLogin()) {
     return;
   }
-
 
   const subject =
     $("#supportSubject")
@@ -2279,9 +2089,7 @@ async function sendSupport() {
     $("#supportText")
       ?.value.trim();
 
-
   if (!subject || !text) {
-
     showMessage(
       $("#supportMsg"),
       "موضوع و متن پیام را وارد کنید.",
@@ -2291,9 +2099,7 @@ async function sendSupport() {
     return;
   }
 
-
   try {
-
     const response =
       await postJSON({
         action:
@@ -2312,11 +2118,9 @@ async function sendSupport() {
         text
       });
 
-
     if (
       response?.success
     ) {
-
       showMessage(
         $("#supportMsg"),
         response.message ||
@@ -2324,14 +2128,15 @@ async function sendSupport() {
         "success"
       );
 
-      $("#supportSubject").value =
-        "";
+      if ($("#supportSubject"))
+        $("#supportSubject").value =
+          "";
 
-      $("#supportText").value =
-        "";
+      if ($("#supportText"))
+        $("#supportText").value =
+          "";
 
     } else {
-
       showMessage(
         $("#supportMsg"),
         response?.message ||
@@ -2341,7 +2146,6 @@ async function sendSupport() {
     }
 
   } catch {
-
     showMessage(
       $("#supportMsg"),
       "ارتباط با سرور برقرار نشد.",
@@ -2353,12 +2157,11 @@ async function sendSupport() {
 
 /* =========================================================
    SERVER
-========================================================= */
+   ========================================================= */
 
 async function postJSON(
   payload
 ) {
-
   const response =
     await fetch(
       API_URL,
@@ -2378,19 +2181,15 @@ async function postJSON(
       }
     );
 
-
   const text =
     await response.text();
 
-
   try {
-
     return JSON.parse(
       text
     );
 
   } catch {
-
     throw new Error(
       "پاسخ سرور معتبر نیست."
     );
@@ -2399,14 +2198,11 @@ async function postJSON(
 
 
 async function syncUser() {
-
   if (!isLoggedIn()) {
     return;
   }
 
-
   try {
-
     const response =
       await postJSON({
         action:
@@ -2443,20 +2239,16 @@ async function syncUser() {
           )
       });
 
-
     if (!response?.success) {
       return;
     }
 
-
     if (
       response.subscription
     ) {
-
       state.subscription =
         response.subscription;
     }
-
 
     if (
       Number.isFinite(
@@ -2465,7 +2257,6 @@ async function syncUser() {
         )
       )
     ) {
-
       state.xp =
         Math.max(
           state.xp,
@@ -2475,17 +2266,14 @@ async function syncUser() {
         );
     }
 
-
     saveState(
       state,
       state.username
     );
 
-
     updateUI();
 
   } catch (error) {
-
     console.warn(
       "Server sync failed:",
       error
@@ -2495,18 +2283,15 @@ async function syncUser() {
 
 
 async function syncProgress() {
-
   await syncUser();
-
 }
 
 
 /* =========================================================
    THEME
-========================================================= */
+   ========================================================= */
 
 function loadTheme() {
-
   const theme =
     localStorage.getItem(
       "quizduo_theme"
@@ -2515,7 +2300,6 @@ function loadTheme() {
   if (
     theme === "dark"
   ) {
-
     document.body.classList.add(
       "dark"
     );
@@ -2524,11 +2308,9 @@ function loadTheme() {
 
 
 function toggleTheme() {
-
   document.body.classList.toggle(
     "dark"
   );
-
 
   localStorage.setItem(
     "quizduo_theme",
@@ -2543,22 +2325,18 @@ function toggleTheme() {
 
 /* =========================================================
    UI
-========================================================= */
+   ========================================================= */
 
 function updateUI() {
-
   const auth =
     $("#authButton");
 
-
   if (auth) {
-
     auth.textContent =
       isLoggedIn()
         ? `👤 ${state.username}`
         : "ورود / ثبت‌نام";
   }
-
 
   renderProfile();
 
@@ -2568,14 +2346,12 @@ function updateUI() {
 
 /* =========================================================
    EVENTS
-========================================================= */
+   ========================================================= */
 
 function setupNavigation() {
-
   document.addEventListener(
     "click",
     event => {
-
       const button =
         event.target.closest(
           "[data-page]"
@@ -2583,26 +2359,21 @@ function setupNavigation() {
 
       if (!button) return;
 
-
       event.preventDefault();
-
 
       const page =
         button.dataset.page;
-
 
       if (
         page === "profile" &&
         !isLoggedIn()
       ) {
-
         openAuth(
           "login"
         );
 
         return;
       }
-
 
       navigate(
         page
@@ -2613,22 +2384,17 @@ function setupNavigation() {
 
 
 function setupAuth() {
-
   $("#authButton")
     ?.addEventListener(
       "click",
       () => {
-
         if (
           isLoggedIn()
         ) {
-
           navigate(
             "profile"
           );
-
         } else {
-
           openAuth(
             "login"
           );
@@ -2636,13 +2402,11 @@ function setupAuth() {
       }
     );
 
-
   $("#authSubmit")
     ?.addEventListener(
       "click",
       handleAuthSubmit
     );
-
 
   $("#toggleAuth")
     ?.addEventListener(
@@ -2655,7 +2419,6 @@ function setupAuth() {
         )
     );
 
-
   $("#authBack")
     ?.addEventListener(
       "click",
@@ -2665,17 +2428,14 @@ function setupAuth() {
         )
     );
 
-
   $("#authPassword")
     ?.addEventListener(
       "keydown",
       event => {
-
         if (
           event.key ===
           "Enter"
         ) {
-
           handleAuthSubmit();
         }
       }
@@ -2684,12 +2444,10 @@ function setupAuth() {
 
 
 function setupQuiz() {
-
   $$(
     "[data-category-tab]"
   ).forEach(
     button => {
-
       button.addEventListener(
         "click",
         () =>
@@ -2704,11 +2462,9 @@ function setupQuiz() {
 
 
 function setupSubscription() {
-
   $$(".select-plan")
     .forEach(
       button => {
-
         button.addEventListener(
           "click",
           () =>
@@ -2718,7 +2474,6 @@ function setupSubscription() {
         );
       }
     );
-
 
   $("#closePayment")
     ?.addEventListener(
@@ -2730,19 +2485,16 @@ function setupSubscription() {
           )
     );
 
-
   $("#submitPayment")
     ?.addEventListener(
       "click",
       submitPayment
     );
 
-
   $("#paymentFile")
     ?.addEventListener(
       "change",
       event => {
-
         const file =
           event.target.files?.[0];
 
@@ -2750,7 +2502,6 @@ function setupSubscription() {
           $("#fileName");
 
         if (label) {
-
           label.textContent =
             file
               ? file.name
@@ -2762,25 +2513,21 @@ function setupSubscription() {
 
 
 function setupChat() {
-
   $("#sendChat")
     ?.addEventListener(
       "click",
       sendChatMessage
     );
 
-
   $("#chatInput")
     ?.addEventListener(
       "keydown",
       event => {
-
         if (
           event.key ===
             "Enter" &&
           !event.shiftKey
         ) {
-
           event.preventDefault();
 
           sendChatMessage();
@@ -2791,7 +2538,6 @@ function setupChat() {
 
 
 function setupSupport() {
-
   $("#supportSend")
     ?.addEventListener(
       "click",
@@ -2801,7 +2547,6 @@ function setupSupport() {
 
 
 function setupTheme() {
-
   $("#themeToggle")
     ?.addEventListener(
       "click",
@@ -2812,12 +2557,10 @@ function setupTheme() {
 
 /* =========================================================
    INIT
-========================================================= */
+   ========================================================= */
 
 async function init() {
-
   try {
-
     loadTheme();
 
     setupNavigation();
@@ -2827,7 +2570,6 @@ async function init() {
     setupChat();
     setupSupport();
     setupTheme();
-
 
     updateStreak(
       state
@@ -2839,35 +2581,27 @@ async function init() {
         "guest"
     );
 
-
     updateUI();
 
-
     /*
-     * برای اینکه صفحه اول آزمون بلافاصله
-     * سؤال‌ها را داشته باشد.
+     * برای اینکه صفحه آزمون بلافاصله
+     * سؤال‌های عمومی را داشته باشد.
      */
-
     await loadCategory(
       "general"
     );
 
-
     if (
       isLoggedIn()
     ) {
-
       await syncUser();
     }
-
 
     navigate(
       "home"
     );
 
-
   } catch (error) {
-
     console.error(
       "QuizDuo initialization error:",
       error
@@ -2881,21 +2615,19 @@ async function init() {
 }
 
 
-document.addEventListener(
-  "DOMContentLoaded",
-  init
-);
-
-
 /* =========================================================
    PUBLIC API
-========================================================= */
+   ========================================================= */
 
 window.QuizDuo = {
-
   state,
 
   navigate,
+
+  /*
+   * برای سازگاری با onclickهای index.html
+   */
+  showPage,
 
   logout,
 
@@ -2913,8 +2645,15 @@ window.QuizDuo = {
 
   canAccessStage,
 
-  toast,
-   
-   showPage
+  toast
 };
 
+
+/* =========================================================
+   START
+   ========================================================= */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  init
+);
