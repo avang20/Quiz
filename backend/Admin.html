@@ -1,1383 +1,301 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
-
 <head>
-
-<meta charset="utf-8">
-
-<meta
-  name="viewport"
-  content="width=device-width,initial-scale=1"
->
-
-<title>QuizDuo Admin</title>
-
-<style>
-
-*{
-  box-sizing:border-box
-}
-
-body{
-  margin:0;
-  font-family:Tahoma,Arial,sans-serif;
-  background:#f4f8f8;
-  color:#16252b;
-  line-height:1.8
-}
-
-.wrap{
-  max-width:1200px;
-  margin:30px auto;
-  padding:0 16px
-}
-
-.panel{
-  background:#fff;
-  border:1px solid #dbe7e8;
-  border-radius:18px;
-  padding:20px;
-  margin-bottom:18px;
-  box-shadow:0 10px 30px rgba(20,50,55,.07)
-}
-
-input,
-select,
-textarea,
-button{
-  font:inherit
-}
-
-input,
-select,
-textarea{
-  width:100%;
-  padding:10px 12px;
-  border:1px solid #cbdcde;
-  border-radius:10px;
-  margin:6px 0;
-  background:#fff;
-  color:#16252b
-}
-
-textarea{
-  min-height:90px;
-  resize:vertical
-}
-
-button{
-  border:0;
-  border-radius:10px;
-  padding:9px 13px;
-  cursor:pointer
-}
-
-.primary{
-  background:#13a6a6;
-  color:#fff
-}
-
-.secondary{
-  background:#e8f4f4;
-  color:#176b70
-}
-
-.danger{
-  background:#ffe8e8;
-  color:#a32626
-}
-
-.hidden{
-  display:none!important
-}
-
-.muted{
-  color:#6d7e82
-}
-
-.actions{
-  display:flex;
-  gap:7px;
-  flex-wrap:wrap
-}
-
-.status{
-  display:inline-block;
-  padding:5px 10px;
-  border-radius:999px;
-  background:#eef4f4;
-  font-size:.85rem
-}
-
-.status.approved{
-  background:#ddfaef;
-  color:#087b59
-}
-
-.status.rejected{
-  background:#ffe7e7;
-  color:#a32626
-}
-
-.status.pending{
-  background:#fff5d9;
-  color:#8a6200
-}
-
-.status.replied{
-  background:#ddf7f7;
-  color:#087274
-}
-
-.cards{
-  display:grid;
-  grid-template-columns:
-    repeat(
-      auto-fit,
-      minmax(320px,1fr)
-    );
-  gap:15px
-}
-
-.item-card{
-  border:1px solid #dfeaea;
-  border-radius:16px;
-  padding:16px;
-  background:#fbfdfd
-}
-
-.item-card.new{
-  border-color:#76d9c1;
-  box-shadow:
-    0 0 0 3px #eafff5
-}
-
-.item-head{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  align-items:flex-start
-}
-
-.item-head h3{
-  margin:2px 0
-}
-
-.meta{
-  display:grid;
-  gap:5px;
-  color:#607276;
-  font-size:.9rem;
-  margin:10px 0
-}
-
-.message-box{
-  background:#f4f8f8;
-  border-radius:12px;
-  padding:12px;
-  margin:10px 0;
-  white-space:pre-wrap
-}
-
-.reply-box{
-  margin-top:12px
-}
-
-.reply-meta{
-  font-size:.78rem;
-  color:#6d7e82;
-  margin-top:5px
-}
-
-.receipt{
-  display:inline-block;
-  margin-top:8px
-}
-
-.section-title{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px
-}
-
-.refresh-status{
-  font-size:.9rem;
-  color:#6d7e82;
-  margin-top:8px
-}
-
-.empty{
-  padding:18px;
-  text-align:center;
-  color:#6d7e82;
-  background:#f7fafb;
-  border-radius:12px
-}
-
-.top-actions{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  flex-wrap:wrap
-}
-
-body.dark{
-  background:#10171d;
-  color:#edf7f7
-}
-
-body.dark .panel,
-body.dark .item-card{
-  background:#182229;
-  border-color:#2b3b43
-}
-
-body.dark input,
-body.dark select,
-body.dark textarea{
-  background:#10171d;
-  color:#edf7f7;
-  border-color:#3a4b55
-}
-
-body.dark .message-box,
-body.dark .empty{
-  background:#20323a
-}
-
-body.dark .muted,
-body.dark .meta,
-body.dark .reply-meta{
-  color:#9eb0b8
-}
-
-@media(max-width:650px){
-
-  .cards{
-    grid-template-columns:1fr
-  }
-
-  .item-head{
-    flex-direction:column
-  }
-
-  .wrap{
-    margin-top:15px
-  }
-
-}
-
-</style>
-
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>QuizDuo Admin</title>
+  <style>
+    :root {
+      font-family: Tahoma, Arial, sans-serif;
+      color: #172033;
+      background: #f5f7fb;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #f8fafc, #eef2ff); }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    .wrap { width: min(1180px, calc(100% - 24px)); margin: 24px auto 48px; }
+    .topbar, .panel { background: rgba(255,255,255,.94); border: 1px solid rgba(15,23,42,.08); box-shadow: 0 18px 45px rgba(15,23,42,.08); border-radius: 22px; }
+    .topbar { padding: 20px; display: grid; gap: 14px; }
+    h1,h2,h3,p { margin-top: 0; }
+    .muted { color: #667085; }
+    .login-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    input, textarea, select { width: 100%; border: 1px solid #d7dce5; border-radius: 14px; padding: 12px 14px; outline: none; background: #fff; }
+    input:focus, textarea:focus, select:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.11); }
+    textarea { min-height: 160px; resize: vertical; line-height: 1.9; }
+    .btn { border: 0; border-radius: 14px; padding: 11px 16px; font-weight: 800; }
+    .btn-primary { background: #6d28d9; color: #fff; }
+    .btn-secondary { background: #eef2ff; color: #312e81; }
+    .btn-danger { background: #fee2e2; color: #991b1b; }
+    .tabs { display: flex; gap: 10px; margin: 18px 0; }
+    .tabs button.active { background: #111827; color: #fff; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .grid { display: grid; gap: 16px; }
+    .payment-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .panel { padding: 18px; }
+    .card-title { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .badge { display: inline-flex; padding: 6px 10px; border-radius: 999px; font-size: .78rem; font-weight: 900; white-space: nowrap; }
+    .badge.wait { background: #fff7ed; color: #9a3412; }
+    .badge.ok { background: #dcfce7; color: #166534; }
+    .badge.no { background: #fee2e2; color: #991b1b; }
+    .badge.info { background: #dbeafe; color: #1d4ed8; }
+    .meta { display: grid; gap: 7px; color: #475467; font-size: .92rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .support-thread { display: grid; gap: 10px; margin: 16px 0; max-height: 560px; overflow-y: auto; padding: 2px; }
+    .message { border-radius: 16px; padding: 12px 14px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .message.user { background: #eff6ff; border: 1px solid #dbeafe; }
+    .message.admin { background: #ecfdf5; border: 1px solid #d1fae5; }
+    .message-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; }
+    .message small { display: block; margin-top: 6px; color: #667085; font-weight: 500; }
+    .reply-box { display: grid; gap: 10px; margin-top: 16px; }
+    .empty, .error { padding: 26px; text-align: center; color: #667085; }
+    .hidden { display: none !important; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+    .count { font-weight: 900; }
+    @media (max-width: 640px) {
+      .wrap { width: min(100% - 12px, 1180px); margin-top: 8px; }
+      .topbar, .panel { border-radius: 16px; padding: 14px; }
+      .login-row { grid-template-columns: 1fr; }
+      .tabs { overflow-x: auto; }
+      .tabs button { white-space: nowrap; }
+    }
+  </style>
 </head>
-
 <body>
+  <div class="wrap">
+    <section class="topbar">
+      <div>
+        <h1>QuizDuo Admin</h1>
+        <p class="muted">مدیریت پرداخت‌ها و گفت‌وگوهای پشتیبانی</p>
+      </div>
+      <div class="login-row">
+        <input id="password" type="password" placeholder="رمز مدیریت">
+        <button class="btn btn-primary" onclick="login()">ورود</button>
+      </div>
+      <p id="loginMessage" class="muted"></p>
+    </section>
 
-<div class="wrap">
+    <div id="adminArea" class="hidden">
+      <div class="tabs">
+        <button id="tabPayments" class="btn btn-secondary active" onclick="showTab('payments')">💳 پرداخت‌ها</button>
+        <button id="tabSupport" class="btn btn-secondary" onclick="showTab('support')">🎫 پشتیبانی</button>
+        <button class="btn btn-secondary" onclick="refreshAll()">🔄 بروزرسانی</button>
+      </div>
 
-  <div class="panel">
+      <section id="payments" class="view active">
+        <div class="toolbar">
+          <h2>پرداخت‌ها</h2>
+          <span id="paymentCount" class="count"></span>
+        </div>
+        <div id="paymentsList" class="grid payment-grid"></div>
+      </section>
 
-    <h1>
-      QuizDuo Admin
-    </h1>
-
-    <p class="muted">
-      مدیریت اشتراک‌ها و پیام‌های کاربران
-    </p>
-
-    <input
-      id="password"
-      type="password"
-      placeholder="رمز مدیریت"
-    >
-
-    <div class="actions">
-
-      <button
-        class="primary"
-        onclick="login()"
-      >
-        ورود به مدیریت
-      </button>
-
-      <button
-        class="secondary"
-        onclick="toggleTheme()"
-      >
-        روشن / تاریک
-      </button>
-
+      <section id="support" class="view">
+        <div class="toolbar">
+          <h2>گفت‌وگوهای پشتیبانی</h2>
+          <span id="supportCount" class="count"></span>
+        </div>
+        <div id="supportList" class="grid"></div>
+      </section>
     </div>
-
-    <p id="loginMsg"></p>
-
   </div>
-
-
-  <div
-    id="dashboard"
-    class="hidden"
-  >
-
-    <div class="panel">
-
-      <div class="top-actions">
-
-        <div class="actions">
-
-          <button
-            class="primary"
-            onclick="loadAll()"
-          >
-            🔄 به‌روزرسانی
-          </button>
-
-          <button
-            class="danger"
-            onclick="logout()"
-          >
-            خروج
-          </button>
-
-        </div>
-
-        <div
-          id="refreshStatus"
-          class="refresh-status"
-        >
-          آماده
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <div class="panel">
-
-      <div class="section-title">
-
-        <div>
-
-          <h2>
-            💳 اشتراک‌ها و پرداخت‌ها
-          </h2>
-
-          <p class="muted">
-            هر پرداخت در یک کارت مستقل نمایش داده می‌شود.
-          </p>
-
-        </div>
-
-        <span
-          id="paymentCount"
-          class="status"
-        >
-          0
-        </span>
-
-      </div>
-
-      <div
-        id="paymentsBody"
-        class="cards"
-      ></div>
-
-    </div>
-
-
-    <div class="panel">
-
-      <div class="section-title">
-
-        <div>
-
-          <h2>
-            🎫 پیام‌های کاربران
-          </h2>
-
-          <p class="muted">
-            هر پیام یک گفت‌وگوی مستقل است و پاسخ شما مستقیماً در پنل همان کاربر نمایش داده می‌شود.
-          </p>
-
-        </div>
-
-        <span
-          id="supportCount"
-          class="status"
-        >
-          0
-        </span>
-
-      </div>
-
-      <div
-        id="supportBody"
-        class="cards"
-      ></div>
-
-    </div>
-
-  </div>
-
-</div>
-
 
 <script>
+  let adminPassword = '';
 
-let adminPassword = "";
-
-let refreshTimer = null;
-
-let lastSupportRows =
-  new Set();
-
-
-function login(){
-
-  const password =
-    document
-      .getElementById(
-        "password"
-      )
-      .value;
-
-  const msg =
-    document
-      .getElementById(
-        "loginMsg"
-      );
-
-  if(!password){
-
-    msg.textContent =
-      "رمز مدیریت را وارد کنید.";
-
-    return;
+  function runServer(method, args = []) {
+    return new Promise((resolve, reject) => {
+      let runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject);
+      runner[method](...args);
+    });
   }
 
-  adminPassword =
-    password;
-
-  google.script.run
-
-    .withSuccessHandler(
-      () => {
-
-        msg.textContent =
-          "ورود موفق بود.";
-
-        document
-          .getElementById(
-            "dashboard"
-          )
-          .classList
-          .remove(
-            "hidden"
-          );
-
-        loadAll();
-
-        startAutoRefresh();
-
-      }
-    )
-
-    .withFailureHandler(
-      error => {
-
-        adminPassword =
-          "";
-
-        msg.textContent =
-          error.message ||
-          "رمز مدیریت اشتباه است.";
-
-      }
-    )
-
-    .getPaymentsForAdmin(
-      password
-    );
-}
-
-
-function logout(){
-
-  stopAutoRefresh();
-
-  adminPassword =
-    "";
-
-  document
-    .getElementById(
-      "dashboard"
-    )
-    .classList
-    .add(
-      "hidden"
-    );
-
-  document
-    .getElementById(
-      "password"
-    )
-    .value =
-    "";
-
-  document
-    .getElementById(
-      "loginMsg"
-    )
-    .textContent =
-    "";
-}
-
-
-function startAutoRefresh(){
-
-  stopAutoRefresh();
-
-  refreshTimer =
-    setInterval(
-      () => {
-
-        if(adminPassword){
-
-          loadAll(
-            true
-          );
-        }
-
-      },
-      15000
-    );
-}
-
-
-function stopAutoRefresh(){
-
-  if(refreshTimer){
-
-    clearInterval(
-      refreshTimer
-    );
-
-    refreshTimer =
-      null;
-  }
-}
-
-
-function loadAll(
-  background = false
-){
-
-  if(!adminPassword){
-    return;
+  function esc(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
   }
 
-  if(!background){
-
-    document
-      .getElementById(
-        "refreshStatus"
-      )
-      .textContent =
-      "در حال دریافت اطلاعات...";
+  function formatDate(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString('fa-IR');
   }
 
-  loadPayments(
-    background
-  );
-
-  loadSupport(
-    background
-  );
-}
-
-
-function loadPayments(
-  background = false
-){
-
-  google.script.run
-
-    .withSuccessHandler(
-      rows => {
-
-        renderPayments(
-          rows
-        );
-
-        if(!background){
-
-          document
-            .getElementById(
-              "refreshStatus"
-            )
-            .textContent =
-            "اطلاعات اشتراک‌ها به‌روز شد.";
-        }
-
-      }
-    )
-
-    .withFailureHandler(
-      error => {
-
-        if(!background){
-
-          document
-            .getElementById(
-              "refreshStatus"
-            )
-            .textContent =
-            error.message ||
-            "دریافت اشتراک‌ها ناموفق بود.";
-        }
-
-      }
-    )
-
-    .getPaymentsForAdmin(
-      adminPassword
-    );
-}
-
-
-function loadSupport(
-  background = false
-){
-
-  google.script.run
-
-    .withSuccessHandler(
-      rows => {
-
-        renderSupport(
-          rows
-        );
-
-        if(!background){
-
-          document
-            .getElementById(
-              "refreshStatus"
-            )
-            .textContent =
-            "پیام‌ها به‌روز شدند.";
-        }
-
-      }
-    )
-
-    .withFailureHandler(
-      error => {
-
-        if(!background){
-
-          document
-            .getElementById(
-              "refreshStatus"
-            )
-            .textContent =
-            error.message ||
-            "دریافت پیام‌ها ناموفق بود.";
-        }
-
-      }
-    )
-
-    .getSupportForAdmin(
-      adminPassword
-    );
-}
-
-
-function renderPayments(
-  rows
-){
-
-  const body =
-    document
-      .getElementById(
-        "paymentsBody"
-      );
-
-  document
-    .getElementById(
-      "paymentCount"
-    )
-    .textContent =
-    String(
-      rows.length || 0
-    );
-
-  if(
-    !Array.isArray(rows) ||
-    !rows.length
-  ){
-
-    body.innerHTML =
-      '<div class="empty">هنوز پرداختی ثبت نشده است.</div>';
-
-    return;
+  function money(value) {
+    return Number(value || 0).toLocaleString('fa-IR') + ' تومان';
   }
 
-  body.innerHTML =
-    rows
-      .map(
-        row => {
-
-          const cls =
-            row.status ===
-            'تأیید شد'
-
-              ? 'approved'
-
-              : row.status ===
-                'رد شد'
-
-                ? 'rejected'
-
-                : 'pending';
-
-          return `
-
-            <article
-              class="item-card"
-            >
-
-              <div
-                class="item-head"
-              >
-
-                <div>
-
-                  <span
-                    class="muted"
-                  >
-                    کاربر
-                  </span>
-
-                  <h3>
-                    ${escapeHtml(
-                      row.username
-                    )}
-                  </h3>
-
-                </div>
-
-                <span
-                  class="status ${cls}"
-                >
-                  ${escapeHtml(
-                    row.status ||
-                    "-"
-                  )}
-                </span>
-
-              </div>
-
-
-              <div
-                class="meta"
-              >
-
-                <span>
-                  🕒
-                  ${formatDate(
-                    row.timestamp
-                  )}
-                </span>
-
-                <span>
-                  📱
-                  ${escapeHtml(
-                    row.phone ||
-                    "-"
-                  )}
-                </span>
-
-                <span>
-                  👑
-                  ${escapeHtml(
-                    row.planName ||
-                    row.planId ||
-                    "-"
-                  )}
-                </span>
-
-                <span>
-                  💰
-                  ${Number(
-                    row.amount ||
-                    0
-                  ).toLocaleString(
-                    'fa-IR'
-                  )}
-                  تومان
-                </span>
-
-                ${
-                  row.subscriptionExpiry
-
-                    ? `
-
-                      <span>
-                        📅
-                        پایان اشتراک:
-                        ${formatDate(
-                          row.subscriptionExpiry
-                        )}
-                      </span>
-
-                    `
-
-                    : ""
-                }
-
-              </div>
-
-
-              ${
-                row.receiptUrl
-
-                  ? `
-
-                    <a
-                      class="receipt"
-                      href="${escapeAttribute(
-                        row.receiptUrl
-                      )}"
-                      target="_blank"
-                    >
-                      مشاهده فیش
-                    </a>
-
-                    `
-
-                  : ""
-              }
-
-
-              ${
-                row.userMessage
-
-                  ? `
-
-                    <div
-                      class="message-box"
-                    >
-                      ${escapeHtml(
-                        row.userMessage
-                      )}
-                    </div>
-
-                    `
-
-                  : ""
-              }
-
-
-              <div
-                class="actions"
-              >
-
-                <button
-                  class="primary"
-                  onclick="setPaymentStatus(
-                    ${row.rowNumber},
-                    'تأیید شد'
-                  )"
-                >
-                  تأیید و فعال‌سازی
-                </button>
-
-                <button
-                  class="danger"
-                  onclick="setPaymentStatus(
-                    ${row.rowNumber},
-                    'رد شد'
-                  )"
-                >
-                  رد
-                </button>
-
-                <button
-                  class="secondary"
-                  onclick="setPaymentStatus(
-                    ${row.rowNumber},
-                    'در انتظار بررسی'
-                  )"
-                >
-                  در انتظار
-                </button>
-
-              </div>
-
-            </article>
-
-          `;
-        }
-      )
-      .join(
-        ''
-      );
-}
-
-
-function renderSupport(
-  rows
-){
-
-  const body =
-    document
-      .getElementById(
-        "supportBody"
-      );
-
-  document
-    .getElementById(
-      "supportCount"
-    )
-    .textContent =
-    String(
-      rows.length || 0
-    );
-
-  if(
-    !Array.isArray(rows) ||
-    !rows.length
-  ){
-
-    body.innerHTML =
-      '<div class="empty">هنوز پیامی ثبت نشده است.</div>';
-
-    return;
+  function statusClass(status) {
+    if (status === 'تأیید شد' || status === 'پاسخ داده شد') return 'ok';
+    if (status === 'رد شد' || status === 'بسته شد') return 'no';
+    if (status === 'در حال بررسی') return 'info';
+    return 'wait';
   }
 
-  body.innerHTML =
-    rows
-      .map(
-        row => {
-
-          const replied =
-            Boolean(
-              row.adminReply
-            );
-
-          const isNew =
-            !lastSupportRows.has(
-              row.rowNumber
-            );
-
-          return `
-
-            <article
-              class="item-card ${
-                isNew
-                  ? "new"
-                  : ""
-              }"
-            >
-
-              <div
-                class="item-head"
-              >
-
-                <div>
-
-                  <span
-                    class="muted"
-                  >
-                    ${escapeHtml(
-                      row.username
-                    )}
-                  </span>
-
-                  <h3>
-                    ${escapeHtml(
-                      row.subject ||
-                      'بدون موضوع'
-                    )}
-                  </h3>
-
-                </div>
-
-                <span
-                  class="status ${
-                    replied
-                      ? 'replied'
-                      : ''
-                  }"
-                >
-                  ${escapeHtml(
-                    row.status ||
-                    'جدید'
-                  )}
-                </span>
-
-              </div>
-
-
-              <div
-                class="meta"
-              >
-
-                <span>
-                  🕒
-                  ${formatDate(
-                    row.timestamp
-                  )}
-                </span>
-
-                <span>
-                  📱
-                  ${escapeHtml(
-                    row.phone ||
-                    '-'
-                  )}
-                </span>
-
-              </div>
-
-
-              <div
-                class="message-box"
-              >
-
-                <strong>
-                  پیام کاربر:
-                </strong>
-
-                <br>
-
-                ${escapeHtml(
-                  row.message ||
-                  ''
-                )}
-
-              </div>
-
-
-              ${
-                replied
-
-                  ? `
-
-                    <div
-                      class="message-box"
-                    >
-
-                      <strong>
-                        پاسخ فعلی شما:
-                      </strong>
-
-                      <br>
-
-                      ${escapeHtml(
-                        row.adminReply
-                      )}
-
-                      <div
-                        class="reply-meta"
-                      >
-                        ${formatDate(
-                          row.replyTimestamp
-                        )}
-                      </div>
-
-                    </div>
-
-                    `
-
-                  : ""
-              }
-
-
-              <div
-                class="reply-box"
-              >
-
-                <textarea
-                  id="reply-${row.rowNumber}"
-                  placeholder="پاسخ را برای کاربر بنویسید..."
-                >${escapeHtml(
-                  row.adminReply ||
-                  ''
-                )}</textarea>
-
-
-                <div
-                  class="actions"
-                >
-
-                  <button
-                    class="primary"
-                    onclick="replySupport(
-                      ${row.rowNumber}
-                    )"
-                  >
-                    ارسال پیام
-                  </button>
-
-                  <button
-                    class="secondary"
-                    onclick="setSupportStatus(
-                      ${row.rowNumber},
-                      'در حال بررسی'
-                    )"
-                  >
-                    در حال بررسی
-                  </button>
-
-                  <button
-                    class="danger"
-                    onclick="setSupportStatus(
-                      ${row.rowNumber},
-                      'بسته شد'
-                    )"
-                  >
-                    بستن
-                  </button>
-
-                </div>
-
-              </div>
-
-            </article>
-
-          `;
-        }
-      )
-      .join(
-        ''
-      );
-
-  lastSupportRows =
-    new Set(
-      rows.map(
-        row =>
-          row.rowNumber
-      )
-    );
-}
-
-
-function setPaymentStatus(
-  rowNumber,
-  status
-){
-
-  google.script.run
-
-    .withSuccessHandler(
-      result => {
-
-        alert(
-          result &&
-          result.message
-            ? result.message
-            : "وضعیت پرداخت به‌روز شد."
-        );
-
-        loadPayments();
-      }
-    )
-
-    .withFailureHandler(
-      error => {
-
-        alert(
-          error.message ||
-          "خطا"
-        );
-      }
-    )
-
-    .updatePaymentStatus(
-      adminPassword,
-      rowNumber,
-      status
-    );
-}
-
-
-function replySupport(
-  rowNumber
-){
-
-  const textarea =
-    document
-      .getElementById(
-        `reply-${rowNumber}`
-      );
-
-  if(!textarea){
-    return;
+  async function login() {
+    adminPassword = document.getElementById('password').value.trim();
+    const msg = document.getElementById('loginMessage');
+    if (!adminPassword) {
+      msg.textContent = 'رمز مدیریت را وارد کنید.';
+      return;
+    }
+    msg.textContent = 'در حال بررسی...';
+    try {
+      const payments = await runServer('getPaymentsForAdmin', [adminPassword]);
+      adminPassword = adminPassword;
+      document.getElementById('adminArea').classList.remove('hidden');
+      msg.textContent = 'ورود موفق بود.';
+      renderPayments(payments);
+      await loadSupport();
+    } catch (error) {
+      msg.textContent = error && error.message ? error.message : 'ورود ناموفق بود.';
+    }
   }
 
-  const reply =
-    textarea.value.trim();
-
-  if(!reply){
-
-    alert(
-      "متن پاسخ را وارد کنید."
-    );
-
-    return;
+  function showTab(name) {
+    document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+    document.getElementById(name).classList.add('active');
+    document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
+    if (name === 'payments') document.getElementById('tabPayments').classList.add('active');
+    if (name === 'support') document.getElementById('tabSupport').classList.add('active');
   }
 
-  textarea.disabled =
-    true;
-
-  google.script.run
-
-    .withSuccessHandler(
-      result => {
-
-        alert(
-          result &&
-          result.message
-            ? result.message
-            : "پاسخ ارسال شد."
-        );
-
-        loadSupport();
-      }
-    )
-
-    .withFailureHandler(
-      error => {
-
-        textarea.disabled =
-          false;
-
-        alert(
-          error.message ||
-          "ارسال پاسخ ناموفق بود."
-        );
-      }
-    )
-
-    .replyToSupport(
-      adminPassword,
-      rowNumber,
-      reply,
-      "پاسخ داده شد"
-    );
-}
-
-
-function setSupportStatus(
-  rowNumber,
-  status
-){
-
-  google.script.run
-
-    .withSuccessHandler(
-      () =>
+  async function refreshAll() {
+    if (!adminPassword) return;
+    try {
+      const [payments] = await Promise.all([
+        runServer('getPaymentsForAdmin', [adminPassword]),
         loadSupport()
-    )
-
-    .withFailureHandler(
-      error =>
-        alert(
-          error.message ||
-          "خطا"
-        )
-    )
-
-    .updateSupportStatus(
-      adminPassword,
-      rowNumber,
-      status
-    );
-}
-
-
-function toggleTheme(){
-
-  document
-    .body
-    .classList
-    .toggle(
-      "dark"
-    );
-}
-
-
-function formatDate(
-  value
-){
-
-  if(!value){
-    return "-";
+      ]);
+      renderPayments(payments);
+    } catch (error) {
+      alert(error && error.message ? error.message : 'بروزرسانی ناموفق بود.');
+    }
   }
 
-  try{
-
-    return new Date(
-      value
-    ).toLocaleString(
-      "fa-IR"
-    );
-
-  }catch{
-
-    return String(
-      value
-    );
+  function renderPayments(items) {
+    const list = document.getElementById('paymentsList');
+    document.getElementById('paymentCount').textContent = `${(items || []).length.toLocaleString('fa-IR')} مورد`;
+    if (!items || !items.length) {
+      list.innerHTML = '<div class="panel empty">هنوز پرداختی ثبت نشده است.</div>';
+      return;
+    }
+    list.innerHTML = items.map(item => `
+      <article class="panel">
+        <div class="card-title">
+          <div>
+            <h3>${esc(item.username || '-')}</h3>
+            <div class="muted">${esc(item.planName || item.planId || '-')}</div>
+          </div>
+          <span class="badge ${statusClass(item.status)}">${esc(item.status || '-')}</span>
+        </div>
+        <div class="meta">
+          <div>📱 ${esc(item.phone || '-')}</div>
+          <div>💰 ${money(item.amount)}</div>
+          <div>🕒 ${esc(formatDate(item.timestamp))}</div>
+          <div>🧾 ${esc(item.fileName || '-')}</div>
+          ${item.receiptUrl ? `<div><a href="${esc(item.receiptUrl)}" target="_blank" rel="noopener">مشاهده فیش</a></div>` : ''}
+          ${item.userMessage ? `<div>💬 ${esc(item.userMessage)}</div>` : ''}
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="setPaymentStatus(${Number(item.rowNumber)}, 'تأیید شد')">✅ تأیید</button>
+          <button class="btn btn-danger" onclick="setPaymentStatus(${Number(item.rowNumber)}, 'رد شد')">❌ رد</button>
+          <button class="btn btn-secondary" onclick="setPaymentStatus(${Number(item.rowNumber)}, 'در انتظار بررسی')">⏳ انتظار</button>
+        </div>
+      </article>
+    `).join('');
   }
-}
 
+  async function setPaymentStatus(rowNumber, status) {
+    if (!adminPassword) return;
+    try {
+      await runServer('updatePaymentStatus', [adminPassword, rowNumber, status]);
+      await refreshAll();
+    } catch (error) {
+      alert(error && error.message ? error.message : 'تغییر وضعیت ناموفق بود.');
+    }
+  }
 
-function escapeHtml(
-  value
-){
+  async function loadSupport() {
+    if (!adminPassword) return [];
+    const items = await runServer('getSupportForAdmin', [adminPassword]);
+    renderSupport(items);
+    return items;
+  }
 
-  return String(
-    value ?? ""
-  )
-    .replaceAll(
-      "&",
-      "&amp;"
-    )
-    .replaceAll(
-      "<",
-      "&lt;"
-    )
-    .replaceAll(
-      ">",
-      "&gt;"
-    )
-    .replaceAll(
-      '"',
-      "&quot;"
-    )
-    .replaceAll(
-      "'",
-      "&#039;"
-    );
-}
+  function renderSupport(items) {
+    const list = document.getElementById('supportList');
+    document.getElementById('supportCount').textContent = `${(items || []).length.toLocaleString('fa-IR')} گفت‌وگو`;
+    if (!items || !items.length) {
+      list.innerHTML = '<div class="panel empty">هنوز گفت‌وگوی پشتیبانی ثبت نشده است.</div>';
+      return;
+    }
 
+    list.innerHTML = items.map(conversation => {
+      const thread = Array.isArray(conversation.thread) ? conversation.thread : [];
+      const messages = thread.map(item => `
+        <div class="message ${item.sender === 'admin' ? 'admin' : 'user'}">
+          <div class="message-head">
+            <span>${item.sender === 'admin' ? 'پشتیبانی QuizDuo' : esc(conversation.username || 'کاربر')}</span>
+            <span>${item.sender === 'admin' ? '🛠️' : '👤'}</span>
+          </div>
+          <div>${esc(item.text || '')}</div>
+          <small>${esc(formatDate(item.timestamp))}</small>
+        </div>
+      `).join('');
 
-function escapeAttribute(
-  value
-){
+      return `
+        <article class="panel">
+          <div class="card-title">
+            <div>
+              <h3>${esc(conversation.subject || 'بدون موضوع')}</h3>
+              <div class="muted">${esc(conversation.username || '-')} · ${esc(conversation.phone || '-')}</div>
+            </div>
+            <span class="badge ${statusClass(conversation.status)}">${esc(conversation.status || 'جدید')}</span>
+          </div>
+          <div class="support-thread">${messages || '<div class="empty">پیامی در این گفت‌وگو وجود ندارد.</div>'}</div>
+          <div class="reply-box">
+            <textarea id="reply-${esc(conversation.conversationId)}" class="admin-support-reply" placeholder="پاسخ ادمین را کامل وارد کنید؛ محدودیت ۱۲ کاراکتر ندارد."></textarea>
+            <div class="actions">
+              <select id="status-${esc(conversation.conversationId)}">
+                <option value="پاسخ داده شد" ${conversation.status === 'پاسخ داده شد' ? 'selected' : ''}>پاسخ داده شد</option>
+                <option value="در حال بررسی" ${conversation.status === 'در حال بررسی' ? 'selected' : ''}>در حال بررسی</option>
+                <option value="جدید" ${conversation.status === 'جدید' ? 'selected' : ''}>جدید</option>
+                <option value="بسته شد" ${conversation.status === 'بسته شد' ? 'selected' : ''}>بسته شد</option>
+              </select>
+              <button class="btn btn-primary" onclick="replySupport(${Number(conversation.lastRowNumber || conversation.rowNumber)}, '${esc(conversation.conversationId)}')">ارسال پاسخ در همین گفت‌وگو</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
 
-  return escapeHtml(
-    value
-  );
-}
-
+  async function replySupport(rowNumber, conversationId) {
+    if (!adminPassword) return;
+    const textarea = document.getElementById(`reply-${conversationId}`);
+    const status = document.getElementById(`status-${conversationId}`).value;
+    const text = textarea ? textarea.value.trim() : '';
+    if (!text) {
+      alert('متن پاسخ را وارد کنید.');
+      return;
+    }
+    try {
+      await runServer('replyToSupport', [adminPassword, rowNumber, text, status]);
+      await loadSupport();
+    } catch (error) {
+      alert(error && error.message ? error.message : 'ارسال پاسخ ناموفق بود.');
+    }
+  }
 </script>
-
 </body>
-
 </html>
