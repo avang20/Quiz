@@ -1,7 +1,11 @@
  const CONFIG = {   SHEET_NAME: 'Payments',   SUPPORT_SHEET_NAME: 'Support',   USERS_SHEET_NAME: 'Users',   DRIVE_FOLDER_NAME: 'QuizDuo Receipts',   PRIVATE_TEST_CODE: 'QDZ-100K-HASTI',   TEST_AMOUNT: 100000,   MAX_RECEIPT_BYTES: 5 * 1024 * 1024,   ADMIN_PASSWORD: 'CHANGE_THIS_ADMIN_PASSWORD' };  const PAYMENT_HEADERS = [   'Timestamp', 'Username', 'Phone', 'Plan ID', 'Plan Name',   'Original Amount', 'Final Amount', 'Discount %', 'Discount Code',   'File Name', 'Receipt URL', 'Status', 'User Message', 'Status Timestamp' ];
 
 const USER_HEADERS = [
-  'Timestamp', 'Username', 'Phone', 'XP', 'Level', 'Streak', 'General Stage', 'Fun Stage'
+  'Timestamp', 'Username', 'Phone', 'XP', 'Level', 'Streak', 'General Stage', 'Fun Stage', 'Best Combo'
+];
+
+const LEADERBOARD_HISTORY_HEADERS = [
+  'Timestamp', 'Date Key', 'Username', 'XP', 'Level', 'Best Combo', 'Streak', 'Best Stage', 'General Stage', 'Fun Stage'
 ];  const SUPPORT_HEADERS = [   'Timestamp', 'Username', 'Phone', 'Subject', 'Message', 'Status',   'Admin Reply', 'Reply Timestamp', 'Conversation ID' ];  function doGet(e) {
   const params = (e && e.parameter) || {};
   const page = params.page;
@@ -17,7 +21,7 @@ const USER_HEADERS = [
   const callback = String(params.callback || '').trim();
 
   if (action === 'leaderboard') {
-    const data = getLeaderboardObject();
+    const data = getLeaderboardObject(params.period || 'week');
     return callback
       ? jsonpResponse(callback, data)
       : jsonResponse(data);
@@ -349,6 +353,15 @@ function closeSupportConversation(data) {
 /* =========================================================
    USER STATE / LEADERBOARD
 ========================================================= */
+function getServerDateKey(date) {
+  const value = date instanceof Date ? date : new Date(date || Date.now());
+  return Utilities.formatDate(
+    value,
+    Session.getScriptTimeZone(),
+    'yyyy-MM-dd'
+  );
+}
+
 function handleUserState(data) {
   const username = String(data.username || '').trim();
 
@@ -371,6 +384,11 @@ function handleUserState(data) {
     }
   }
 
+  const generalStage = Math.max(0, Number(data.generalStage || 0));
+  const funStage = Math.max(0, Number(data.funStage || 0));
+  const bestStage = Math.max(generalStage, funStage);
+  const bestCombo = Math.max(0, Number(data.bestCombo || 0));
+
   const row = [
     new Date(),
     username,
@@ -378,8 +396,9 @@ function handleUserState(data) {
     Number(data.xp || 0),
     Number(data.level || 1),
     Number(data.streak || 0),
-    Number(data.generalStage || 0),
-    Number(data.funStage || 0)
+    generalStage,
+    funStage,
+    bestCombo
   ];
 
   if (foundRow) {
@@ -390,94 +409,222 @@ function handleUserState(data) {
 
   SpreadsheetApp.flush();
 
+  upsertLeaderboardHistory({
+    username,
+    xp: Number(data.xp || 0),
+    level: Number(data.level || 1),
+    bestCombo,
+    streak: Number(data.streak || 0),
+    bestStage,
+    generalStage,
+    funStage
+  });
+
   return jsonResponse({
     success: true,
     message: 'وضعیت کاربر ذخیره شد.'
   });
 }
 
-function getLeaderboardObject() {
+function upsertLeaderboardHistory(data) {
+  const sheet = getOrCreateLeaderboardHistorySheet();
+  const now = new Date();
+  const dateKey = getServerDateKey(now);
+  const username = String(data.username || '').trim();
+  const normalized = username.toLowerCase();
+
+  if (!username) return;
+
+  const values = sheet.getDataRange().getValues();
+  let foundRow = 0;
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const rowDate = String(row[1] || '');
+    const rowUser = String(row[2] || '').trim().toLowerCase();
+
+    if (rowDate === dateKey && rowUser === normalized) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+
+  const row = [
+    now,
+    dateKey,
+    username,
+    Number(data.xp || 0),
+    Number(data.level || 1),
+    Number(data.bestCombo || 0),
+    Number(data.streak || 0),
+    Number(data.bestStage || 0),
+    Number(data.generalStage || 0),
+    Number(data.funStage || 0)
+  ];
+
+  if (foundRow) {
+    sheet.getRange(foundRow, 1, 1, LEADERBOARD_HISTORY_HEADERS.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+}
+
+function getLeaderboardPeriodRange(period) {
+  const now = new Date();
+  const safePeriod = ['week', 'month', 'year'].includes(String(period))
+    ? String(period)
+    : 'week';
+
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+
+  if (safePeriod === 'week') {
+    const day = start.getDay();
+    const daysFromMonday = (day + 6) % 7;
+    start.setDate(start.getDate() - daysFromMonday);
+  } else if (safePeriod === 'month') {
+    start.setDate(1);
+  } else if (safePeriod === 'year') {
+    start.setMonth(0, 1);
+  }
+
+  return {
+    period: safePeriod,
+    start,
+    end: now
+  };
+}
+
+function getLeaderboardObject(period) {
+  const range = getLeaderboardPeriodRange(period);
   const entriesByUser = {};
+  const historySheet = getOrCreateLeaderboardHistorySheet();
+  const historyValues = historySheet.getDataRange().getValues();
 
-  try {
-    const sheet = getOrCreateUsersSheet();
-    const values = sheet.getDataRange().getValues();
+  historyValues.slice(1).forEach(row => {
+    const timestamp = row[0] ? new Date(row[0]) : null;
+    if (!timestamp || Number.isNaN(timestamp.getTime())) return;
+    if (timestamp < range.start || timestamp > range.end) return;
 
-    values.slice(1).forEach(row => {
-      const username = String(row[1] || '').trim();
-      if (!username) return;
+    const username = String(row[2] || '').trim();
+    if (!username) return;
 
-      entriesByUser[username.toLowerCase()] = {
+    const key = username.toLowerCase();
+    const current = entriesByUser[key];
+
+    if (!current) {
+      entriesByUser[key] = {
         username,
         xp: Number(row[3] || 0),
         level: Number(row[4] || 1),
-        streak: Number(row[5] || 0),
-        generalStage: Number(row[6] || 0),
-        funStage: Number(row[7] || 0)
+        bestCombo: Number(row[5] || 0),
+        streak: Number(row[6] || 0),
+        bestStage: Number(row[7] || 0),
+        generalStage: Number(row[8] || 0),
+        funStage: Number(row[9] || 0),
+        latestTimestamp: timestamp.getTime()
       };
-    });
-  } catch (error) {
-    console.error('Users sheet read failed:', error);
-  }
+      return;
+    }
 
-  // Add users that have appeared in Payments or Support even if no gameplay
-  // state has been synchronized yet.
+    current.xp = Math.max(current.xp, Number(row[3] || 0));
+    current.level = Math.max(current.level, Number(row[4] || 1));
+    current.bestCombo = Math.max(current.bestCombo, Number(row[5] || 0));
+    current.bestStage = Math.max(current.bestStage, Number(row[7] || 0));
+
+    if (timestamp.getTime() >= current.latestTimestamp) {
+      current.streak = Number(row[6] || 0);
+      current.generalStage = Number(row[8] || 0);
+      current.funStage = Number(row[9] || 0);
+      current.latestTimestamp = timestamp.getTime();
+    }
+  });
+
+  // For the current period, include users who have a fresh Users snapshot
+  // but do not yet have a history row (e.g. immediately after deployment).
   try {
-    const paymentSheet = getOrCreateSheet();
-    const values = paymentSheet.getDataRange().getValues();
+    const usersSheet = getOrCreateUsersSheet();
+    const values = usersSheet.getDataRange().getValues();
+
     values.slice(1).forEach(row => {
+      const timestamp = row[0] ? new Date(row[0]) : null;
+      if (!timestamp || Number.isNaN(timestamp.getTime())) return;
+      if (timestamp < range.start || timestamp > range.end) return;
+
       const username = String(row[1] || '').trim();
       if (!username) return;
+
       const key = username.toLowerCase();
+      const candidate = {
+        username,
+        xp: Number(row[3] || 0),
+        level: Number(row[4] || 1),
+        bestCombo: Number(row[8] || 0),
+        streak: Number(row[5] || 0),
+        bestStage: Math.max(Number(row[6] || 0), Number(row[7] || 0)),
+        generalStage: Number(row[6] || 0),
+        funStage: Number(row[7] || 0),
+        latestTimestamp: timestamp.getTime()
+      };
+
       if (!entriesByUser[key]) {
-        entriesByUser[key] = {
-          username,
-          xp: 0,
-          level: 1,
-          streak: 0,
-          generalStage: 0,
-          funStage: 0
-        };
+        entriesByUser[key] = candidate;
+      } else {
+        const current = entriesByUser[key];
+        current.xp = Math.max(current.xp, candidate.xp);
+        current.level = Math.max(current.level, candidate.level);
+        current.bestCombo = Math.max(current.bestCombo, candidate.bestCombo);
+        current.bestStage = Math.max(current.bestStage, candidate.bestStage);
+        if (candidate.latestTimestamp >= current.latestTimestamp) {
+          current.streak = candidate.streak;
+          current.generalStage = candidate.generalStage;
+          current.funStage = candidate.funStage;
+          current.latestTimestamp = candidate.latestTimestamp;
+        }
       }
     });
   } catch (error) {
-    console.error('Payments leaderboard merge failed:', error);
+    console.error('Users current-period merge failed:', error);
   }
 
-  try {
-    const supportSheet = getOrCreateSupportSheet();
-    const values = supportSheet.getDataRange().getValues();
-    values.slice(1).forEach(row => {
-      const username = String(row[1] || '').trim();
-      if (!username) return;
-      const key = username.toLowerCase();
-      if (!entriesByUser[key]) {
-        entriesByUser[key] = {
-          username,
-          xp: 0,
-          level: 1,
-          streak: 0,
-          generalStage: 0,
-          funStage: 0
-        };
-      }
-    });
-  } catch (error) {
-    console.error('Support leaderboard merge failed:', error);
-  }
+  const entries = Object.values(entriesByUser);
 
-  const entries = Object.values(entriesByUser)
+  const xpBoard = [...entries]
     .sort((a, b) =>
       Number(b.xp || 0) - Number(a.xp || 0) ||
-      Number(b.level || 1) - Number(a.level || 1) ||
-      Number(b.generalStage || 0) - Number(a.generalStage || 0) ||
-      Number(b.funStage || 0) - Number(a.funStage || 0) ||
+      Number(b.bestStage || 0) - Number(a.bestStage || 0) ||
+      Number(b.bestCombo || 0) - Number(a.bestCombo || 0) ||
       String(a.username).localeCompare(String(b.username), 'fa')
-    );
+    )
+    .slice(0, 3);
+
+  const comboBoard = [...entries]
+    .sort((a, b) =>
+      Number(b.bestCombo || 0) - Number(a.bestCombo || 0) ||
+      Number(b.xp || 0) - Number(a.xp || 0) ||
+      String(a.username).localeCompare(String(b.username), 'fa')
+    )
+    .slice(0, 3);
+
+  const stageBoard = [...entries]
+    .sort((a, b) =>
+      Number(b.bestStage || 0) - Number(a.bestStage || 0) ||
+      Number(b.xp || 0) - Number(a.xp || 0) ||
+      Number(b.bestCombo || 0) - Number(a.bestCombo || 0) ||
+      String(a.username).localeCompare(String(b.username), 'fa')
+    )
+    .slice(0, 3);
 
   return {
     success: true,
-    entries,
+    period: range.period,
+    periodStart: range.start.toISOString(),
+    periodEnd: range.end.toISOString(),
+    boards: {
+      xp: xpBoard,
+      combo: comboBoard,
+      stage: stageBoard
+    },
     updatedAt: new Date().toISOString()
   };
 }
@@ -553,6 +700,16 @@ function addMonths(date, months) {
     sheet = spreadsheet.insertSheet(CONFIG.USERS_SHEET_NAME);
   }
   ensureHeaders(sheet, USER_HEADERS);
+  return sheet;
+}
+
+function getOrCreateLeaderboardHistorySheet() {
+  const spreadsheet = getOrCreateSpreadsheet();
+  let sheet = spreadsheet.getSheetByName(CONFIG.LEADERBOARD_HISTORY_SHEET_NAME);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(CONFIG.LEADERBOARD_HISTORY_SHEET_NAME);
+  }
+  ensureHeaders(sheet, LEADERBOARD_HISTORY_HEADERS);
   return sheet;
 }
 
