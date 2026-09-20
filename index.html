@@ -46,7 +46,52 @@
        بزن بریم! 🚀
      </button>
    </div>
- </div>  <section id="leaderboard" class="page">   <div class="section-heading"><div><span class="eyebrow">🏆 رقابت</span><h2>لیدربورد</h2></div></div>   <div class="panel table-panel">     <table>       <thead><tr><th>رتبه</th><th>بازیکن</th><th>XP</th><th>مرحله</th></tr></thead>       <tbody id="leaderBody"></tbody>     </table>   </div>   <p class="muted">لیدربورد بین حساب‌های ثبت‌شده QuizDuo به‌صورت مشترک نمایش داده می‌شود.</p> </section>  <section id="profile" class="page">   <div class="section-heading">     <div><span class="eyebrow">👤 حساب کاربری</span><h2>پنل کاربری</h2></div>     <span id="dashboardAccessBadge" class="dashboard-badge free">🔒 فقط ۱ مرحله رایگان</span>   </div>    <div class="user-dashboard-layout">     <aside class="panel user-dashboard-sidebar">       <div class="dashboard-avatar">👤</div>       <h3 id="dashboardName">بازیکن مهمان</h3>       <p id="dashboardSubscription">رایگان — ۱ مرحله</p>       <div class="dashboard-menu">
+ </div>  <section id="leaderboard" class="page">
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">🏆 رقابت</span>
+      <h2>لیدربورد QuizDuo</h2>
+      <p id="leaderboardPeriodSubtitle" class="muted">سه بازیکن برتر هر معیار در این بازه زمانی</p>
+    </div>
+  </div>
+
+  <div class="leaderboard-period-switcher" role="tablist" aria-label="بازه لیدربورد">
+    <button type="button" data-leader-period="week" class="active">📅 هفته</button>
+    <button type="button" data-leader-period="month">🗓️ ماه</button>
+    <button type="button" data-leader-period="year">🎯 سال</button>
+  </div>
+
+  <div class="leaderboard-current-period panel">
+    <span class="eyebrow">بازه انتخاب‌شده</span>
+    <h3 id="leaderboardPeriodTitle">هفته جاری</h3>
+    <span id="leaderboardUpdatedAt" class="muted">در حال بروزرسانی...</span>
+  </div>
+
+  <div class="leaderboard-grid">
+    <article class="panel leaderboard-card leaderboard-xp">
+      <div class="leaderboard-card-head">
+        <div><span class="leaderboard-card-icon">⭐</span><h3>برترین‌های XP</h3><p>بیشترین امتیاز تجربه</p></div>
+      </div>
+      <div id="leaderXpBody" class="leaderboard-list"></div>
+    </article>
+
+    <article class="panel leaderboard-card leaderboard-combo">
+      <div class="leaderboard-card-head">
+        <div><span class="leaderboard-card-icon">🔥</span><h3>برترین‌های Combo</h3><p>بیشترین پاسخ درست پشت سر هم</p></div>
+      </div>
+      <div id="leaderComboBody" class="leaderboard-list"></div>
+    </article>
+
+    <article class="panel leaderboard-card leaderboard-stage">
+      <div class="leaderboard-card-head">
+        <div><span class="leaderboard-card-icon">🚀</span><h3>برترین‌های مرحله</h3><p>بالاترین مرحله گذرانده‌شده</p></div>
+      </div>
+      <div id="leaderStageBody" class="leaderboard-list"></div>
+    </article>
+  </div>
+
+  <p class="muted leaderboard-footnote">هر دوره جداگانه محاسبه می‌شود و رتبه‌های اول تا سوم ظاهر ویژه دارند.</p>
+</section>  <section id="profile" class="page">   <div class="section-heading">     <div><span class="eyebrow">👤 حساب کاربری</span><h2>پنل کاربری</h2></div>     <span id="dashboardAccessBadge" class="dashboard-badge free">🔒 فقط ۱ مرحله رایگان</span>   </div>    <div class="user-dashboard-layout">     <aside class="panel user-dashboard-sidebar">       <div class="dashboard-avatar">👤</div>       <h3 id="dashboardName">بازیکن مهمان</h3>       <p id="dashboardSubscription">رایگان — ۱ مرحله</p>       <div class="dashboard-menu">
         <button class="dashboard-nav-item active" data-dashboard-target="overview" type="button">
           <span class="dashboard-nav-icon">📊</span>
           <span class="dashboard-nav-copy"><b>نمای کلی</b><small>وضعیت حساب و پیشرفت</small></span>
