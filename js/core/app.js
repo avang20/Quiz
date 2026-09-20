@@ -1042,7 +1042,7 @@ class App {
             registration: {
                 icon: "🎉🪪",
                 kicker: "حساب تو آماده‌ست",
-                title: "تبریک! <span id="welcomeUserName">دوست QuizDuo</span> ثبت‌نامت انجام شد 🎊",
+                title: `تبریک! <span id="welcomeUserName">دوست QuizDuo</span> ثبت‌نامت انجام شد 🎊`,
                 text: "از اینجا به بعد امتیازها، پیشرفت مرحله‌ها و رکوردت برای حسابت ذخیره می‌شن. اولین قدمت رو با قدرت بردار!",
                 points: [
                     ["✅", "حساب ساخته شد"],
