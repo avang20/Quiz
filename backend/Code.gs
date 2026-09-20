@@ -42,20 +42,89 @@ const SUPPORT_HEADERS = [
 ========================================================= */
 
 function doGet(e) {
-  const page = e && e.parameter && e.parameter.page;
+
+  const params =
+    e &&
+    e.parameter
+      ? e.parameter
+      : {};
+
+  const page =
+    String(
+      params.page || ''
+    ).trim();
+
+  const action =
+    String(
+      params.action || ''
+    ).trim();
+
+  const callback =
+    String(
+      params.callback || ''
+    ).trim();
+
 
   if (page === 'admin') {
+
     return HtmlService
-      .createTemplateFromFile('Admin')
+      .createTemplateFromFile(
+        'Admin'
+      )
       .evaluate()
-      .setTitle('QuizDuo Admin')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      .setTitle(
+        'QuizDuo Admin'
+      )
+      .setXFrameOptionsMode(
+        HtmlService.XFrameOptionsMode.ALLOWALL
+      );
   }
 
+
+  /*
+   * خواندن اطلاعات کاربر از GitHub Pages
+   *
+   * چون ContentService به
+   * script.googleusercontent.com
+   * ریدایرکت می‌شود، برای خواندن
+   * از JSONP استفاده می‌کنیم.
+   */
+
+  if (
+    action === 'userUpdates' &&
+    callback
+  ) {
+
+    const username =
+      String(
+        params.username || ''
+      ).trim();
+
+
+    const result =
+      getUserUpdatesObject({
+        username
+      });
+
+
+    return jsonpResponse(
+      callback,
+      result
+    );
+  }
+
+
   return jsonResponse({
-    success: true,
-    service: 'QuizDuo',
-    time: new Date().toISOString()
+
+    success:
+      true,
+
+    service:
+      'QuizDuo',
+
+    time:
+      new Date().toISOString()
+
   });
 }
 
