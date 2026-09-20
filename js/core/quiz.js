@@ -476,12 +476,21 @@ export class QuizEngine {
                     this.stageRewardGiven = true;
                 }
             } else if (!this.isReplay) {
-                if (Number(this.state.hearts) > 0) {
+                const infiniteHeartsActive =
+                    Number(this.state.infiniteHeartsUntil || 0) > Date.now();
+
+                if (!infiniteHeartsActive && Number(this.state.hearts) > 0) {
                     this.state.hearts = Math.max(
                         0,
                         Number(this.state.hearts) -
                             QUIZ_CONFIG.failedStageHeartPenalty
                     );
+
+                    if (Number(this.state.hearts) > 0 && !this.state.heartRefillAt) {
+                        this.state.heartRefillAt = Date.now() + 20 * 60 * 1000;
+                    } else if (Number(this.state.hearts) === 0 && !this.state.heartRefillAt) {
+                        this.state.heartRefillAt = Date.now() + 20 * 60 * 1000;
+                    }
 
                     heartLost = true;
                 }
