@@ -8,11 +8,22 @@ import {
 
 
 export const QUIZ_CONFIG = {
-    questionsPerStage: 15,
-    passingPercentage: 0.5,
-    questionTime: 20,
-    stageXP: 10,
-    failedStageHeartPenalty: 1
+
+    questionsPerStage:
+        15,
+
+    passingPercentage:
+        0.5,
+
+    questionTime:
+        20,
+
+    stageXP:
+        10,
+
+    failedStageHeartPenalty:
+        1
+
 };
 
 
@@ -25,7 +36,9 @@ function normalizeQuestion(
         !raw ||
         typeof raw !== "object"
     ) {
+
         return null;
+
     }
 
 
@@ -51,6 +64,7 @@ function normalizeQuestion(
             questionText.title ??
             questionText.content ??
             "";
+
     }
 
 
@@ -63,38 +77,47 @@ function normalizeQuestion(
         [];
 
 
-    if (!Array.isArray(options)) {
+    if (
+        !Array.isArray(
+            options
+        )
+    ) {
 
         options =
-            options &&
-            typeof options === "object"
-                ? Object.values(options)
-                : [];
+            Object.values(
+                options || {}
+            );
+
     }
 
 
     options =
-        options.map(option => {
+        options.map(
+            option => {
 
-            if (
-                option &&
-                typeof option === "object"
-            ) {
+                if (
+                    option &&
+                    typeof option === "object"
+                ) {
+
+                    return String(
+                        option.text ??
+                        option.label ??
+                        option.value ??
+                        option.answer ??
+                        option.content ??
+                        ""
+                    );
+
+                }
+
 
                 return String(
-                    option.text ??
-                    option.label ??
-                    option.value ??
-                    option.answer ??
-                    option.content ??
-                    ""
+                    option ?? ""
                 );
-            }
 
-            return String(
-                option ?? ""
-            );
-        });
+            }
+        );
 
 
     const rawAnswer =
@@ -110,17 +133,22 @@ function normalizeQuestion(
         raw.correct_option;
 
 
-    let answer = -1;
+    let answer =
+        -1;
 
 
     if (
-        typeof rawAnswer === "number" &&
-        Number.isInteger(rawAnswer)
+        typeof rawAnswer ===
+            "number" &&
+        Number.isInteger(
+            rawAnswer
+        )
     ) {
 
         if (
             rawAnswer >= 0 &&
-            rawAnswer < options.length
+            rawAnswer <
+                options.length
         ) {
 
             answer =
@@ -128,17 +156,18 @@ function normalizeQuestion(
 
         } else if (
             rawAnswer > 0 &&
-            rawAnswer <= options.length
+            rawAnswer <=
+                options.length
         ) {
 
             answer =
                 rawAnswer - 1;
+
         }
-    }
 
-
-    else if (
-        typeof rawAnswer === "string"
+    } else if (
+        typeof rawAnswer ===
+            "string"
     ) {
 
         const trimmed =
@@ -146,14 +175,21 @@ function normalizeQuestion(
 
 
         const numeric =
-            Number(trimmed);
+            Number(
+                trimmed
+            );
 
 
-        if (Number.isInteger(numeric)) {
+        if (
+            Number.isInteger(
+                numeric
+            )
+        ) {
 
             if (
                 numeric >= 0 &&
-                numeric < options.length
+                numeric <
+                    options.length
             ) {
 
                 answer =
@@ -161,58 +197,71 @@ function normalizeQuestion(
 
             } else if (
                 numeric > 0 &&
-                numeric <= options.length
+                numeric <=
+                    options.length
             ) {
 
                 answer =
                     numeric - 1;
+
             }
+
         }
 
 
         if (
             answer < 0 &&
-            /^[A-Za-z]$/.test(trimmed)
+            /^[A-Za-z]$/.test(
+                trimmed
+            )
         ) {
 
-            const letterIndex =
+            const index =
                 trimmed
                     .toUpperCase()
                     .charCodeAt(0) - 65;
 
 
             if (
-                letterIndex >= 0 &&
-                letterIndex < options.length
+                index >= 0 &&
+                index <
+                    options.length
             ) {
 
                 answer =
-                    letterIndex;
+                    index;
+
             }
+
         }
 
 
-        if (answer < 0) {
+        if (
+            answer < 0
+        ) {
 
             const normalized =
-                trimmed.toLocaleLowerCase();
+                trimmed
+                    .toLocaleLowerCase();
 
 
             answer =
                 options.findIndex(
                     option =>
-                        String(option)
+                        String(
+                            option
+                        )
                             .trim()
                             .toLocaleLowerCase() ===
                         normalized
                 );
+
         }
-    }
 
-
-    else if (
+    } else if (
         rawAnswer &&
-        typeof rawAnswer === "object"
+        typeof rawAnswer ===
+            "object"
     ) {
 
         const candidate =
@@ -223,22 +272,29 @@ function normalizeQuestion(
 
 
         if (
-            candidate !== undefined
+            candidate !==
+            undefined
         ) {
 
             answer =
                 options.findIndex(
                     option =>
-                        String(option)
-                            .trim() ===
-                        String(candidate)
-                            .trim()
+                        String(
+                            option
+                        ).trim() ===
+                        String(
+                            candidate
+                        ).trim()
                 );
+
         }
+
     }
 
 
-    if (answer < 0) {
+    if (
+        answer < 0
+    ) {
 
         const correctOptions =
             raw.correctOptions ??
@@ -246,23 +302,25 @@ function normalizeQuestion(
 
 
         if (
-            Array.isArray(correctOptions) &&
+            Array.isArray(
+                correctOptions
+            ) &&
             correctOptions.length
         ) {
-
-            const candidate =
-                correctOptions[0];
-
 
             answer =
                 options.findIndex(
                     option =>
-                        String(option)
-                            .trim() ===
-                        String(candidate)
-                            .trim()
+                        String(
+                            option
+                        ).trim() ===
+                        String(
+                            correctOptions[0]
+                        ).trim()
                 );
+
         }
+
     }
 
 
@@ -274,7 +332,8 @@ function normalizeQuestion(
             raw.level ??
             raw.levelNumber ??
             fallbackStage
-        ) || fallbackStage;
+        ) ||
+        fallbackStage;
 
 
     return {
@@ -285,12 +344,14 @@ function normalizeQuestion(
 
         question:
             String(
-                questionText ?? ""
+                questionText ??
+                ""
             ),
 
         q:
             String(
-                questionText ?? ""
+                questionText ??
+                ""
             ),
 
         options,
@@ -304,7 +365,9 @@ function normalizeQuestion(
                 raw.description ??
                 ""
             )
+
     };
+
 }
 
 
@@ -318,8 +381,15 @@ export class QuizEngine {
         this.state =
             state;
 
+
         this.saveState =
-            saveState;
+            typeof saveState ===
+            "function"
+
+                ? saveState
+
+                : () => {};
+
 
         this.questions =
             [];
@@ -353,106 +423,199 @@ export class QuizEngine {
 
         this.stageRewardGiven =
             false;
+
     }
 
 
-    async loadCategory(category) {
-    this.currentCategory = category;
+    async loadCategory(
+        category
+    ) {
 
-    const basePath = window.location.pathname
-        .replace(/\/+$/, "");
+        const safeCategory =
+            category === "fun"
+                ? "fun"
+                : "general";
 
-    const projectPath =
-        basePath.endsWith("/Quiz")
-            ? basePath
-            : "/Quiz";
 
-    const url =
-        `${projectPath}/data/${category}.json`;
+        const base =
+            document.baseURI ||
+            window.location.href;
 
-    console.log("Loading quiz data:", url);
 
-    const response = await fetch(url, {
-        cache: "no-store"
-    });
-
-    if (!response.ok) {
-        throw new Error(
-            `Could not load ${url} (${response.status})`
-        );
-    }
-
-    const data = await response.json();
-
-    let rawQuestions = [];
-
-    if (Array.isArray(data)) {
-        rawQuestions = data;
-    }
-    else if (Array.isArray(data.questions)) {
-        rawQuestions = data.questions;
-    }
-    else if (Array.isArray(data.items)) {
-        rawQuestions = data.items;
-    }
-    else if (Array.isArray(data.stages)) {
-
-        data.stages.forEach(stageBlock => {
-
-            const stageNumber =
-                Number(
-                    stageBlock.stage ??
-                    stageBlock.id ??
-                    1
-                ) || 1;
-
-            const list =
-                Array.isArray(stageBlock.questions)
-                    ? stageBlock.questions
-                    : [];
-
-            list.forEach(question => {
-
-                rawQuestions.push({
-                    ...question,
-                    stage:
-                        question.stage ??
-                        stageNumber
-                });
-
-            });
-        });
-    }
-
-    this.questions =
-        rawQuestions
-            .map(question =>
-                normalizeQuestion(
-                    question,
-                    1
-                )
-            )
-            .filter(question =>
-                question &&
-                question.question.trim() &&
-                question.options.length > 0
+        const url =
+            new URL(
+                `data/${safeCategory}.json`,
+                base
             );
 
-    console.log(
-        `Loaded ${this.questions.length} ${category} questions`
-    );
 
-    this.currentCategory = category;
-}
+        console.log(
+            "Loading quiz data:",
+            url.pathname
+        );
 
 
-    getStageQuestions(stage) {
+        const response =
+            await fetch(
+                url.href,
+                {
+                    cache:
+                        "no-store"
+                }
+            );
+
+
+        if (
+            !response.ok
+        ) {
+
+            throw new Error(
+                `Could not load ${url.pathname}`
+            );
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        let rawQuestions =
+            [];
+
+
+        if (
+            Array.isArray(
+                data
+            )
+        ) {
+
+            rawQuestions =
+                data;
+
+        } else if (
+            Array.isArray(
+                data.questions
+            )
+        ) {
+
+            rawQuestions =
+                data.questions;
+
+        } else if (
+            Array.isArray(
+                data.items
+            )
+        ) {
+
+            rawQuestions =
+                data.items;
+
+        } else if (
+            Array.isArray(
+                data.stages
+            )
+        ) {
+
+            data.stages.forEach(
+                stageBlock => {
+
+                    const stageNumber =
+                        Number(
+                            stageBlock.stage ??
+                            stageBlock.id ??
+                            1
+                        ) ||
+                        1;
+
+
+                    const list =
+                        Array.isArray(
+                            stageBlock.questions
+                        )
+                            ? stageBlock.questions
+                            : [];
+
+
+                    list.forEach(
+                        question => {
+
+                            rawQuestions.push({
+
+                                ...question,
+
+                                stage:
+                                    question.stage ??
+                                    stageNumber
+
+                            });
+
+                        }
+                    );
+
+                }
+            );
+
+        }
+
+
+        this.questions =
+            rawQuestions
+                .map(
+                    question =>
+                        normalizeQuestion(
+                            question,
+                            1
+                        )
+                )
+                .filter(
+                    question =>
+
+                        question &&
+
+                        question.question
+                            .trim() &&
+
+                        question.options
+                            .length >= 2 &&
+
+                        question.answer >= 0 &&
+
+                        question.answer <
+                            question.options
+                                .length
+
+                );
+
+
+        this.currentCategory =
+            safeCategory;
+
+
+        console.log(
+            `Loaded ${this.questions.length} ${safeCategory} questions`
+        );
+
+
+        return this.questions;
+
+    }
+
+
+    getStageQuestions(
+        stage
+    ) {
 
         return this.questions.filter(
             question =>
-                Number(question.stage) ===
-                Number(stage)
+                Number(
+                    question.stage
+                ) ===
+                Number(
+                    stage
+                )
         );
+
     }
 
 
@@ -466,10 +629,15 @@ export class QuizEngine {
             category;
 
         this.currentStage =
-            stage;
+            Number(
+                stage
+            ) ||
+            1;
 
         this.isReplay =
-            replay;
+            Boolean(
+                replay
+            );
 
         this.currentQuestion =
             0;
@@ -492,16 +660,14 @@ export class QuizEngine {
 
         const stageQuestions =
             this.getStageQuestions(
-                stage
-            )
-            .filter(
-                question =>
-                    question.answer >= 0
+                this.currentStage
             );
 
 
         this.selectedQuestions =
-            shuffle(stageQuestions)
+            shuffle(
+                stageQuestions
+            )
                 .slice(
                     0,
                     Math.min(
@@ -511,49 +677,79 @@ export class QuizEngine {
                 );
 
 
-        if (!this.selectedQuestions.length) {
+        console.log(
+            "Starting stage:",
+            this.currentStage,
+            "questions:",
+            this.selectedQuestions.length
+        );
 
-            throw new Error(
-                "No valid questions available for this stage."
-            );
-        }
+
+        return this.selectedQuestions;
+
     }
 
 
-    answer(index) {
+    getCurrentQuestion() {
 
-        if (this.finished) {
-            return null;
-        }
-
-
-        const question =
+        return (
             this.selectedQuestions[
                 this.currentQuestion
-            ];
+            ] ||
+            null
+        );
+
+    }
+
+
+    getQuestionCount() {
+
+        return this.selectedQuestions.length;
+
+    }
+
+
+    answer(
+        answerIndex
+    ) {
+
+        const question =
+            this.getCurrentQuestion();
 
 
         if (!question) {
-            return null;
+
+            return {
+
+                finished:
+                    true,
+
+                correct:
+                    false,
+
+                passed:
+                    false,
+
+                total:
+                    this.selectedQuestions.length
+
+            };
+
         }
 
 
-        const selectedIndex =
-            Number(index);
-
-
-        const correctIndex =
+        const correct =
+            Number(
+                answerIndex
+            ) ===
             Number(
                 question.answer
             );
 
 
-        const correct =
-            selectedIndex ===
-            correctIndex;
-
-
-        if (correct) {
+        if (
+            correct
+        ) {
 
             this.correctAnswers++;
 
@@ -563,128 +759,186 @@ export class QuizEngine {
 
             this.wrongAnswers++;
 
-            this.combo = 0;
+            this.combo =
+                0;
+
         }
-
-
-        const result = {
-
-            correct,
-
-            selectedIndex,
-
-            correctIndex,
-
-            question,
-
-            correctAnswers:
-                this.correctAnswers,
-
-            wrongAnswers:
-                this.wrongAnswers
-        };
 
 
         this.currentQuestion++;
 
 
-        if (
+        const finished =
             this.currentQuestion >=
-            this.selectedQuestions.length
-        ) {
-
-            this.finished =
-                true;
-        }
-
-
-        return result;
-    }
-
-
-    finish() {
-
-        const total =
             this.selectedQuestions.length;
 
 
-        if (!total) {
-            return null;
-        }
+        let passed =
+            false;
 
+        let earnedXP =
+            0;
 
-        const percentage =
-            this.correctAnswers /
-            total;
+        let heartLost =
+            false;
 
-
-        const passed =
-            percentage >=
-            QUIZ_CONFIG.passingPercentage;
-
-
-        let xpGained = 0;
+        let newlyCompleted =
+            false;
 
 
         if (
-            passed &&
-            !this.isReplay &&
-            !this.stageRewardGiven
+            finished
         ) {
 
-            xpGained =
-                QUIZ_CONFIG.stageXP;
+            const percentage =
+                this.selectedQuestions.length
 
-            addXP(
-                this.state,
-                xpGained
-            );
+                    ? this.correctAnswers /
+                      this.selectedQuestions.length
 
-
-            markStageCompleted(
-                this.state,
-                this.currentCategory,
-                this.currentStage
-            );
+                    : 0;
 
 
-            this.stageRewardGiven =
-                true;
+            passed =
+                percentage >=
+                QUIZ_CONFIG.passingPercentage;
 
 
-            this.saveState(
-                this.state
-            );
+            if (
+                passed
+            ) {
+
+                const alreadyCompleted =
+                    isStageCompleted(
+                        this.state,
+                        this.currentCategory,
+                        this.currentStage
+                    );
+
+
+                if (
+                    !this.isReplay &&
+                    !alreadyCompleted
+                ) {
+
+                    addXP(
+                        this.state,
+                        QUIZ_CONFIG.stageXP
+                    );
+
+
+                    earnedXP =
+                        QUIZ_CONFIG.stageXP;
+
+
+                    markStageCompleted(
+                        this.state,
+                        this.currentCategory,
+                        this.currentStage
+                    );
+
+
+                    newlyCompleted =
+                        true;
+
+
+                    this.stageRewardGiven =
+                        true;
+
+                }
+
+            } else if (
+                !this.isReplay
+            ) {
+
+                if (
+                    Number(
+                        this.state.hearts
+                    ) > 0
+                ) {
+
+                    this.state.hearts =
+                        Math.max(
+                            0,
+                            Number(
+                                this.state.hearts
+                            ) -
+                            QUIZ_CONFIG.failedStageHeartPenalty
+                        );
+
+
+                    heartLost =
+                        true;
+
+                }
+
+            }
+
         }
+
+
+        this.finished =
+            finished;
+
+
+        this.saveState(
+            this.state
+        );
 
 
         return {
 
+            correct,
+
+            finished,
+
             passed,
 
-            percentage,
+            earnedXP,
 
-            correct:
+            heartLost,
+
+            newlyCompleted,
+
+            replay:
+                this.isReplay,
+
+            combo:
+                this.combo,
+
+            correctAnswers:
                 this.correctAnswers,
 
-            wrong:
+            wrongAnswers:
                 this.wrongAnswers,
 
-            total,
+            total:
+                this.selectedQuestions.length,
 
-            xpGained,
+            percentage:
 
-            stage:
-                this.currentStage,
+                this.selectedQuestions.length
 
-            category:
-                this.currentCategory
+                    ? this.correctAnswers /
+                      this.selectedQuestions.length
+
+                    : 0,
+
+            explanation:
+                question.explanation ||
+                ""
+
         };
+
     }
+
 }
 
 
 export default {
+
     QuizEngine,
+
     QUIZ_CONFIG
+
 };
