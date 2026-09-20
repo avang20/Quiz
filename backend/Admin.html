@@ -264,7 +264,7 @@
           </div>
           <div class="support-thread">${messages || '<div class="empty">پیامی در این گفت‌وگو وجود ندارد.</div>'}</div>
           <div class="reply-box">
-            <textarea id="reply-${esc(conversation.conversationId)}" class="admin-support-reply" placeholder="پاسخ ادمین را کامل وارد کنید؛."></textarea>
+            <textarea id="reply-${esc(conversation.conversationId)}" class="admin-support-reply" placeholder="پاسخ ادمین را کامل وارد کنید.."></textarea>
             <div class="actions">
               <select id="status-${esc(conversation.conversationId)}">
                 <option value="پاسخ داده شد" ${conversation.status === 'پاسخ داده شد' ? 'selected' : ''}>پاسخ داده شد</option>
