@@ -25,7 +25,7 @@ import {
 
 
 const APPS_SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFkK02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXIvzVyuxzJiZQ/exec";
+    "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnTTPygTup97Ly5QULQCj25MfbDsxby2Iu-RL34y561E7jwaeeFPRgJsM60hVNmvKhrdCNwmonOHZw2R8MiAEPzfC-YJNFyfBNC6eTPB91lDvTyPCcKCh1jEI7FwaG7UjpwwxpUYPKp5f8OEgoXQ72G0MheF6cVFIKNiEExi0nt44CDV5tKdR2yRvXHk1w7WqKDoWrKzAY5D11ex0qVAwLZJjStLCIYBzOUdKFRpAIJTbcoewdhamknqXO79De_PFpuUMqViEOYYUIz3IWmjP0IZER9V_g&lib=MyfoiWnjfcjZBV58ESc7ClMexWo_aQZTj";
 
 
 const ACCOUNT_NUMBER =
