@@ -488,7 +488,7 @@ export class QuizEngine {
                     ? this.correctAnswers /
                       this.selectedQuestions.length
                     : 0,
-            explanation: question.explanation || ""
+            explanation: ""
         };
     }
 }
