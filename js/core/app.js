@@ -463,13 +463,13 @@ class App {
             return [hours, minutes, seconds]
                 .map((value, index) => index === 0 ? String(value) : String(value).padStart(2, "0"))
                 .join(":")
-                .replace(/\\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
+                .replace(/\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
         }
 
         return [minutes, seconds]
             .map(value => String(value).padStart(2, "0"))
             .join(":")
-            .replace(/\\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
+            .replace(/\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
     }
 
 
@@ -1688,9 +1688,7 @@ class App {
         if (completed) {
             const replay =
                 confirm(
-                    "این مرحله را قبلاً با حداقل ۷۵٪ رد کرده‌ای. می‌خواهی دوباره بازی کنی؟
-
-بازی دوباره XP جدیدی برای قبولی قبلی اضافه نمی‌کند."
+                    "این مرحله را قبلاً با حداقل ۷۵٪ رد کرده‌ای. می‌خواهی دوباره بازی کنی؟\n\nبازی دوباره XP جدیدی برای قبولی قبلی اضافه نمی‌کند."
                 );
 
             if (!replay) {
