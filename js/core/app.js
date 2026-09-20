@@ -37,8 +37,8 @@ const ACCOUNT_NUMBER =
 const subscriptionPlans = {
     monthly: { name: "ماهانه", months: 1, price: 100000 },
     quarterly: { name: "سه‌ماهه", months: 3, price: 270000 },
-    sixMonth: { name: "شش‌ماهه", months: 6, price: 480000 },
-    nineMonth: { name: "نه‌ماهه", months: 9, price: 660000 }
+    sixMonth: { name: "شش‌ماهه", months: 6, price: 550000 },
+    nineMonth: { name: "نه‌ماهه", months: 9, price: 800000 }
 };
 
 
@@ -309,11 +309,16 @@ class App {
                         this.state.subscriptionPlan || "",
                     planName:
                         this.state.subscriptionName || "",
+                    premium:
+                        this.state.premiumActive === true ||
+                        this.state.subscriptionPlan === "nineMonth",
                     start: null,
                     expiry:
                         this.state.subscriptionExpiry || null
                 };
 
+
+        this.applySubscriptionTierFeatures();
 
         this.serverSyncTimer =
             null;
@@ -1956,6 +1961,99 @@ class App {
     }
 
 
+    isPremiumActive() {
+
+        if (!this.hasActiveSubscription()) {
+            return false;
+        }
+
+        const info =
+            this.getSubscriptionInfo();
+
+        return (
+            info.premium === true ||
+            String(info.planId || "") === "nineMonth"
+        );
+    }
+
+
+    applySubscriptionTierFeatures() {
+
+        const premium = this.isPremiumActive();
+
+        this.state.premiumActive = premium;
+
+        this.state.maxHearts = premium ? 8 : 5;
+
+        if (premium) {
+            this.state.hearts = Math.min(
+                Math.max(
+                    Number(this.state.hearts || 0),
+                    1
+                ),
+                this.state.maxHearts
+            );
+        } else {
+            this.state.hearts = Math.min(
+                Number(this.state.hearts || 0),
+                this.state.maxHearts
+            );
+        }
+
+        this.updatePremiumUI();
+    }
+
+
+    updatePremiumUI() {
+
+        const active = this.isPremiumActive();
+
+        const badge =
+            document.getElementById(
+                "dashboardAccessBadge"
+            );
+
+        if (badge) {
+            badge.classList.toggle("premium", active);
+            badge.classList.toggle(
+                "free",
+                !active && !this.hasActiveSubscription()
+            );
+            badge.textContent = active
+                ? "👑 Premium فعال"
+                : this.hasActiveSubscription()
+                    ? "🔓 اشتراک فعال"
+                    : "🔒 فقط ۱ مرحله رایگان";
+        }
+
+        const premiumBadge =
+            document.getElementById(
+                "premiumStatusBadge"
+            );
+
+        if (premiumBadge) {
+            premiumBadge.textContent = active
+                ? "✅ Premium فعال"
+                : "🔒 با تأیید پلن ۹ ماهه فعال می‌شود";
+            premiumBadge.classList.toggle(
+                "active",
+                active
+            );
+        }
+
+        document
+            .querySelectorAll(
+                "[data-premium-feature]"
+            )
+            .forEach(item => {
+                item.classList.toggle(
+                    "is-active",
+                    active
+                );
+            });
+    }
+
+
     getRemainingSubscriptionDays() {
 
         const info =
@@ -2107,26 +2205,38 @@ class App {
         }
 
         if (dashboardBadge) {
-            dashboardBadge.classList.toggle("free", !active);
-            dashboardBadge.classList.toggle("premium", active);
+            dashboardBadge.classList.toggle(
+                "premium",
+                this.isPremiumActive()
+            );
+            dashboardBadge.classList.toggle(
+                "free",
+                !this.isPremiumActive() && !active
+            );
             dashboardBadge.textContent =
-                active
-                    ? "🔓 اشتراک فعال"
-                    : "🔒 فقط ۱ مرحله رایگان";
+                this.isPremiumActive()
+                    ? "👑 Premium فعال"
+                    : active
+                        ? "🔓 اشتراک فعال"
+                        : "🔒 فقط ۱ مرحله رایگان";
         }
 
         if (dashboardTitle) {
             dashboardTitle.textContent =
-                active
-                    ? "اشتراک شما فعال است"
-                    : "حساب رایگان";
+                this.isPremiumActive()
+                    ? "اشتراک Premium شما فعال است"
+                    : active
+                        ? "اشتراک شما فعال است"
+                        : "حساب رایگان";
         }
 
         if (dashboardText) {
             dashboardText.textContent =
-                active
-                    ? remainingText
-                    : "حساب رایگان فقط به مرحله ۱ دسترسی دارد.";
+                this.isPremiumActive()
+                    ? `${remainingText} · 👑 امکانات Premium فعال است.`
+                    : active
+                        ? remainingText
+                        : "حساب رایگان فقط به مرحله ۱ دسترسی دارد.";
         }
 
         if (profileName) {
@@ -3449,6 +3559,7 @@ class App {
                     ? data.subscription
                     : {
                         active: false,
+                        premium: false,
                         planId: "",
                         planName: "",
                         start: null,
@@ -3463,8 +3574,15 @@ class App {
             const wasActiveBeforeSync =
                 this.hasActiveSubscription();
 
+            const wasPremiumBeforeSync =
+                this.isPremiumActive();
+
             this.state.subscriptionInfo =
                 serverSubscription;
+
+            this.state.premiumActive =
+                serverSubscription.premium === true ||
+                String(serverSubscription.planId || "") === "nineMonth";
 
             if (serverSubscription.active === true) {
 
@@ -3511,6 +3629,16 @@ class App {
                 JSON.stringify(
                     this.getSubscriptionInfo()
                 );
+
+            this.applySubscriptionTierFeatures();
+
+            if (
+                this.isPremiumActive() &&
+                !wasPremiumBeforeSync
+            ) {
+                this.state.hearts =
+                    this.state.maxHearts;
+            }
 
             if (before !== after) {
                 this.persist();
