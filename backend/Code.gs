@@ -108,7 +108,7 @@ function doPost(e) {
   }
 }
 
-/* =========================================================    DISCOUNT ========================================================= */  function validateDiscount(data) {   const code = String(data.code || '').trim().toUpperCase();   const plan = String(data.plan || '');    const valid =     code === CONFIG.PRIVATE_TEST_CODE &&     plan === 'nineMonth';    return jsonResponse({     success: true,     testCodeApplied: valid,     amount: valid ? CONFIG.TEST_AMOUNT : null   }); }   /* =========================================================    PAYMENT ========================================================= */  function handlePayment(data) {    if (     !data.username ||     !data.plan ||     !data.receiptBase64   ) {     return jsonResponse({       success: false,       message: 'اطلاعات پرداخت کامل نیست.'     });   }    const base64 = String(data.receiptBase64);    const estimatedBytes =     Math.floor(base64.length * 0.75);    if (estimatedBytes > CONFIG.MAX_RECEIPT_BYTES) {     return jsonResponse({       success: false,       message: 'حجم فیش بیشتر از ۵ مگابایت است.'     });   }    const planPrices = {     monthly: 100000,     quarterly: 270000,     sixMonth: 480000,     nineMonth: 660000   };    if (     !Object.prototype.hasOwnProperty.call(       planPrices,       data.plan     )   ) {     return jsonResponse({       success: false,       message: 'پلن نامعتبر است.'     });   }    const originalAmount =     Number(planPrices[data.plan]);    let amount =     Number(data.amount || originalAmount);    let testCodeApplied = false;    if (     String(data.discountCode || '')       .trim()       .toUpperCase() === CONFIG.PRIVATE_TEST_CODE &&     data.plan === 'nineMonth'   ) {     amount = CONFIG.TEST_AMOUNT;     testCodeApplied = true;   }    const mimeType =     data.mimeType ||     data.fileMime ||     'image/jpeg';    const fileName =     data.fileName ||     ('receipt_' + Date.now() + '.jpg');    const bytes =     Utilities.base64Decode(base64);    const blob =     Utilities.newBlob(       bytes,       mimeType,       fileName     );    const folder =     getOrCreateReceiptFolder();    const savedFile =     folder.createFile(blob);    savedFile.setName(     'QuizDuo_' +     sanitizeFileName(data.username) +     '_' +     Date.now() +     '_' +     fileName   );    const fileUrl =     savedFile.getUrl();    const timestamp =     new Date();    const row = [     timestamp,     data.username,     data.phone || '',     data.plan,     data.planName || data.plan,     originalAmount,     amount,     Number(data.discountPercent || 0),     data.discountCode || '',     fileName,     fileUrl,     'در انتظار بررسی',     '',     ''   ];    appendPaymentRow(row);
+/* =========================================================    DISCOUNT ========================================================= */  function validateDiscount(data) {   const code = String(data.code || '').trim().toUpperCase();   const plan = String(data.plan || '');    const valid =     code === CONFIG.PRIVATE_TEST_CODE &&     plan === 'nineMonth';    return jsonResponse({     success: true,     testCodeApplied: valid,     amount: valid ? CONFIG.TEST_AMOUNT : null   }); }   /* =========================================================    PAYMENT ========================================================= */  function handlePayment(data) {    if (     !data.username ||     !data.plan ||     !data.receiptBase64   ) {     return jsonResponse({       success: false,       message: 'اطلاعات پرداخت کامل نیست.'     });   }    const base64 = String(data.receiptBase64);    const estimatedBytes =     Math.floor(base64.length * 0.75);    if (estimatedBytes > CONFIG.MAX_RECEIPT_BYTES) {     return jsonResponse({       success: false,       message: 'حجم فیش بیشتر از ۵ مگابایت است.'     });   }    const planPrices = {     monthly: 100000,     quarterly: 270000,     sixMonth: 550000,     nineMonth: 800000   };    if (     !Object.prototype.hasOwnProperty.call(       planPrices,       data.plan     )   ) {     return jsonResponse({       success: false,       message: 'پلن نامعتبر است.'     });   }    const originalAmount =     Number(planPrices[data.plan]);    let amount =     Number(data.amount || originalAmount);    let testCodeApplied = false;    if (     String(data.discountCode || '')       .trim()       .toUpperCase() === CONFIG.PRIVATE_TEST_CODE &&     data.plan === 'nineMonth'   ) {     amount = CONFIG.TEST_AMOUNT;     testCodeApplied = true;   }    const mimeType =     data.mimeType ||     data.fileMime ||     'image/jpeg';    const fileName =     data.fileName ||     ('receipt_' + Date.now() + '.jpg');    const bytes =     Utilities.base64Decode(base64);    const blob =     Utilities.newBlob(       bytes,       mimeType,       fileName     );    const folder =     getOrCreateReceiptFolder();    const savedFile =     folder.createFile(blob);    savedFile.setName(     'QuizDuo_' +     sanitizeFileName(data.username) +     '_' +     Date.now() +     '_' +     fileName   );    const fileUrl =     savedFile.getUrl();    const timestamp =     new Date();    const row = [     timestamp,     data.username,     data.phone || '',     data.plan,     data.planName || data.plan,     originalAmount,     amount,     Number(data.discountPercent || 0),     data.discountCode || '',     fileName,     fileUrl,     'در انتظار بررسی',     '',     ''   ];    appendPaymentRow(row);
 
     let emailSent = false;
     let emailError = '';
@@ -646,7 +646,7 @@ function getUserSubscription(username) {
     .sort((a, b) => new Date(a.row[0] || 0) - new Date(b.row[0] || 0));
 
   if (!approved.length) {
-    return { active: false, planId: '', planName: '', start: null, expiry: null };
+    return { active: false, premium: false, planId: '', planName: '', start: null, expiry: null };
   }
 
   let cursor = null;
@@ -674,12 +674,15 @@ function getUserSubscription(username) {
 
   const now = new Date();
   const active = activeExpiry && activeExpiry.getTime() > now.getTime();
+  const activeBoolean = Boolean(active);
+  const premium = activeBoolean && activePlanId === 'nineMonth';
   return {
-    active: Boolean(active),
-    planId: active ? activePlanId : '',
-    planName: active ? activePlanName : '',
-    start: active ? activeStart.toISOString() : null,
-    expiry: active ? activeExpiry.toISOString() : null
+    active: activeBoolean,
+    premium,
+    planId: activeBoolean ? activePlanId : '',
+    planName: activeBoolean ? activePlanName : '',
+    start: activeBoolean ? activeStart.toISOString() : null,
+    expiry: activeBoolean ? activeExpiry.toISOString() : null
   };
 }
 
@@ -728,4 +731,116 @@ function ensureHeaders(   sheet,   headers ) {    const existingLastColumn =    
     );
 }
 
-function jsonResponse(data) {    return ContentService     .createTextOutput(       JSON.stringify(data)     )     .setMimeType(       ContentService.MimeType.JSON     ); }   /* =========================================================    ADMIN AUTH ========================================================= */  function checkAdmin(password) {    return String(password || '') ===     CONFIG.ADMIN_PASSWORD; }   /* =========================================================    ADMIN PAYMENTS ========================================================= */  function getPaymentsForAdmin(password) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const sheet =     getOrCreateSheet();    SpreadsheetApp.flush();    const values =     sheet.getDataRange().getValues();    if (values.length <= 1) {     return [];   }    return values     .slice(1)     .map((row, index) => ({        rowNumber: index + 2,        timestamp:         row[0]           ? new Date(row[0]).toISOString()           : '',        username:         row[1] || '',        phone:         row[2] || '',        planId:         row[3] || '',        planName:         row[4] || '',        originalAmount:         row[5] || 0,        amount:         row[6] || 0,        discountPercent:         row[7] || 0,        discountCode:         row[8] || '',        fileName:         row[9] || '',        receiptUrl:         row[10] || '',        status:         row[11] ||         'در انتظار بررسی',        userMessage:         row[12] || '',        statusTimestamp:         row[13]           ? new Date(row[13]).toISOString()           : ''      }))     .reverse(); }   /* =========================================================    ADMIN PAYMENT STATUS ========================================================= */  function updatePaymentStatus(   password,   rowNumber,   status ) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const allowed = [     'تأیید شد',     'رد شد',     'در انتظار بررسی'   ];    if (!allowed.includes(status)) {     throw new Error(       'وضعیت نامعتبر است.'     );   }    const sheet =     getOrCreateSheet();    const row =     Number(rowNumber);    const username =     String(       sheet         .getRange(row, 2)         .getValue() || ''     );    const planId =     String(       sheet         .getRange(row, 4)         .getValue() || ''     );    const now =     new Date();    let userMessage = '';    if (status === 'تأیید شد') {      userMessage =       'پرداخت شما تأیید شد و اشتراک شما فعال شد. همه مراحل برای حساب شما باز شد.';    } else if (status === 'رد شد') {      userMessage =       'پرداخت شما رد شد. در صورت بروز مشکل به آیدی @hv901 در بله پیام بدهید.';   }    sheet     .getRange(row, 12)     .setValue(status);    sheet     .getRange(row, 13)     .setValue(userMessage);    sheet     .getRange(row, 14)     .setValue(now);    SpreadsheetApp.flush();    return {     success: true,     username,     planId,     status,     userMessage   }; }   /* =========================================================    ADMIN SUPPORT ========================================================= */  function getSupportForAdmin(password) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const sheet =     getOrCreateSupportSheet();    SpreadsheetApp.flush();    const values =     sheet.getDataRange().getValues();    if (values.length <= 1) {     return [];   }    /*     نکته مهم:     این تابع هیچ‌وقت پیام‌ها را حذف نمی‌کند.     تمام ردیف‌های Support خوانده می‌شوند.   */    return values     .slice(1)     .map((row, index) => ({        rowNumber:         index + 2,        timestamp:         row[0]           ? new Date(row[0]).toISOString()           : '',        username:         row[1] || '',        phone:         row[2] || '',        subject:         row[3] || '',        message:         row[4] || '',        status:         row[5] || 'جدید',        adminReply:         row[6] || '',        replyTimestamp:         row[7]           ? new Date(row[7]).toISOString()           : '',        conversationId:         String(row[8] || ('legacy-' + (index + 2)))      }))     .reverse(); }   /* =========================================================    ADMIN REPLY ========================================================= */  function replyToSupport(   password,   rowNumber,   reply,   status ) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const text =     String(reply || '').trim();    if (!text) {     throw new Error(       'متن پاسخ را وارد کنید.'     );   }    const allowed = [     'جدید',     'در حال بررسی',     'پاسخ داده شد',     'بسته شد'   ];    const finalStatus =     allowed.includes(status)       ? status       : 'پاسخ داده شد';    const sheet =     getOrCreateSupportSheet();    const row =     Number(rowNumber);    sheet     .getRange(row, 6)     .setValue(finalStatus);    sheet     .getRange(row, 7)     .setValue(text);    sheet     .getRange(row, 8)     .setValue(new Date());    SpreadsheetApp.flush();    return {     success: true,     message:       'پاسخ با موفقیت برای پنل کاربر ثبت شد.'   }; }   /* =========================================================    ADMIN SUPPORT STATUS ========================================================= */  function updateSupportStatus(   password,   rowNumber,   status ) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const allowed = [     'جدید',     'در حال بررسی',     'پاسخ داده شد',     'بسته شد'   ];    if (!allowed.includes(status)) {     throw new Error(       'وضعیت نامعتبر است.'     );   }    const sheet =     getOrCreateSupportSheet();    sheet     .getRange(       Number(rowNumber),       6     )     .setValue(status);    SpreadsheetApp.flush();    return {     success: true   }; }   /* =========================================================    TEST EMAIL ========================================================= */  function testEmail() {    GmailApp.sendEmail({     to: getAdminEmail(),      subject:       'QuizDuo Test Email',      htmlBody:       '<div dir="rtl">' +       '<h2>ایمیل تست QuizDuo</h2>' +       '<p>ارسال ایمیل با موفقیت انجام شد.</p>' +       '</div>'   }); }  
+function jsonResponse(data) {    return ContentService     .createTextOutput(       JSON.stringify(data)     )     .setMimeType(       ContentService.MimeType.JSON     ); }   /* =========================================================    ADMIN AUTH ========================================================= */  function checkAdmin(password) {    return String(password || '') ===     CONFIG.ADMIN_PASSWORD; }   /* =========================================================    ADMIN PAYMENTS ========================================================= */  function getPaymentsForAdmin(password) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const sheet =     getOrCreateSheet();    SpreadsheetApp.flush();    const values =     sheet.getDataRange().getValues();    if (values.length <= 1) {     return [];   }    return values     .slice(1)     .map((row, index) => ({        rowNumber: index + 2,        timestamp:         row[0]           ? new Date(row[0]).toISOString()           : '',        username:         row[1] || '',        phone:         row[2] || '',        planId:         row[3] || '',        planName:         row[4] || '',        originalAmount:         row[5] || 0,        amount:         row[6] || 0,        discountPercent:         row[7] || 0,        discountCode:         row[8] || '',        fileName:         row[9] || '',        receiptUrl:         row[10] || '',        status:         row[11] ||         'در انتظار بررسی',        userMessage:         row[12] || '',        statusTimestamp:         row[13]           ? new Date(row[13]).toISOString()           : ''      }))     .reverse(); }   /* =========================================================    ADMIN PAYMENT STATUS ========================================================= */  function updatePaymentStatus(   password,   rowNumber,   status ) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const allowed = [     'تأیید شد',     'رد شد',     'در انتظار بررسی'   ];    if (!allowed.includes(status)) {     throw new Error(       'وضعیت نامعتبر است.'     );   }    const sheet =     getOrCreateSheet();    const row =     Number(rowNumber);    const username =     String(       sheet         .getRange(row, 2)         .getValue() || ''     );    const planId =     String(       sheet         .getRange(row, 4)         .getValue() || ''     );    const now =     new Date();    let userMessage = '';    if (status === 'تأیید شد') {      userMessage =       'پرداخت شما تأیید شد و اشتراک شما فعال شد. همه مراحل برای حساب شما باز شد.';    } else if (status === 'رد شد') {      userMessage =       'پرداخت شما رد شد. در صورت بروز مشکل به آیدی @hv901 در بله پیام بدهید.';   }    sheet     .getRange(row, 12)     .setValue(status);    sheet     .getRange(row, 13)     .setValue(userMessage);    sheet     .getRange(row, 14)     .setValue(now);    SpreadsheetApp.flush();    return {     success: true,     username,     planId,     status,     userMessage   }; }   /* =========================================================    ADMIN SUPPORT ========================================================= */  function getSupportForAdmin(password) {
+  if (!checkAdmin(password)) {
+    throw new Error('رمز مدیریت اشتباه است.');
+  }
+
+  const sheet = getOrCreateSupportSheet();
+  SpreadsheetApp.flush();
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+
+  const groups = {};
+
+  values.slice(1).forEach((row, index) => {
+    const rowNumber = index + 2;
+    const conversationId = String(row[8] || ('legacy-' + rowNumber));
+    const username = String(row[1] || '').trim();
+
+    if (!groups[conversationId]) {
+      groups[conversationId] = {
+        conversationId,
+        rowNumber,
+        lastRowNumber: rowNumber,
+        timestamp: row[0] ? new Date(row[0]).toISOString() : '',
+        username,
+        phone: row[2] || '',
+        subject: row[3] || '',
+        status: row[5] || 'جدید',
+        thread: []
+      };
+    }
+
+    const group = groups[conversationId];
+    group.lastRowNumber = rowNumber;
+    if (row[0]) group.timestamp = new Date(row[0]).toISOString();
+    if (!group.subject) group.subject = row[3] || '';
+    if (!group.phone) group.phone = row[2] || '';
+    if (!group.username) group.username = username;
+    group.status = row[5] || group.status;
+
+    if (row[4]) {
+      group.thread.push({
+        sender: 'user',
+        text: String(row[4]),
+        timestamp: row[0] ? new Date(row[0]).toISOString() : ''
+      });
+    }
+
+    if (row[6]) {
+      group.thread.push({
+        sender: 'admin',
+        text: String(row[6]),
+        timestamp: row[7]
+          ? new Date(row[7]).toISOString()
+          : (row[0] ? new Date(row[0]).toISOString() : '')
+      });
+    }
+  });
+
+  return Object.values(groups)
+    .map(group => {
+      group.thread.sort(
+        (a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
+      );
+      return group;
+    })
+    .sort(
+      (a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
+    );
+}
+
+/* =========================================================    ADMIN REPLY ========================================================= */  function replyToSupport(password, rowNumber, reply, status) {
+  if (!checkAdmin(password)) {
+    throw new Error('رمز مدیریت اشتباه است.');
+  }
+
+  const text = String(reply || '').trim();
+  if (!text) {
+    throw new Error('متن پاسخ را وارد کنید.');
+  }
+
+  const allowed = ['جدید', 'در حال بررسی', 'پاسخ داده شد', 'بسته شد'];
+  const finalStatus = allowed.includes(status) ? status : 'پاسخ داده شد';
+  const sheet = getOrCreateSupportSheet();
+  const row = Number(rowNumber);
+
+  if (!row || row < 2 || row > sheet.getLastRow()) {
+    throw new Error('ردیف گفت‌وگو نامعتبر است.');
+  }
+
+  const source = sheet.getRange(row, 1, 1, SUPPORT_HEADERS.length).getValues()[0];
+  const conversationId = String(source[8] || ('legacy-' + row));
+  const now = new Date();
+
+  sheet.appendRow([
+    now,
+    source[1] || '',
+    source[2] || '',
+    source[3] || 'ادامه گفت‌وگو',
+    '',
+    finalStatus,
+    text,
+    now,
+    conversationId
+  ]);
+
+  SpreadsheetApp.flush();
+  return {
+    success: true,
+    message: 'پاسخ با موفقیت در همان گفت‌وگو ثبت شد.'
+  };
+}
+
+/* =========================================================    ADMIN SUPPORT STATUS ========================================================= */  function updateSupportStatus(   password,   rowNumber,   status ) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const allowed = [     'جدید',     'در حال بررسی',     'پاسخ داده شد',     'بسته شد'   ];    if (!allowed.includes(status)) {     throw new Error(       'وضعیت نامعتبر است.'     );   }    const sheet =     getOrCreateSupportSheet();    sheet     .getRange(       Number(rowNumber),       6     )     .setValue(status);    SpreadsheetApp.flush();    return {     success: true   }; }   /* =========================================================    TEST EMAIL ========================================================= */  function testEmail() {    GmailApp.sendEmail({     to: getAdminEmail(),      subject:       'QuizDuo Test Email',      htmlBody:       '<div dir="rtl">' +       '<h2>ایمیل تست QuizDuo</h2>' +       '<p>ارسال ایمیل با موفقیت انجام شد.</p>' +       '</div>'   }); }  
