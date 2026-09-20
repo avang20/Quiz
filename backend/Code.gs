@@ -1,54 +1,71 @@
 const CONFIG = {
 
-    SHEET_NAME:
-        "Payments",
+  SHEET_NAME:
+    "Payments",
 
-    SUPPORT_SHEET_NAME:
-        "Support",
+  SUPPORT_SHEET_NAME:
+    "Support",
 
-    DRIVE_FOLDER_NAME:
-        "QuizDuo Receipts",
+  USERS_SHEET_NAME:
+    "Users",
 
-    MAX_RECEIPT_BYTES:
-        5 * 1024 * 1024,
+  DRIVE_FOLDER_NAME:
+    "QuizDuo Receipts",
 
-    ADMIN_PASSWORD:
-        "CHANGE_THIS_ADMIN_PASSWORD"
+  MAX_RECEIPT_BYTES:
+    5 * 1024 * 1024,
+
+  ADMIN_PASSWORD:
+    "CHANGE_THIS_ADMIN_PASSWORD"
 
 };
 
 
 const PAYMENT_HEADERS = [
 
-    "Timestamp",
-    "Username",
-    "Phone",
-    "Plan ID",
-    "Plan Name",
-    "Original Amount",
-    "Final Amount",
-    "Discount %",
-    "Discount Code",
-    "File Name",
-    "Receipt URL",
-    "Status",
-    "User Message",
-    "Status Timestamp"
+  "Timestamp",
+  "Username",
+  "Phone",
+  "Plan ID",
+  "Plan Name",
+  "Original Amount",
+  "Final Amount",
+  "Discount %",
+  "Discount Code",
+  "File Name",
+  "Receipt URL",
+  "Status",
+  "User Message",
+  "Status Timestamp"
 
 ];
 
 
 const SUPPORT_HEADERS = [
 
-    "Timestamp",
-    "Username",
-    "Phone",
-    "Subject",
-    "Message",
-    "Status",
-    "Admin Reply",
-    "Reply Timestamp",
-    "Conversation ID"
+  "Timestamp",
+  "Username",
+  "Phone",
+  "Subject",
+  "Message",
+  "Status",
+  "Admin Reply",
+  "Reply Timestamp",
+  "Conversation ID"
+
+];
+
+
+const USER_HEADERS = [
+
+  "Username",
+  "Phone",
+  "XP",
+  "Level",
+  "Streak",
+  "General Stage",
+  "Fun Stage",
+  "Updated At"
 
 ];
 
@@ -58,110 +75,141 @@ const SUPPORT_HEADERS = [
 ========================================================= */
 
 
-function doGet(e) {
+function doGet(
+  e
+) {
 
-    const params =
-        e && e.parameter
-            ? e.parameter
-            : {};
+  const params =
+    e &&
+    e.parameter
+      ? e.parameter
+      : {};
 
 
-    const page =
-        String(
-            params.page ||
+  const page =
+    String(
+      params.page ||
+      ""
+    ).trim();
+
+
+  const action =
+    String(
+      params.action ||
+      ""
+    ).trim();
+
+
+  const callback =
+    String(
+      params.callback ||
+      ""
+    ).trim();
+
+
+  if (
+    page ===
+    "admin"
+  ) {
+
+    return HtmlService
+
+      .createTemplateFromFile(
+        "Admin"
+      )
+
+      .evaluate()
+
+      .setTitle(
+        "QuizDuo Admin"
+      )
+
+      .setXFrameOptionsMode(
+        HtmlService
+          .XFrameOptionsMode
+          .ALLOWALL
+      );
+
+  }
+
+
+  if (
+    action ===
+    "userUpdates"
+  ) {
+
+    const result =
+      getUserUpdatesObject({
+
+        username:
+          String(
+            params.username ||
             ""
-        ).trim();
+          ).trim()
 
-
-    const action =
-        String(
-            params.action ||
-            ""
-        ).trim();
-
-
-    const callback =
-        String(
-            params.callback ||
-            ""
-        ).trim();
+      });
 
 
     if (
-        page ===
-        "admin"
+      callback
     ) {
 
-        return HtmlService
-
-            .createTemplateFromFile(
-                "Admin"
-            )
-
-            .evaluate()
-
-            .setTitle(
-                "QuizDuo Admin"
-            )
-
-            .setXFrameOptionsMode(
-                HtmlService
-                    .XFrameOptionsMode
-                    .ALLOWALL
-            );
+      return jsonpResponse(
+        callback,
+        result
+      );
 
     }
 
 
+    return jsonResponse(
+      result
+    );
+
+  }
+
+
+  if (
+    action ===
+    "leaderboard"
+  ) {
+
+    const result =
+      getLeaderboardObject();
+
+
     if (
-        action ===
-        "userUpdates"
+      callback
     ) {
 
-        const data =
-            getUserUpdatesObject({
-
-                username:
-                    String(
-                        params.username ||
-                        ""
-                    ).trim()
-
-            });
-
-
-        if (
-            callback
-        ) {
-
-            return jsonpResponse(
-                callback,
-                data
-            );
-
-        }
-
-
-        return jsonResponse(
-            data
-        );
+      return jsonpResponse(
+        callback,
+        result
+      );
 
     }
 
 
-    return jsonResponse({
+    return jsonResponse(
+      result
+    );
 
-        success:
-            true,
+  }
 
-        service:
-            "QuizDuo",
 
-        time:
-            new Date()
-                .toISOString()
+  return jsonResponse({
 
-    });
+    success:
+      true,
+
+    service:
+      "QuizDuo",
+
+    time:
+      new Date()
+        .toISOString()
+
+  });
 
 }
 
@@ -171,146 +219,720 @@ function doGet(e) {
 ========================================================= */
 
 
-function doPost(e) {
+function doPost(
+  e
+) {
 
-    try {
+  try {
 
-        const body =
-            e &&
-            e.postData &&
+    let data =
+      null;
+
+
+    /*
+     * حالت ۱:
+     * JSON مستقیم
+     */
+
+    const rawBody =
+      e &&
+      e.postData &&
+      e.postData.contents
+        ? String(
             e.postData.contents
-                ? e.postData.contents
-                : "";
+          )
+        : "";
 
 
-        if (!body) {
+    /*
+     * حالت ۲:
+     * فرم مخفی سایت
+     *
+     * payload=<JSON>
+     */
 
-            return jsonResponse({
-
-                success:
-                    false,
-
-                message:
-                    "درخواست خالی است."
-
-            });
-
-        }
-
-
-        const data =
-            JSON.parse(
-                body
-            );
+    const formPayload =
+      e &&
+      e.parameter &&
+      e.parameter.payload
+        ? String(
+            e.parameter.payload
+          )
+        : "";
 
 
-        switch (
-            data.action
-        ) {
-
-            case "payment":
-
-                return handlePayment(
-                    data
-                );
-
-
-            case "validateDiscount":
-
-                return validateDiscount(
-                    data
-                );
-
-
-            case "support":
-
-                return handleSupport(
-                    data
-                );
-
-
-            case "supportUserReply":
-
-                return handleSupportUserReply(
-                    data
-                );
-
-
-            case "closeSupport":
-
-                return closeSupportConversation(
-                    data
-                );
-
-
-            case "userUpdates":
-
-                return getUserUpdates(
-                    data
-                );
-
-
-            default:
-
-                return jsonResponse({
-
-                    success:
-                        false,
-
-                    message:
-                        "عملیات ناشناخته است."
-
-                });
-
-        }
-
-
-    } catch (
-        error
+    if (
+      formPayload
     ) {
 
-        console.error(
-            error
+      data =
+        JSON.parse(
+          formPayload
+        );
+
+    } else if (
+      rawBody
+    ) {
+
+      /*
+       * گاهی Apps Script body را
+       * به صورت form-urlencoded می‌گیرد.
+       */
+
+      try {
+
+        data =
+          JSON.parse(
+            rawBody
+          );
+
+      } catch (
+        firstError
+      ) {
+
+        const match =
+          rawBody.match(
+            /(?:^|&)payload=([^&]*)/
+          );
+
+
+        if (
+          match
+        ) {
+
+          data =
+            JSON.parse(
+              decodeURIComponent(
+                match[1]
+              )
+            );
+
+        } else {
+
+          throw firstError;
+
+        }
+
+      }
+
+    }
+
+
+    /*
+     * fallback برای درخواست‌هایی که مستقیماً
+     * action را در parameter می‌فرستند.
+     */
+
+    if (
+      !data &&
+      e &&
+      e.parameter &&
+      e.parameter.action
+    ) {
+
+      data = {
+
+        action:
+          e.parameter.action,
+
+        username:
+          e.parameter.username ||
+          "",
+
+        conversationId:
+          e.parameter.conversationId ||
+          "",
+
+        message:
+          e.parameter.message ||
+          ""
+
+      };
+
+    }
+
+
+    if (
+      !data ||
+      !data.action
+    ) {
+
+      return jsonResponse({
+
+        success:
+          false,
+
+        message:
+          "درخواست نامعتبر است."
+
+      });
+
+    }
+
+
+    switch (
+      String(
+        data.action
+      )
+    ) {
+
+      case "payment":
+
+        return handlePayment(
+          data
         );
 
 
+      case "support":
+
+        return handleSupport(
+          data
+        );
+
+
+      case "supportUserReply":
+
+        return handleSupportUserReply(
+          data
+        );
+
+
+      case "closeSupport":
+
+        return closeSupportConversation(
+          data
+        );
+
+
+      case "userUpdates":
+
+        return getUserUpdates(
+          data
+        );
+
+
+      case "userState":
+
+        return handleUserState(
+          data
+        );
+
+
+      case "leaderboard":
+
+        return jsonResponse(
+          getLeaderboardObject()
+        );
+
+
+      default:
+
         return jsonResponse({
 
-            success:
-                false,
+          success:
+            false,
 
-            message:
-                "خطای سرور: " +
-                error.message
+          message:
+            "عملیات ناشناخته است."
 
         });
 
     }
 
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      error
+    );
+
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "خطای سرور: " +
+        error.message
+
+    });
+
+  }
+
 }
 
 
 /* =========================================================
-   DISCOUNT
+   USER STATE
 ========================================================= */
 
 
-function validateDiscount(
-    data
+function handleUserState(
+  data
 ) {
+
+  const username =
+    String(
+      data.username ||
+      ""
+    ).trim();
+
+
+  if (
+    !username ||
+    username ===
+      "بازیکن مهمان"
+  ) {
 
     return jsonResponse({
 
-        success:
-            true,
+      success:
+        false,
 
-        testCodeApplied:
-            false,
-
-        amount:
-            null
+      message:
+        "کاربر معتبر نیست."
 
     });
+
+  }
+
+
+  const sheet =
+    getOrCreateUsersSheet();
+
+
+  const values =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  let rowNumber =
+    -1;
+
+
+  for (
+    let i = 1;
+    i < values.length;
+    i++
+  ) {
+
+    if (
+      String(
+        values[i][0] ||
+        ""
+      )
+        .trim()
+        .toLowerCase() ===
+      username.toLowerCase()
+    ) {
+
+      rowNumber =
+        i + 1;
+
+      break;
+
+    }
+
+  }
+
+
+  const row = [
+
+    username,
+
+    String(
+      data.phone ||
+      ""
+    ),
+
+    Number(
+      data.xp ||
+      0
+    ),
+
+    Number(
+      data.level ||
+      1
+    ),
+
+    Number(
+      data.streak ||
+      0
+    ),
+
+    Number(
+      data.generalStage ||
+      1
+    ),
+
+    Number(
+      data.funStage ||
+      1
+    ),
+
+    new Date()
+
+  ];
+
+
+  if (
+    rowNumber < 0
+  ) {
+
+    sheet.appendRow(
+      row
+    );
+
+  } else {
+
+    sheet
+      .getRange(
+        rowNumber,
+        1,
+        1,
+        USER_HEADERS.length
+      )
+      .setValues([
+        row
+      ]);
+
+  }
+
+
+  SpreadsheetApp.flush();
+
+
+  return jsonResponse({
+
+    success:
+      true
+
+  });
+
+}
+
+
+/* =========================================================
+   LEADERBOARD
+========================================================= */
+
+
+function getLeaderboardObject() {
+
+  const users =
+    getAllUsersForLeaderboard();
+
+
+  users.sort(
+
+    (a, b) => {
+
+      const xpDiff =
+        Number(
+          b.xp ||
+          0
+        ) -
+        Number(
+          a.xp ||
+          0
+        );
+
+
+      if (
+        xpDiff !==
+        0
+      ) {
+
+        return xpDiff;
+
+      }
+
+
+      const stageDiff =
+        Math.max(
+
+          Number(
+            b.generalStage ||
+            1
+          ),
+
+          Number(
+            b.funStage ||
+            1
+          )
+
+        ) -
+
+        Math.max(
+
+          Number(
+            a.generalStage ||
+            1
+          ),
+
+          Number(
+            a.funStage ||
+            1
+          )
+
+        );
+
+
+      if (
+        stageDiff !==
+        0
+      ) {
+
+        return stageDiff;
+
+      }
+
+
+      return (
+        Number(
+          b.level ||
+          1
+        ) -
+        Number(
+          a.level ||
+          1
+        )
+      );
+
+    }
+
+  );
+
+
+  return {
+
+    success:
+      true,
+
+    users
+
+  };
+
+}
+
+
+function getAllUsersForLeaderboard() {
+
+  const map =
+    {};
+
+
+  /*
+   * اول Users Sheet
+   */
+
+  const userValues =
+    getOrCreateUsersSheet()
+      .getDataRange()
+      .getValues();
+
+
+  userValues
+    .slice(1)
+    .forEach(
+      row => {
+
+        const username =
+          String(
+            row[0] ||
+            ""
+          ).trim();
+
+
+        if (
+          !username
+        ) {
+
+          return;
+
+        }
+
+
+        map[
+          username.toLowerCase()
+        ] = {
+
+          username,
+
+          xp:
+            Number(
+              row[2] ||
+              0
+            ),
+
+          level:
+            Number(
+              row[3] ||
+              1
+            ),
+
+          streak:
+            Number(
+              row[4] ||
+              0
+            ),
+
+          generalStage:
+            Number(
+              row[5] ||
+              1
+            ),
+
+          funStage:
+            Number(
+              row[6] ||
+              1
+            )
+
+        };
+
+      }
+    );
+
+
+  /*
+   * برای اینکه کاربران قدیمی که قبل از این نسخه
+   * ثبت‌نام کرده‌اند هم از بین نروند، نام کاربری‌هایی
+   * که در Payment یا Support هستند نیز اضافه می‌شوند.
+   */
+
+  const paymentValues =
+    getOrCreateSheet()
+      .getDataRange()
+      .getValues();
+
+
+  paymentValues
+    .slice(1)
+    .forEach(
+      row => {
+
+        const username =
+          String(
+            row[1] ||
+            ""
+          ).trim();
+
+
+        if (
+          !username
+        ) {
+
+          return;
+
+        }
+
+
+        const key =
+          username.toLowerCase();
+
+
+        if (
+          !map[key]
+        ) {
+
+          map[key] = {
+
+            username,
+
+            xp:
+              0,
+
+            level:
+              1,
+
+            streak:
+              0,
+
+            generalStage:
+              1,
+
+            funStage:
+              1
+
+          };
+
+        }
+
+      }
+    );
+
+
+  const supportValues =
+    getOrCreateSupportSheet()
+      .getDataRange()
+      .getValues();
+
+
+  supportValues
+    .slice(1)
+    .forEach(
+      row => {
+
+        const username =
+          String(
+            row[1] ||
+            ""
+          ).trim();
+
+
+        if (
+          !username
+        ) {
+
+          return;
+
+        }
+
+
+        const key =
+          username.toLowerCase();
+
+
+        if (
+          !map[key]
+        ) {
+
+          map[key] = {
+
+            username,
+
+            xp:
+              0,
+
+            level:
+              1,
+
+            streak:
+              0,
+
+            generalStage:
+              1,
+
+            funStage:
+              1
+
+          };
+
+        }
+
+      }
+    );
+
+
+  return Object
+    .values(
+      map
+    );
 
 }
 
@@ -321,759 +943,732 @@ function validateDiscount(
 
 
 function handlePayment(
-    data
+  data
 ) {
 
-    if (
-        !data.username ||
-        !data.plan ||
-        !data.receiptBase64
-    ) {
+  if (
+    !data.username ||
+    !data.plan ||
+    !data.receiptBase64
+  ) {
 
-        return jsonResponse({
+    return jsonResponse({
 
-            success:
-                false,
+      success:
+        false,
 
-            message:
-                "اطلاعات پرداخت کامل نیست."
+      message:
+        "اطلاعات پرداخت کامل نیست."
 
-        });
+    });
 
-    }
-
-
-    const planPrices = {
-
-        monthly:
-            100000,
-
-        quarterly:
-            270000,
-
-        sixMonth:
-            480000,
-
-        nineMonth:
-            660000
-
-    };
+  }
 
 
-    if (
-        !Object.prototype.hasOwnProperty.call(
-            planPrices,
-            data.plan
-        )
-    ) {
+  const prices = {
 
-        return jsonResponse({
+    monthly:
+      100000,
 
-            success:
-                false,
+    quarterly:
+      270000,
 
-            message:
-                "پلن نامعتبر است."
+    sixMonth:
+      480000,
 
-        });
+    nineMonth:
+      660000
 
-    }
+  };
 
 
-    const base64 =
-        String(
-            data.receiptBase64
-        );
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      prices,
+      data.plan
+    )
+  ) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "پلن انتخاب‌شده معتبر نیست."
+
+    });
+
+  }
 
 
-    const estimatedBytes =
-        Math.floor(
-            base64.length *
-            0.75
-        );
+  const originalAmount =
+    Number(
+      prices[
+        data.plan
+      ]
+    );
 
 
-    if (
-        estimatedBytes >
-        CONFIG.MAX_RECEIPT_BYTES
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "حجم فیش بیشتر از ۵ مگابایت است."
-
-        });
-
-    }
+  const amount =
+    Number(
+      data.amount ||
+      originalAmount
+    );
 
 
-    const originalAmount =
-        Number(
-            planPrices[
-                data.plan
-            ]
-        );
+  const base64 =
+    String(
+      data.receiptBase64
+    );
 
 
-    const amount =
-        Number(
-            data.amount ||
-            originalAmount
-        );
+  const estimatedBytes =
+    Math.floor(
+      base64.length *
+      0.75
+    );
 
 
-    const mimeType =
-        data.mimeType ||
-        "image/jpeg";
+  if (
+    estimatedBytes >
+    CONFIG.MAX_RECEIPT_BYTES
+  ) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "حجم فیش بیشتر از ۵ مگابایت است."
+
+    });
+
+  }
 
 
-    const fileName =
-        data.fileName ||
-        (
-            "receipt_" +
-            Date.now() +
-            ".jpg"
-        );
+  const bytes =
+    Utilities.base64Decode(
+      base64
+    );
 
 
-    const bytes =
-        Utilities.base64Decode(
-            base64
-        );
+  const mimeType =
+    data.mimeType ||
+    "image/jpeg";
 
 
-    const blob =
-        Utilities.newBlob(
-            bytes,
-            mimeType,
-            fileName
-        );
+  const fileName =
+    data.fileName ||
+    (
+      "receipt_" +
+      Date.now() +
+      ".jpg"
+    );
 
 
-    const folder =
-        getOrCreateReceiptFolder();
+  const blob =
+    Utilities.newBlob(
 
+      bytes,
 
-    const savedFile =
-        folder.createFile(
-            blob
-        );
+      mimeType,
 
-
-    savedFile.setName(
-
-        "QuizDuo_" +
-
-        sanitizeFileName(
-            data.username
-        ) +
-
-        "_" +
-
-        Date.now() +
-
-        "_" +
-
-        fileName
+      fileName
 
     );
 
 
-    const fileUrl =
-        savedFile.getUrl();
+  const folder =
+    getOrCreateReceiptFolder();
 
 
-    appendPaymentRow([
+  const file =
+    folder.createFile(
+      blob
+    );
 
-        new Date(),
 
-        data.username,
+  file.setName(
 
-        data.phone ||
-            "",
+    "QuizDuo_" +
 
-        data.plan,
+    sanitizeFileName(
+      data.username
+    ) +
 
-        data.planName ||
-            data.plan,
+    "_" +
 
-        originalAmount,
+    Date.now() +
 
-        amount,
+    "_" +
 
-        Number(
-            data.discountPercent ||
-            0
-        ),
+    fileName
 
-        data.discountCode ||
-            "",
+  );
 
-        fileName,
 
-        fileUrl,
+  const fileUrl =
+    file.getUrl();
 
-        "در انتظار بررسی",
 
+  getOrCreateSheet()
+    .appendRow([
+
+      new Date(),
+
+      data.username,
+
+      data.phone ||
         "",
 
-        ""
+      data.plan,
+
+      data.planName ||
+        data.plan,
+
+      originalAmount,
+
+      amount,
+
+      Number(
+        data.discountPercent ||
+        0
+      ),
+
+      data.discountCode ||
+        "",
+
+      fileName,
+
+      fileUrl,
+
+      "در انتظار بررسی",
+
+      "",
+
+      ""
 
     ]);
 
 
-    try {
-
-        sendReceiptEmail(
-            data,
-            amount,
-            fileUrl,
-            savedFile
-        );
-
-    } catch (
-        mailError
-    ) {
-
-        console.error(
-            mailError
-        );
-
-    }
+  SpreadsheetApp.flush();
 
 
-    return jsonResponse({
+  try {
 
-        success:
-            true,
+    sendReceiptEmail(
+      data,
+      amount,
+      fileUrl,
+      file
+    );
 
-        message:
-            "فیش با موفقیت برای بررسی ارسال شد."
+  } catch (
+    error
+  ) {
 
-    });
+    console.error(
+      error
+    );
+
+  }
+
+
+  return jsonResponse({
+
+    success:
+      true,
+
+    message:
+      "فیش با موفقیت برای بررسی ثبت شد."
+
+  });
 
 }
 
 
 /* =========================================================
-   SUPPORT - NEW CONVERSATION
+   SUPPORT - NEW
 ========================================================= */
 
 
 function handleSupport(
-    data
+  data
 ) {
 
-    const username =
-        String(
-            data.username ||
-            ""
-        ).trim();
-
-
-    const phone =
-        String(
-            data.phone ||
-            ""
-        ).trim();
-
-
-    const subject =
-        String(
-            data.subject ||
-            ""
-        ).trim();
-
-
-    const message =
-        String(
-            data.message ||
-            data.text ||
-            ""
-        ).trim();
-
-
-    if (
-        !username ||
-        username ===
-            "بازیکن مهمان"
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "ابتدا وارد حساب شوید."
-
-        });
-
-    }
-
-
-    if (
-        !subject ||
-        !message
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "موضوع و پیام را وارد کنید."
-
-        });
-
-    }
-
-
-    const conversationId =
-
-        String(
-            data.conversationId ||
-            ""
-        ).trim() ||
-
-        Utilities.getUuid();
-
-
-    const sheet =
-        getOrCreateSupportSheet();
-
-
-    const lock =
-        LockService.getScriptLock();
-
-
-    lock.waitLock(
-        10000
-    );
-
-
-    let rowNumber;
-
-
-    try {
-
-        sheet.appendRow([
-
-            new Date(),
-
-            username,
-
-            phone,
-
-            subject,
-
-            message,
-
-            "جدید",
-
-            "",
-
-            "",
-
-            conversationId
-
-        ]);
-
-
-        SpreadsheetApp.flush();
-
-
-        rowNumber =
-            sheet.getLastRow();
-
-
-    } finally {
-
-        lock.releaseLock();
-
-    }
-
-
-    try {
-
-        const adminEmail =
-            getAdminEmail();
-
-
-        if (
-            adminEmail
-        ) {
-
-            GmailApp.sendEmail(
-
-                adminEmail,
-
-                "QuizDuo | پیام پشتیبانی | " +
-                    username,
-
-                [
-
-                    "پیام جدیدی در پشتیبانی QuizDuo ثبت شد.",
-
-                    "",
-
-                    "کاربر: " +
-                        username,
-
-                    "شماره تماس: " +
-                        (
-                            phone ||
-                            "-"
-                        ),
-
-                    "موضوع: " +
-                        subject,
-
-                    "",
-
-                    message,
-
-                    "",
-
-                    "شناسه گفت‌وگو: " +
-                        conversationId,
-
-                    "ردیف: " +
-                        rowNumber
-
-                ].join(
-                    "\n"
-                )
-
-            );
-
-        }
-
-    } catch (
-        mailError
-    ) {
-
-        console.error(
-            mailError
-        );
-
-    }
-
+  const username =
+    String(
+      data.username ||
+      ""
+    ).trim();
+
+
+  const phone =
+    String(
+      data.phone ||
+      ""
+    ).trim();
+
+
+  const subject =
+    String(
+      data.subject ||
+      ""
+    ).trim();
+
+
+  const message =
+    String(
+      data.message ||
+      ""
+    ).trim();
+
+
+  const conversationId =
+    String(
+      data.conversationId ||
+      ""
+    ).trim() ||
+    Utilities.getUuid();
+
+
+  if (
+    !username ||
+    username ===
+      "بازیکن مهمان"
+  ) {
 
     return jsonResponse({
 
-        success:
-            true,
+      success:
+        false,
 
-        rowNumber,
-
-        conversationId,
-
-        message:
-            "گفتگو با موفقیت ثبت شد."
+      message:
+        "ابتدا وارد حساب شوید."
 
     });
+
+  }
+
+
+  if (
+    !subject ||
+    !message
+  ) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "موضوع و متن پیام الزامی است."
+
+    });
+
+  }
+
+
+  const sheet =
+    getOrCreateSupportSheet();
+
+
+  sheet.appendRow([
+
+    new Date(),
+
+    username,
+
+    phone,
+
+    subject,
+
+    message,
+
+    "جدید",
+
+    "",
+
+    "",
+
+    conversationId
+
+  ]);
+
+
+  SpreadsheetApp.flush();
+
+
+  try {
+
+    const email =
+      getAdminEmail();
+
+
+    if (
+      email
+    ) {
+
+      GmailApp.sendEmail(
+
+        email,
+
+        "QuizDuo | پیام پشتیبانی | " +
+          username,
+
+        [
+
+          "گفتگوی جدید پشتیبانی QuizDuo",
+
+          "",
+
+          "کاربر: " +
+            username,
+
+          "شماره تماس: " +
+            (
+              phone ||
+              "-"
+            ),
+
+          "موضوع: " +
+            subject,
+
+          "شناسه گفتگو: " +
+            conversationId,
+
+          "",
+
+          message
+
+        ].join(
+          "\n"
+        )
+
+      );
+
+    }
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      error
+    );
+
+  }
+
+
+  return jsonResponse({
+
+    success:
+      true,
+
+    conversationId,
+
+    message:
+      "گفتگو با موفقیت ثبت شد."
+
+  });
 
 }
 
 
 /* =========================================================
-   SUPPORT - CONTINUE CONVERSATION
+   SUPPORT - CONTINUE
 ========================================================= */
 
 
 function handleSupportUserReply(
-    data
+  data
 ) {
 
-    const username =
-        String(
-            data.username ||
-            ""
-        ).trim();
-
-
-    const conversationId =
-        String(
-            data.conversationId ||
-            ""
-        ).trim();
-
-
-    const message =
-        String(
-            data.message ||
-            ""
-        ).trim();
-
-
-    if (
-        !username ||
-        username ===
-            "بازیکن مهمان"
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "ابتدا وارد حساب شوید."
-
-        });
-
-    }
-
-
-    if (
-        !conversationId ||
-        !message
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "شناسه گفت‌وگو و پیام الزامی است."
-
-        });
-
-    }
-
-
-    const sheet =
-        getOrCreateSupportSheet();
-
-
-    const values =
-        sheet
-            .getDataRange()
-            .getValues();
-
-
-    let found =
-        false;
-
-
-    let closed =
-        false;
-
-
-    let subject =
-        "ادامه گفت‌وگو";
-
-
-    let phone =
-        "";
-
-
-    for (
-        let i = 1;
-        i < values.length;
-        i++
-    ) {
-
-        const row =
-            values[i];
-
-
-        const id =
-            String(
-                row[8] ||
-                (
-                    "legacy-" +
-                    (
-                        i + 1
-                    )
-                )
-            );
-
-
-        const rowUsername =
-            String(
-                row[1] ||
-                ""
-            ).trim();
-
-
-        if (
-            id ===
-                conversationId &&
-
-            rowUsername
-                .toLowerCase() ===
-                username
-                    .toLowerCase()
-        ) {
-
-            found =
-                true;
-
-
-            subject =
-                String(
-                    row[3] ||
-                    subject
-                );
-
-
-            phone =
-                String(
-                    row[2] ||
-                    ""
-                );
-
-
-            if (
-                String(
-                    row[5] ||
-                    ""
-                ) ===
-                "بسته شد"
-            ) {
-
-                closed =
-                    true;
-
-            }
-
-        }
-
-    }
-
-
-    if (
-        !found
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "گفت‌وگو پیدا نشد."
-
-        });
-
-    }
-
-
-    if (
-        closed
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "این گفت‌وگو بسته شده است."
-
-        });
-
-    }
-
-
-    sheet.appendRow([
-
-        new Date(),
-
-        username,
-
-        phone,
-
-        subject,
-
-        message,
-
-        "جدید",
-
-        "",
-
-        "",
-
-        conversationId
-
-    ]);
-
-
-    SpreadsheetApp.flush();
-
-
-    try {
-
-        const adminEmail =
-            getAdminEmail();
-
-
-        if (
-            adminEmail
-        ) {
-
-            GmailApp.sendEmail(
-
-                adminEmail,
-
-                "QuizDuo | ادامه گفت‌وگو | " +
-                    username,
-
-                [
-
-                    "پیام جدید در یک گفت‌وگوی موجود ثبت شد.",
-
-                    "",
-
-                    "کاربر: " +
-                        username,
-
-                    "موضوع: " +
-                        subject,
-
-                    "شناسه: " +
-                        conversationId,
-
-                    "",
-
-                    message
-
-                ].join(
-                    "\n"
-                )
-
-            );
-
-        }
-
-    } catch (
-        mailError
-    ) {
-
-        console.error(
-            mailError
-        );
-
-    }
-
+  const username =
+    String(
+      data.username ||
+      ""
+    ).trim();
+
+
+  const conversationId =
+    String(
+      data.conversationId ||
+      ""
+    ).trim();
+
+
+  const message =
+    String(
+      data.message ||
+      ""
+    ).trim();
+
+
+  if (
+    !username ||
+    username ===
+      "بازیکن مهمان"
+  ) {
 
     return jsonResponse({
 
-        success:
-            true,
+      success:
+        false,
 
-        message:
-            "پیام شما در همان گفت‌وگو ثبت شد."
+      message:
+        "ابتدا وارد حساب شوید."
 
     });
+
+  }
+
+
+  if (
+    !conversationId ||
+    !message
+  ) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "اطلاعات گفت‌وگو کامل نیست."
+
+    });
+
+  }
+
+
+  const sheet =
+    getOrCreateSupportSheet();
+
+
+  const values =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  let found =
+    false;
+
+
+  let closed =
+    false;
+
+
+  let subject =
+    "ادامه گفت‌وگو";
+
+
+  let phone =
+    "";
+
+
+  for (
+    let i = 1;
+    i < values.length;
+    i++
+  ) {
+
+    const row =
+      values[i];
+
+
+    const rowConversationId =
+      String(
+        row[8] ||
+        (
+          "legacy-" +
+          (
+            i + 1
+          )
+        )
+      );
+
+
+    const rowUsername =
+      String(
+        row[1] ||
+        ""
+      ).trim();
+
+
+    if (
+      rowConversationId ===
+        conversationId &&
+
+      rowUsername
+        .toLowerCase() ===
+        username
+          .toLowerCase()
+    ) {
+
+      found =
+        true;
+
+
+      subject =
+        String(
+          row[3] ||
+          subject
+        );
+
+
+      phone =
+        String(
+          row[2] ||
+          ""
+        );
+
+
+      if (
+        String(
+          row[5] ||
+          ""
+        ) ===
+        "بسته شد"
+      ) {
+
+        closed =
+          true;
+
+      }
+
+    }
+
+  }
+
+
+  if (
+    !found
+  ) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "گفت‌وگو پیدا نشد."
+
+    });
+
+  }
+
+
+  if (
+    closed
+  ) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "این گفت‌وگو بسته شده است."
+
+    });
+
+  }
+
+
+  sheet.appendRow([
+
+    new Date(),
+
+    username,
+
+    phone,
+
+    subject,
+
+    message,
+
+    "جدید",
+
+    "",
+
+    "",
+
+    conversationId
+
+  ]);
+
+
+  SpreadsheetApp.flush();
+
+
+  try {
+
+    const email =
+      getAdminEmail();
+
+
+    if (
+      email
+    ) {
+
+      GmailApp.sendEmail(
+
+        email,
+
+        "QuizDuo | ادامه پشتیبانی | " +
+          username,
+
+        [
+
+          "کاربر در همان گفت‌وگوی قبلی پیام جدید فرستاد.",
+
+          "",
+
+          "کاربر: " +
+            username,
+
+          "موضوع: " +
+            subject,
+
+          "شناسه گفت‌وگو: " +
+            conversationId,
+
+          "",
+
+          message
+
+        ].join(
+          "\n"
+        )
+
+      );
+
+    }
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      error
+    );
+
+  }
+
+
+  return jsonResponse({
+
+    success:
+      true,
+
+    message:
+      "پیام در همان گفت‌وگو ثبت شد."
+
+  });
 
 }
 
@@ -1084,141 +1679,141 @@ function handleSupportUserReply(
 
 
 function closeSupportConversation(
-    data
+  data
 ) {
 
-    const username =
-        String(
-            data.username ||
-            ""
-        ).trim();
+  const username =
+    String(
+      data.username ||
+      ""
+    ).trim();
 
 
-    const conversationId =
-        String(
-            data.conversationId ||
-            ""
-        ).trim();
+  const conversationId =
+    String(
+      data.conversationId ||
+      ""
+    ).trim();
 
 
-    if (
-        !username ||
-        !conversationId
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "اطلاعات گفت‌وگو کامل نیست."
-
-        });
-
-    }
-
-
-    const sheet =
-        getOrCreateSupportSheet();
-
-
-    const values =
-        sheet
-            .getDataRange()
-            .getValues();
-
-
-    let found =
-        false;
-
-
-    for (
-        let i = 1;
-        i < values.length;
-        i++
-    ) {
-
-        const row =
-            values[i];
-
-
-        const id =
-            String(
-                row[8] ||
-                (
-                    "legacy-" +
-                    (
-                        i + 1
-                    )
-                )
-            );
-
-
-        const rowUsername =
-            String(
-                row[1] ||
-                ""
-            ).trim();
-
-
-        if (
-            id ===
-                conversationId &&
-
-            rowUsername
-                .toLowerCase() ===
-                username
-                    .toLowerCase()
-        ) {
-
-            sheet
-                .getRange(
-                    i + 1,
-                    6
-                )
-                .setValue(
-                    "بسته شد"
-                );
-
-
-            found =
-                true;
-
-        }
-
-    }
-
-
-    if (
-        !found
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "گفت‌وگو پیدا نشد."
-
-        });
-
-    }
-
-
-    SpreadsheetApp.flush();
-
+  if (
+    !username ||
+    !conversationId
+  ) {
 
     return jsonResponse({
 
-        success:
-            true,
+      success:
+        false,
 
-        message:
-            "گفت‌وگو بسته شد."
+      message:
+        "اطلاعات گفت‌وگو کامل نیست."
 
     });
+
+  }
+
+
+  const sheet =
+    getOrCreateSupportSheet();
+
+
+  const values =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  let found =
+    false;
+
+
+  for (
+    let i = 1;
+    i < values.length;
+    i++
+  ) {
+
+    const row =
+      values[i];
+
+
+    const rowConversationId =
+      String(
+        row[8] ||
+        (
+          "legacy-" +
+          (
+            i + 1
+          )
+        )
+      );
+
+
+    const rowUsername =
+      String(
+        row[1] ||
+        ""
+      ).trim();
+
+
+    if (
+      rowConversationId ===
+        conversationId &&
+
+      rowUsername
+        .toLowerCase() ===
+        username
+          .toLowerCase()
+    ) {
+
+      sheet
+        .getRange(
+          i + 1,
+          6
+        )
+        .setValue(
+          "بسته شد"
+        );
+
+
+      found =
+        true;
+
+    }
+
+  }
+
+
+  if (
+    !found
+  ) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "گفت‌وگو پیدا نشد."
+
+    });
+
+  }
+
+
+  SpreadsheetApp.flush();
+
+
+  return jsonResponse({
+
+    success:
+      true,
+
+    message:
+      "گفت‌وگو بسته شد."
+
+  });
 
 }
 
@@ -1229,445 +1824,398 @@ function closeSupportConversation(
 
 
 function getUserUpdates(
-    data
+  data
 ) {
 
-    return jsonResponse(
-        getUserUpdatesObject(
-            data
-        )
-    );
+  return jsonResponse(
+    getUserUpdatesObject(
+      data
+    )
+  );
 
 }
 
 
 function getUserUpdatesObject(
-    data
+  data
 ) {
 
-    const username =
-        String(
-            data.username ||
-            ""
-        ).trim();
+  const username =
+    String(
+      data.username ||
+      ""
+    ).trim();
 
 
-    if (
-        !username ||
-        username ===
-            "بازیکن مهمان"
-    ) {
-
-        return {
-
-            success:
-                true,
-
-            payments:
-                [],
-
-            support:
-                [],
-
-            subscription: {
-
-                active:
-                    false,
-
-                planId:
-                    "",
-
-                planName:
-                    "",
-
-                start:
-                    null,
-
-                expiry:
-                    null
-
-            }
-
-        };
-
-    }
-
+  if (
+    !username ||
+    username ===
+      "بازیکن مهمان"
+  ) {
 
     return {
 
-        success:
-            true,
+      success:
+        true,
 
-        payments:
-            getUserPaymentUpdates(
-                username
-            ),
+      payments:
+        [],
 
-        support:
-            getUserSupportUpdates(
-                username
-            ),
+      support:
+        [],
 
-        subscription:
-            getUserSubscription(
-                username
-            )
+      subscription: {
+
+        active:
+          false
+
+      }
 
     };
+
+  }
+
+
+  return {
+
+    success:
+      true,
+
+    payments:
+      getUserPaymentUpdates(
+        username
+      ),
+
+    support:
+      getUserSupportUpdates(
+        username
+      ),
+
+    subscription:
+      getUserSubscription(
+        username
+      )
+
+  };
 
 }
 
 
 /* =========================================================
-   USER PAYMENT UPDATES
+   PAYMENT USER UPDATES
 ========================================================= */
 
 
 function getUserPaymentUpdates(
-    username
+  username
 ) {
 
-    const values =
-        getOrCreateSheet()
-            .getDataRange()
-            .getValues();
+  const values =
+    getOrCreateSheet()
+      .getDataRange()
+      .getValues();
 
 
-    if (
-        values.length <= 1
-    ) {
+  return values
+    .slice(1)
 
-        return [];
+    .map(
+      (
+        row,
+        index
+      ) => ({
 
-    }
+        rowNumber:
+          index + 2,
 
+        timestamp:
+          row[0]
+            ? new Date(
+                row[0]
+              )
+                .toISOString()
+            : "",
 
-    return values
-        .slice(1)
+        username:
+          String(
+            row[1] ||
+            ""
+          ),
 
-        .map(
-            (
-                row,
-                index
-            ) => ({
+        phone:
+          row[2] ||
+          "",
 
-                rowNumber:
-                    index + 2,
+        planId:
+          row[3] ||
+          "",
 
-                timestamp:
-                    row[0]
-                        ? new Date(
-                            row[0]
-                          ).toISOString()
-                        : "",
+        planName:
+          row[4] ||
+          "",
 
-                username:
-                    String(
-                        row[1] ||
-                        ""
-                    ),
+        amount:
+          row[6] ||
+          0,
 
-                phone:
-                    row[2] ||
-                    "",
+        status:
+          row[11] ||
+          "در انتظار بررسی",
 
-                planId:
-                    row[3] ||
-                    "",
+        userMessage:
+          row[12] ||
+          "",
 
-                planName:
-                    row[4] ||
-                    "",
+        statusTimestamp:
+          row[13]
+            ? new Date(
+                row[13]
+              ).toISOString()
+            : ""
 
-                amount:
-                    row[6] ||
-                    0,
+      })
+    )
 
-                status:
-                    row[11] ||
-                    "در انتظار بررسی",
+    .filter(
+      item =>
 
-                userMessage:
-                    row[12] ||
-                    "",
+        item.username
+          .toLowerCase() ===
+        username
+          .toLowerCase()
 
-                statusTimestamp:
-                    row[13]
-                        ? new Date(
-                            row[13]
-                          ).toISOString()
-                        : ""
+    )
 
-            })
-        )
-
-        .filter(
-            item =>
-                item.username
-                    .toLowerCase() ===
-                username
-                    .toLowerCase()
-        )
-
-        .reverse();
+    .reverse();
 
 }
 
 
 /* =========================================================
-   USER SUPPORT UPDATES
+   SUPPORT USER UPDATES
 ========================================================= */
 
 
 function getUserSupportUpdates(
-    username
+  username
 ) {
 
-    const values =
-        getOrCreateSupportSheet()
-            .getDataRange()
-            .getValues();
+  const values =
+    getOrCreateSupportSheet()
+      .getDataRange()
+      .getValues();
 
 
-    if (
-        values.length <= 1
-    ) {
+  if (
+    values.length <= 1
+  ) {
 
-        return [];
+    return [];
 
-    }
-
-
-    const groups =
-        {};
+  }
 
 
-    values
-        .slice(1)
-        .forEach(
+  const groups =
+    {};
+
+
+  values
+    .slice(1)
+    .forEach(
+      (
+        row,
+        index
+      ) => {
+
+        const rowNumber =
+          index + 2;
+
+
+        const conversationId =
+          String(
+            row[8] ||
             (
-                row,
-                index
-            ) => {
-
-                const rowNumber =
-                    index + 2;
+              "legacy-" +
+              rowNumber
+            )
+          );
 
 
-                const id =
-                    String(
-                        row[8] ||
-                        (
-                            "legacy-" +
-                            rowNumber
-                        )
-                    );
+        const rowUsername =
+          String(
+            row[1] ||
+            ""
+          ).trim();
 
 
-                const rowUsername =
-                    String(
-                        row[1] ||
-                        ""
-                    ).trim();
+        if (
+          rowUsername
+            .toLowerCase() !==
+          username
+            .toLowerCase()
+        ) {
+
+          return;
+
+        }
 
 
-                if (
-                    rowUsername
-                        .toLowerCase() !==
-                    username
-                        .toLowerCase()
-                ) {
+        if (
+          !groups[
+            conversationId
+          ]
+        ) {
 
-                    return;
+          groups[
+            conversationId
+          ] = {
 
-                }
+            conversationId,
 
+            rowNumber,
 
-                if (
-                    !groups[id]
-                ) {
-
-                    groups[id] = {
-
-                        conversationId:
-                            id,
-
-                        rowNumber,
-
-                        timestamp:
-                            row[0]
-                                ? new Date(
-                                    row[0]
-                                  ).toISOString()
-                                : "",
-
-                        username:
-                            rowUsername,
-
-                        phone:
-                            row[2] ||
-                            "",
-
-                        subject:
-                            row[3] ||
-                            "",
-
-                        status:
-                            row[5] ||
-                            "جدید",
-
-                        thread:
-                            []
-
-                    };
-
-                }
-
-
-                const group =
-                    groups[id];
-
-
-                group.rowNumber =
-                    Math.min(
-                        group.rowNumber,
-                        rowNumber
-                    );
-
-
-                group.subject =
-                    group.subject ||
-                    String(
-                        row[3] ||
-                        ""
-                    );
-
-
-                group.status =
-                    String(
-                        row[5] ||
-                        group.status
-                    );
-
-
-                if (
+            timestamp:
+              row[0]
+                ? new Date(
                     row[0]
-                ) {
+                  ).toISOString()
+                : "",
 
-                    group.timestamp =
-                        new Date(
-                            row[0]
-                        ).toISOString();
+            username:
+              rowUsername,
 
-                }
+            phone:
+              row[2] ||
+              "",
 
+            subject:
+              row[3] ||
+              "",
 
-                if (
-                    row[4]
-                ) {
+            status:
+              row[5] ||
+              "جدید",
 
-                    group.thread.push({
+            thread:
+              []
 
-                        sender:
-                            "user",
+          };
 
-                        text:
-                            String(
-                                row[4]
-                            ),
-
-                        timestamp:
-                            row[0]
-                                ? new Date(
-                                    row[0]
-                                  ).toISOString()
-                                : ""
-
-                    });
-
-                }
+        }
 
 
-                if (
-                    row[6]
-                ) {
+        const group =
+          groups[
+            conversationId
+          ];
 
-                    group.thread.push({
 
-                        sender:
-                            "admin",
+        group.status =
+          row[5] ||
+          group.status;
 
-                        text:
-                            String(
-                                row[6]
-                            ),
 
-                        timestamp:
-                            row[7]
-                                ? new Date(
-                                    row[7]
-                                  ).toISOString()
-                                : ""
+        if (
+          row[4]
+        ) {
 
-                    });
+          group.thread.push({
 
-                }
+            sender:
+              "user",
 
-            }
+            text:
+              String(
+                row[4]
+              ),
+
+            timestamp:
+              row[0]
+                ? new Date(
+                    row[0]
+                  ).toISOString()
+                : ""
+
+          });
+
+        }
+
+
+        if (
+          row[6]
+        ) {
+
+          group.thread.push({
+
+            sender:
+              "admin",
+
+            text:
+              String(
+                row[6]
+              ),
+
+            timestamp:
+              row[7]
+                ? new Date(
+                    row[7]
+                  ).toISOString()
+                : ""
+
+          });
+
+        }
+
+      }
+    );
+
+
+  return Object
+    .values(
+      groups
+    )
+    .map(
+      group => {
+
+        group.thread.sort(
+          (
+            a,
+            b
+          ) =>
+
+            new Date(
+              a.timestamp ||
+              0
+            ) -
+
+            new Date(
+              b.timestamp ||
+              0
+            )
+
         );
 
 
-    return Object
-        .values(
-            groups
+        return group;
+
+      }
+    )
+    .sort(
+      (
+        a,
+        b
+      ) =>
+
+        new Date(
+          b.timestamp ||
+          0
+        ) -
+
+        new Date(
+          a.timestamp ||
+          0
         )
-
-        .map(
-            group => {
-
-                group.thread.sort(
-
-                    (
-                        a,
-                        b
-                    ) =>
-
-                        new Date(
-                            a.timestamp ||
-                            0
-                        ) -
-
-                        new Date(
-                            b.timestamp ||
-                            0
-                        )
-
-                );
-
-
-                return group;
-
-            }
-        )
-
-        .sort(
-
-            (
-                a,
-                b
-            ) =>
-
-                new Date(
-                    b.timestamp ||
-                    0
-                ) -
-
-                new Date(
-                    a.timestamp ||
-                    0
-                )
-
-        );
+    );
 
 }
 
@@ -1678,773 +2226,654 @@ function getUserSupportUpdates(
 
 
 function getUserSubscription(
-    username
+  username
 ) {
 
-    const values =
-        getOrCreateSheet()
-            .getDataRange()
-            .getValues();
+  const values =
+    getOrCreateSheet()
+      .getDataRange()
+      .getValues();
 
 
-    const planMonths = {
+  const monthsMap = {
 
-        monthly:
-            1,
+    monthly:
+      1,
 
-        quarterly:
-            3,
+    quarterly:
+      3,
 
-        sixMonth:
-            6,
+    sixMonth:
+      6,
 
-        nineMonth:
-            9
+    nineMonth:
+      9
 
-    };
+  };
 
 
-    const approved =
-        values
-            .slice(1)
+  const approved =
+    values
+      .slice(1)
 
-            .map(
-                (
-                    row,
-                    index
-                ) => ({
-                    row,
-                    rowNumber:
-                        index + 2
-                })
-            )
+      .map(
+        (
+          row,
+          index
+        ) => ({
 
-            .filter(
-                item =>
+          row,
 
-                    String(
-                        item.row[1] ||
-                        ""
-                    )
-                        .trim()
-                        .toLowerCase() ===
-                    username
-                        .toLowerCase()
+          rowNumber:
+            index + 2
 
-                    &&
+        })
+      )
 
-                    String(
-                        item.row[11] ||
-                        ""
-                    ).trim() ===
-                    "تأیید شد"
-            )
+      .filter(
+        item =>
 
-            .sort(
+          String(
+            item.row[1] ||
+            ""
+          )
+            .trim()
+            .toLowerCase() ===
+          username
+            .toLowerCase()
 
-                (
-                    a,
-                    b
-                ) =>
+          &&
 
-                    new Date(
-                        a.row[0] ||
-                        0
-                    ) -
+          String(
+            item.row[11] ||
+            ""
+          )
+            .trim() ===
+          "تأیید شد"
 
-                    new Date(
-                        b.row[0] ||
-                        0
-                    )
+      )
 
-            );
+      .sort(
+        (
+          a,
+          b
+        ) =>
 
+          new Date(
+            a.row[0] ||
+            0
+          ) -
 
-    if (
-        !approved.length
-    ) {
+          new Date(
+            b.row[0] ||
+            0
+          )
 
-        return {
+      );
 
-            active:
-                false,
 
-            planId:
-                "",
-
-            planName:
-                "",
-
-            start:
-                null,
-
-            expiry:
-                null
-
-        };
-
-    }
-
-
-    let cursor =
-        null;
-
-
-    let activeStart =
-        null;
-
-
-    let activeExpiry =
-        null;
-
-
-    let activePlanId =
-        "";
-
-
-    let activePlanName =
-        "";
-
-
-    approved.forEach(
-        item => {
-
-            const paymentDate =
-                new Date(
-                    item.row[0] ||
-                    Date.now()
-                );
-
-
-            const months =
-                Number(
-                    planMonths[
-                        String(
-                            item.row[3] ||
-                            ""
-                        )
-                    ] ||
-                    0
-                );
-
-
-            if (
-                !months
-            ) {
-                return;
-            }
-
-
-            const base =
-
-                cursor &&
-                cursor.getTime() >
-                    paymentDate.getTime()
-
-                    ? new Date(
-                        cursor
-                    )
-
-                    : new Date(
-                        paymentDate
-                    );
-
-
-            const expiry =
-                addMonths(
-                    base,
-                    months
-                );
-
-
-            if (
-                !activeExpiry ||
-                expiry.getTime() >=
-                    activeExpiry.getTime()
-            ) {
-
-                activeStart =
-                    base;
-
-
-                activeExpiry =
-                    expiry;
-
-
-                activePlanId =
-                    String(
-                        item.row[3] ||
-                        ""
-                    );
-
-
-                activePlanName =
-                    String(
-                        item.row[4] ||
-                        activePlanId
-                    );
-
-            }
-
-
-            cursor =
-                expiry;
-
-        }
-    );
-
-
-    const now =
-        new Date();
-
-
-    const active =
-        activeExpiry &&
-        activeExpiry.getTime() >
-            now.getTime();
-
+  if (
+    !approved.length
+  ) {
 
     return {
 
-        active:
-            Boolean(
-                active
-            ),
+      active:
+        false,
 
-        planId:
-            active
-                ? activePlanId
-                : "",
+      planId:
+        "",
 
-        planName:
-            active
-                ? activePlanName
-                : "",
+      planName:
+        "",
 
-        start:
-            active
-                ? activeStart
-                    .toISOString()
-                : null,
+      start:
+        null,
 
-        expiry:
-            active
-                ? activeExpiry
-                    .toISOString()
-                : null
+      expiry:
+        null
 
     };
+
+  }
+
+
+  let cursor =
+    null;
+
+
+  let activeStart =
+    null;
+
+
+  let activeExpiry =
+    null;
+
+
+  let activePlanId =
+    "";
+
+
+  let activePlanName =
+    "";
+
+
+  approved.forEach(
+    item => {
+
+      const paymentDate =
+        new Date(
+          item.row[0] ||
+          Date.now()
+        );
+
+
+      const months =
+        Number(
+          monthsMap[
+            String(
+              item.row[3] ||
+              ""
+            )
+          ] ||
+          0
+        );
+
+
+      if (
+        !months
+      ) {
+
+        return;
+
+      }
+
+
+      const base =
+        cursor &&
+        cursor.getTime() >
+          paymentDate.getTime()
+
+          ? new Date(
+              cursor
+            )
+
+          : new Date(
+              paymentDate
+            );
+
+
+      const expiry =
+        addMonths(
+          base,
+          months
+        );
+
+
+      activeStart =
+        base;
+
+
+      activeExpiry =
+        expiry;
+
+
+      activePlanId =
+        String(
+          item.row[3] ||
+          ""
+        );
+
+
+      activePlanName =
+        String(
+          item.row[4] ||
+          activePlanId
+        );
+
+
+      cursor =
+        expiry;
+
+    }
+  );
+
+
+  const now =
+    new Date();
+
+
+  const active =
+    activeExpiry &&
+    activeExpiry.getTime() >
+      now.getTime();
+
+
+  return {
+
+    active:
+      Boolean(
+        active
+      ),
+
+    planId:
+      active
+        ? activePlanId
+        : "",
+
+    planName:
+      active
+        ? activePlanName
+        : "",
+
+    start:
+      active
+        ? activeStart
+          .toISOString()
+        : null,
+
+    expiry:
+      active
+        ? activeExpiry
+          .toISOString()
+        : null
+
+  };
 
 }
 
 
 function addMonths(
-    date,
-    months
+  date,
+  months
 ) {
 
-    const result =
-        new Date(
-            date
-        );
-
-
-    const day =
-        result.getDate();
-
-
-    result.setDate(
-        1
+  const result =
+    new Date(
+      date
     );
 
 
-    result.setMonth(
-        result.getMonth() +
-        Number(
-            months
-        )
-    );
+  const day =
+    result.getDate();
 
 
-    const lastDay =
-        new Date(
-
-            result.getFullYear(),
-
-            result.getMonth() +
-                1,
-
-            0
-
-        ).getDate();
+  result.setDate(
+    1
+  );
 
 
-    result.setDate(
-        Math.min(
-            day,
-            lastDay
-        )
-    );
+  result.setMonth(
+    result.getMonth() +
+    Number(
+      months
+    )
+  );
 
 
-    return result;
+  const lastDay =
+    new Date(
+
+      result.getFullYear(),
+
+      result.getMonth() +
+        1,
+
+      0
+
+    )
+      .getDate();
+
+
+  result.setDate(
+    Math.min(
+      day,
+      lastDay
+    )
+  );
+
+
+  return result;
 
 }
 
 
 /* =========================================================
-   EMAIL / DRIVE
+   DRIVE / EMAIL
 ========================================================= */
 
 
+function getOrCreateReceiptFolder() {
+
+  const folders =
+    DriveApp
+      .getFoldersByName(
+        CONFIG
+          .DRIVE_FOLDER_NAME
+      );
+
+
+  return folders.hasNext()
+
+    ? folders.next()
+
+    : DriveApp.createFolder(
+        CONFIG
+          .DRIVE_FOLDER_NAME
+      );
+
+}
+
+
 function sendReceiptEmail(
-    data,
-    amount,
-    fileUrl,
-    file
+  data,
+  amount,
+  fileUrl,
+  file
 ) {
 
-    const adminEmail =
-        getAdminEmail();
+  const email =
+    getAdminEmail();
 
 
-    if (
-        !adminEmail
-    ) {
+  if (
+    !email
+  ) {
 
-        return;
+    return;
+
+  }
+
+
+  GmailApp.sendEmail(
+
+    email,
+
+    "QuizDuo | فیش پرداخت جدید | " +
+      data.username,
+
+    [
+
+      "فیش پرداخت جدید دریافت شد.",
+
+      "",
+
+      "کاربر: " +
+        data.username,
+
+      "شماره تماس: " +
+        (
+          data.phone ||
+          "-"
+        ),
+
+      "پلن: " +
+        (
+          data.planName ||
+          data.plan
+        ),
+
+      "مبلغ: " +
+        Number(
+          amount ||
+          0
+        )
+          .toLocaleString(
+            "fa-IR"
+          ) +
+        " تومان",
+
+      "",
+
+      "لینک فیش:",
+
+      fileUrl
+
+    ].join(
+      "\n"
+    ),
+
+    {
+
+      attachments:
+        [
+          file.getBlob()
+        ]
 
     }
 
-
-    GmailApp.sendEmail(
-
-        adminEmail,
-
-        "QuizDuo | فیش پرداخت جدید | " +
-            data.username,
-
-        [
-
-            "یک فیش پرداخت جدید در QuizDuo ثبت شد.",
-
-            "",
-
-            "نام کاربری: " +
-                data.username,
-
-            "شماره تماس: " +
-                (
-                    data.phone ||
-                    "-"
-                ),
-
-            "پلن: " +
-                (
-                    data.planName ||
-                    data.plan
-                ),
-
-            "مبلغ: " +
-                Number(
-                    amount ||
-                    0
-                ).toLocaleString(
-                    "fa-IR"
-                ) +
-                " تومان",
-
-            "",
-
-            "لینک فیش:",
-
-            fileUrl
-
-        ].join(
-            "\n"
-        ),
-
-        {
-
-            attachments:
-                [
-                    file.getBlob()
-                ]
-
-        }
-
-    );
+  );
 
 }
 
 
 function getAdminEmail() {
 
-    const saved =
-        PropertiesService
-            .getScriptProperties()
-            .getProperty(
-                "ADMIN_EMAIL"
-            );
+  const saved =
+    PropertiesService
+      .getScriptProperties()
+      .getProperty(
+        "ADMIN_EMAIL"
+      );
 
 
-    if (
-        saved
-    ) {
+  if (
+    saved
+  ) {
 
-        return saved;
+    return saved;
 
-    }
-
-
-    return (
-        Session
-            .getEffectiveUser()
-            .getEmail() ||
-        ""
-    );
-
-}
+  }
 
 
-function getOrCreateReceiptFolder() {
-
-    const folders =
-        DriveApp
-            .getFoldersByName(
-                CONFIG
-                    .DRIVE_FOLDER_NAME
-            );
-
-
-    return folders.hasNext()
-
-        ? folders.next()
-
-        : DriveApp.createFolder(
-            CONFIG
-                .DRIVE_FOLDER_NAME
-          );
+  return (
+    Session
+      .getEffectiveUser()
+      .getEmail() ||
+    ""
+  );
 
 }
+
+
+/* =========================================================
+   SHEETS
+========================================================= */
 
 
 function getOrCreateSpreadsheet() {
 
-    const props =
-        PropertiesService
-            .getScriptProperties();
+  const props =
+    PropertiesService
+      .getScriptProperties();
 
 
-    let id =
-        props.getProperty(
-            "PAYMENTS_SPREADSHEET_ID"
-        );
+  let id =
+    props.getProperty(
+      "PAYMENTS_SPREADSHEET_ID"
+    );
 
 
-    let spreadsheet =
+  let spreadsheet =
+    null;
+
+
+  if (
+    id
+  ) {
+
+    try {
+
+      spreadsheet =
+        SpreadsheetApp
+          .openById(
+            id
+          );
+
+    } catch (
+      error
+    ) {
+
+      spreadsheet =
         null;
 
-
-    if (
-        id
-    ) {
-
-        try {
-
-            spreadsheet =
-                SpreadsheetApp
-                    .openById(
-                        id
-                    );
-
-        } catch (
-            error
-        ) {
-
-            spreadsheet =
-                null;
-
-        }
-
     }
 
-
-    if (
-        !spreadsheet
-    ) {
-
-        spreadsheet =
-            SpreadsheetApp.create(
-                "QuizDuo Payments"
-            );
+  }
 
 
-        props.setProperty(
+  if (
+    !spreadsheet
+  ) {
 
-            "PAYMENTS_SPREADSHEET_ID",
-
-            spreadsheet.getId()
-
-        );
-
-    }
+    spreadsheet =
+      SpreadsheetApp.create(
+        "QuizDuo Payments"
+      );
 
 
-    return spreadsheet;
+    props.setProperty(
+      "PAYMENTS_SPREADSHEET_ID",
+      spreadsheet.getId()
+    );
+
+  }
+
+
+  return spreadsheet;
 
 }
 
 
 function getOrCreateSheet() {
 
-    const spreadsheet =
-        getOrCreateSpreadsheet();
-
-
-    let sheet =
-        spreadsheet.getSheetByName(
-            CONFIG
-                .SHEET_NAME
-        );
-
-
-    if (
-        !sheet
-    ) {
-
-        sheet =
-            spreadsheet.insertSheet(
-                CONFIG
-                    .SHEET_NAME
-            );
-
-    }
-
-
-    ensureHeaders(
-        sheet,
-        PAYMENT_HEADERS
-    );
-
-
-    return sheet;
+  return getSheet(
+    CONFIG.SHEET_NAME,
+    PAYMENT_HEADERS
+  );
 
 }
 
 
 function getOrCreateSupportSheet() {
 
-    const spreadsheet =
-        getOrCreateSpreadsheet();
+  return getSheet(
+    CONFIG.SUPPORT_SHEET_NAME,
+    SUPPORT_HEADERS
+  );
+
+}
 
 
-    let sheet =
-        spreadsheet.getSheetByName(
-            CONFIG
-                .SUPPORT_SHEET_NAME
-        );
+function getOrCreateUsersSheet() {
+
+  return getSheet(
+    CONFIG.USERS_SHEET_NAME,
+    USER_HEADERS
+  );
+
+}
 
 
-    if (
-        !sheet
-    ) {
+function getSheet(
+  name,
+  headers
+) {
 
-        sheet =
-            spreadsheet.insertSheet(
-                CONFIG
-                    .SUPPORT_SHEET_NAME
-            );
-
-    }
+  const spreadsheet =
+    getOrCreateSpreadsheet();
 
 
-    ensureHeaders(
-        sheet,
-        SUPPORT_HEADERS
-    );
+  let sheet =
+    spreadsheet
+      .getSheetByName(
+        name
+      );
 
 
-    return sheet;
+  if (
+    !sheet
+  ) {
+
+    sheet =
+      spreadsheet.insertSheet(
+        name
+      );
+
+  }
+
+
+  ensureHeaders(
+    sheet,
+    headers
+  );
+
+
+  return sheet;
 
 }
 
 
 function ensureHeaders(
-    sheet,
-    headers
+  sheet,
+  headers
 ) {
 
-    const lastColumn =
-        sheet.getLastColumn();
+  const lastColumn =
+    sheet.getLastColumn();
 
 
-    const existing =
-        lastColumn > 0
+  const existing =
+    lastColumn > 0
 
-            ? sheet
-                .getRange(
-                    1,
-                    1,
-                    1,
-                    lastColumn
-                )
-                .getValues()[0]
+      ? sheet
+          .getRange(
+            1,
+            1,
+            1,
+            lastColumn
+          )
+          .getValues()[0]
 
-            : [];
+      : [];
 
 
-    headers.forEach(
-        (
-            header,
-            index
-        ) => {
+  headers.forEach(
+    (
+      header,
+      index
+    ) => {
 
-            if (
-                existing[index] !==
-                header
-            ) {
+      if (
+        existing[index] !==
+        header
+      ) {
 
-                sheet
-                    .getRange(
-                        1,
-                        index + 1
-                    )
-                    .setValue(
-                        header
-                    );
+        sheet
+          .getRange(
+            1,
+            index + 1
+          )
+          .setValue(
+            header
+          );
 
-            }
+      }
 
-        }
+    }
+  );
+
+
+  if (
+    sheet.getFrozenRows() ===
+    0
+  ) {
+
+    sheet.setFrozenRows(
+      1
     );
 
-
-    if (
-        sheet.getFrozenRows() ===
-        0
-    ) {
-
-        sheet.setFrozenRows(
-            1
-        );
-
-    }
-
-}
-
-
-function appendPaymentRow(
-    row
-) {
-
-    getOrCreateSheet()
-        .appendRow(
-            row
-        );
-
-}
-
-
-function sanitizeFileName(
-    value
-) {
-
-    return String(
-        value ||
-        "user"
-    )
-
-        .replace(
-            /[\\/:*?"<>|]/g,
-            "_"
-        )
-
-        .slice(
-            0,
-            60
-        );
-
-}
-
-
-/* =========================================================
-   OUTPUT
-========================================================= */
-
-
-function jsonResponse(
-    data
-) {
-
-    return ContentService
-
-        .createTextOutput(
-            JSON.stringify(
-                data
-            )
-        )
-
-        .setMimeType(
-            ContentService
-                .MimeType
-                .JSON
-        );
-
-}
-
-
-function jsonpResponse(
-    callback,
-    data
-) {
-
-    const safeCallback =
-        String(
-            callback ||
-            ""
-        )
-            .replace(
-                /[^a-zA-Z0-9_$.]/g,
-                ""
-            );
-
-
-    if (
-        !safeCallback
-    ) {
-
-        return jsonResponse({
-
-            success:
-                false,
-
-            message:
-                "callback نامعتبر است."
-
-        });
-
-    }
-
-
-    return ContentService
-
-        .createTextOutput(
-
-            safeCallback +
-            "(" +
-            JSON.stringify(
-                data
-            ) +
-            ")"
-
-        )
-
-        .setMimeType(
-            ContentService
-                .MimeType
-                .JAVASCRIPT
-        );
+  }
 
 }
 
@@ -2455,571 +2884,804 @@ function jsonpResponse(
 
 
 function checkAdmin(
-    password
+  password
 ) {
 
-    return (
-        String(
-            password ||
-            ""
-        ) ===
-        CONFIG.ADMIN_PASSWORD
-    );
+  return (
+    String(
+      password ||
+      ""
+    ) ===
+    CONFIG.ADMIN_PASSWORD
+  );
 
 }
 
 
 function getPaymentsForAdmin(
-    password
+  password
 ) {
 
-    if (
-        !checkAdmin(
-            password
-        )
-    ) {
+  if (
+    !checkAdmin(
+      password
+    )
+  ) {
 
-        throw new Error(
-            "رمز مدیریت اشتباه است."
-        );
+    throw new Error(
+      "رمز مدیریت اشتباه است."
+    );
 
-    }
-
-
-    const values =
-        getOrCreateSheet()
-            .getDataRange()
-            .getValues();
+  }
 
 
-    if (
-        values.length <= 1
-    ) {
-
-        return [];
-
-    }
+  const values =
+    getOrCreateSheet()
+      .getDataRange()
+      .getValues();
 
 
-    return values
-        .slice(1)
+  return values
+    .slice(1)
+    .map(
+      (
+        row,
+        index
+      ) => ({
 
-        .map(
-            (
-                row,
-                index
-            ) => ({
+        rowNumber:
+          index + 2,
 
-                rowNumber:
-                    index + 2,
+        timestamp:
+          row[0]
+            ? new Date(
+                row[0]
+              )
+                .toISOString()
+            : "",
 
-                timestamp:
-                    row[0]
-                        ? new Date(
-                            row[0]
-                          ).toISOString()
-                        : "",
+        username:
+          row[1] ||
+          "",
 
-                username:
-                    row[1] ||
-                    "",
+        phone:
+          row[2] ||
+          "",
 
-                phone:
-                    row[2] ||
-                    "",
+        planId:
+          row[3] ||
+          "",
 
-                planId:
-                    row[3] ||
-                    "",
+        planName:
+          row[4] ||
+          "",
 
-                planName:
-                    row[4] ||
-                    "",
+        originalAmount:
+          row[5] ||
+          0,
 
-                originalAmount:
-                    row[5] ||
-                    0,
+        amount:
+          row[6] ||
+          0,
 
-                amount:
-                    row[6] ||
-                    0,
+        discountPercent:
+          row[7] ||
+          0,
 
-                discountPercent:
-                    row[7] ||
-                    0,
+        discountCode:
+          row[8] ||
+          "",
 
-                discountCode:
-                    row[8] ||
-                    "",
+        fileName:
+          row[9] ||
+          "",
 
-                fileName:
-                    row[9] ||
-                    "",
+        receiptUrl:
+          row[10] ||
+          "",
 
-                receiptUrl:
-                    row[10] ||
-                    "",
+        status:
+          row[11] ||
+          "در انتظار بررسی",
 
-                status:
-                    row[11] ||
-                    "در انتظار بررسی",
+        userMessage:
+          row[12] ||
+          "",
 
-                userMessage:
-                    row[12] ||
-                    "",
+        statusTimestamp:
+          row[13]
+            ? new Date(
+                row[13]
+              )
+                .toISOString()
+            : ""
 
-                statusTimestamp:
-                    row[13]
-                        ? new Date(
-                            row[13]
-                          ).toISOString()
-                        : ""
-
-            })
-        )
-
-        .reverse();
+      })
+    )
+    .reverse();
 
 }
 
 
 function updatePaymentStatus(
-    password,
-    rowNumber,
-    status
+  password,
+  rowNumber,
+  status
 ) {
 
-    if (
-        !checkAdmin(
-            password
-        )
-    ) {
+  if (
+    !checkAdmin(
+      password
+    )
+  ) {
 
-        throw new Error(
-            "رمز مدیریت اشتباه است."
-        );
+    throw new Error(
+      "رمز مدیریت اشتباه است."
+    );
 
-    }
-
-
-    const allowed = [
-
-        "تأیید شد",
-
-        "رد شد",
-
-        "در انتظار بررسی"
-
-    ];
+  }
 
 
-    if (
-        !allowed.includes(
-            status
-        )
-    ) {
+  const allowed = [
 
-        throw new Error(
-            "وضعیت نامعتبر است."
-        );
+    "تأیید شد",
 
-    }
+    "رد شد",
+
+    "در انتظار بررسی"
+
+  ];
 
 
-    const sheet =
-        getOrCreateSheet();
+  if (
+    !allowed.includes(
+      status
+    )
+  ) {
+
+    throw new Error(
+      "وضعیت نامعتبر است."
+    );
+
+  }
 
 
-    const row =
-        Number(
-            rowNumber
-        );
+  const sheet =
+    getOrCreateSheet();
 
 
-    const username =
-        String(
-            sheet
-                .getRange(
-                    row,
-                    2
-                )
-                .getValue() ||
-                ""
-        );
+  const row =
+    Number(
+      rowNumber
+    );
 
 
-    const planId =
-        String(
-            sheet
-                .getRange(
-                    row,
-                    4
-                )
-                .getValue() ||
-                ""
-        );
-
-
-    let userMessage =
-        "";
-
-
-    if (
-        status ===
-        "تأیید شد"
-    ) {
-
-        userMessage =
-            "پرداخت شما تأیید شد و اشتراک شما فعال شد. همه مراحل برای حساب شما باز شد.";
-
-    } else if (
-        status ===
-        "رد شد"
-    ) {
-
-        userMessage =
-            "پرداخت شما رد شد.";
-
-    }
-
-
-    sheet
+  const username =
+    String(
+      sheet
         .getRange(
-            row,
-            12
+          row,
+          2
         )
-        .setValue(
-            status
-        );
+        .getValue() ||
+        ""
+    );
 
 
-    sheet
+  const planId =
+    String(
+      sheet
         .getRange(
-            row,
-            13
+          row,
+          4
         )
-        .setValue(
-            userMessage
-        );
+        .getValue() ||
+        ""
+    );
 
 
-    sheet
-        .getRange(
-            row,
-            14
-        )
-        .setValue(
-            new Date()
-        );
+  let userMessage =
+    "";
 
 
-    SpreadsheetApp.flush();
+  if (
+    status ===
+    "تأیید شد"
+  ) {
+
+    userMessage =
+      "پرداخت شما تأیید شد و اشتراک فعال شد.";
+
+  }
 
 
-    return {
+  if (
+    status ===
+    "رد شد"
+  ) {
 
-        success:
-            true,
+    userMessage =
+      "پرداخت شما رد شد.";
 
-        username,
+  }
 
-        planId,
 
-        status,
+  sheet
+    .getRange(
+      row,
+      12
+    )
+    .setValue(
+      status
+    );
 
-        userMessage
 
-    };
+  sheet
+    .getRange(
+      row,
+      13
+    )
+    .setValue(
+      userMessage
+    );
+
+
+  sheet
+    .getRange(
+      row,
+      14
+    )
+    .setValue(
+      new Date()
+    );
+
+
+  SpreadsheetApp.flush();
+
+
+  return {
+
+    success:
+      true,
+
+    username,
+
+    planId,
+
+    status,
+
+    userMessage
+
+  };
 
 }
 
 
 function getSupportForAdmin(
-    password
+  password
 ) {
 
-    if (
-        !checkAdmin(
-            password
-        )
-    ) {
+  if (
+    !checkAdmin(
+      password
+    )
+  ) {
 
-        throw new Error(
-            "رمز مدیریت اشتباه است."
-        );
+    throw new Error(
+      "رمز مدیریت اشتباه است."
+    );
 
-    }
-
-
-    const values =
-        getOrCreateSupportSheet()
-            .getDataRange()
-            .getValues();
+  }
 
 
-    if (
-        values.length <= 1
-    ) {
-
-        return [];
-
-    }
+  const values =
+    getOrCreateSupportSheet()
+      .getDataRange()
+      .getValues();
 
 
-    return values
-        .slice(1)
+  return values
+    .slice(1)
+    .map(
+      (
+        row,
+        index
+      ) => ({
 
-        .map(
+        rowNumber:
+          index + 2,
+
+        timestamp:
+          row[0]
+            ? new Date(
+                row[0]
+              )
+                .toISOString()
+            : "",
+
+        username:
+          row[1] ||
+          "",
+
+        phone:
+          row[2] ||
+          "",
+
+        subject:
+          row[3] ||
+          "",
+
+        message:
+          row[4] ||
+          "",
+
+        status:
+          row[5] ||
+          "جدید",
+
+        adminReply:
+          row[6] ||
+          "",
+
+        replyTimestamp:
+          row[7]
+            ? new Date(
+                row[7]
+              )
+                .toISOString()
+            : "",
+
+        conversationId:
+          String(
+            row[8] ||
             (
-                row,
-                index
-            ) => ({
+              "legacy-" +
+              (
+                index + 2
+              )
+            )
+          )
 
-                rowNumber:
-                    index + 2,
-
-                timestamp:
-                    row[0]
-                        ? new Date(
-                            row[0]
-                          ).toISOString()
-                        : "",
-
-                username:
-                    row[1] ||
-                    "",
-
-                phone:
-                    row[2] ||
-                    "",
-
-                subject:
-                    row[3] ||
-                    "",
-
-                message:
-                    row[4] ||
-                    "",
-
-                status:
-                    row[5] ||
-                    "جدید",
-
-                adminReply:
-                    row[6] ||
-                    "",
-
-                replyTimestamp:
-                    row[7]
-                        ? new Date(
-                            row[7]
-                          ).toISOString()
-                        : "",
-
-                conversationId:
-                    String(
-                        row[8] ||
-                        (
-                            "legacy-" +
-                            (
-                                index +
-                                2
-                            )
-                        )
-                    )
-
-            })
-        )
-
-        .reverse();
+      })
+    )
+    .reverse();
 
 }
 
 
 function replyToSupport(
-    password,
-    rowNumber,
-    reply,
-    status
+  password,
+  rowNumber,
+  reply,
+  status
 ) {
 
-    if (
-        !checkAdmin(
-            password
-        )
-    ) {
+  if (
+    !checkAdmin(
+      password
+    )
+  ) {
 
-        throw new Error(
-            "رمز مدیریت اشتباه است."
-        );
+    throw new Error(
+      "رمز مدیریت اشتباه است."
+    );
 
-    }
-
-
-    const text =
-        String(
-            reply ||
-            ""
-        ).trim();
+  }
 
 
-    if (
-        !text
-    ) {
-
-        throw new Error(
-            "متن پاسخ را وارد کنید."
-        );
-
-    }
+  const text =
+    String(
+      reply ||
+      ""
+    ).trim();
 
 
-    const allowed = [
+  if (
+    !text
+  ) {
 
-        "جدید",
+    throw new Error(
+      "متن پاسخ را وارد کنید."
+    );
 
-        "در حال بررسی",
-
-        "پاسخ داده شد",
-
-        "بسته شد"
-
-    ];
+  }
 
 
-    const finalStatus =
-        allowed.includes(
-            status
-        )
+  const allowed = [
 
-            ? status
+    "جدید",
 
-            : "پاسخ داده شد";
+    "در حال بررسی",
 
+    "پاسخ داده شد",
 
-    const sheet =
-        getOrCreateSupportSheet();
+    "بسته شد"
 
-
-    const row =
-        Number(
-            rowNumber
-        );
+  ];
 
 
-    sheet
-        .getRange(
-            row,
-            6
-        )
-        .setValue(
-            finalStatus
-        );
+  const finalStatus =
+    allowed.includes(
+      status
+    )
+      ? status
+      : "پاسخ داده شد";
 
 
-    sheet
-        .getRange(
-            row,
-            7
-        )
-        .setValue(
-            text
-        );
+  const sheet =
+    getOrCreateSupportSheet();
 
 
-    sheet
-        .getRange(
-            row,
-            8
-        )
-        .setValue(
-            new Date()
-        );
+  const row =
+    Number(
+      rowNumber
+    );
 
 
-    SpreadsheetApp.flush();
+  sheet
+    .getRange(
+      row,
+      6
+    )
+    .setValue(
+      finalStatus
+    );
 
 
-    return {
+  sheet
+    .getRange(
+      row,
+      7
+    )
+    .setValue(
+      text
+    );
 
-        success:
-            true,
 
-        message:
-            "پاسخ با موفقیت برای پنل کاربر ثبت شد."
+  sheet
+    .getRange(
+      row,
+      8
+    )
+    .setValue(
+      new Date()
+    );
 
-    };
+
+  SpreadsheetApp.flush();
+
+
+  return {
+
+    success:
+      true,
+
+    message:
+      "پاسخ با موفقیت ثبت شد."
+
+  };
 
 }
 
 
 function updateSupportStatus(
-    password,
-    rowNumber,
-    status
+  password,
+  rowNumber,
+  status
 ) {
 
-    if (
-        !checkAdmin(
-            password
-        )
+  if (
+    !checkAdmin(
+      password
+    )
+  ) {
+
+    throw new Error(
+      "رمز مدیریت اشتباه است."
+    );
+
+  }
+
+
+  const allowed = [
+
+    "جدید",
+
+    "در حال بررسی",
+
+    "پاسخ داده شد",
+
+    "بسته شد"
+
+  ];
+
+
+  if (
+    !allowed.includes(
+      status
+    )
+  ) {
+
+    throw new Error(
+      "وضعیت نامعتبر است."
+    );
+
+  }
+
+
+  getOrCreateSupportSheet()
+    .getRange(
+      Number(
+        rowNumber
+      ),
+      6
+    )
+    .setValue(
+      status
+    );
+
+
+  SpreadsheetApp.flush();
+
+
+  return {
+
+    success:
+      true
+
+  };
+
+}
+
+
+/* =========================================================
+   DRIVE / HELPERS
+========================================================= */
+
+
+function sanitizeFileName(
+  value
+) {
+
+  return String(
+    value ||
+    "user"
+  )
+
+    .replace(
+      /[\\/:*?"<>|]/g,
+      "_"
+    )
+
+    .slice(
+      0,
+      60
+    );
+
+}
+
+
+function jsonResponse(
+  data
+) {
+
+  return ContentService
+
+    .createTextOutput(
+      JSON.stringify(
+        data
+      )
+    )
+
+    .setMimeType(
+      ContentService
+        .MimeType
+        .JSON
+    );
+
+}
+
+
+function jsonpResponse(
+  callback,
+  data
+) {
+
+  const safeCallback =
+    String(
+      callback ||
+      ""
+    )
+      .replace(
+        /[^a-zA-Z0-9_$.]/g,
+        ""
+      );
+
+
+  if (
+    !safeCallback
+  ) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        "callback نامعتبر است."
+
+    });
+
+  }
+
+
+  return ContentService
+
+    .createTextOutput(
+
+      safeCallback +
+      "(" +
+      JSON.stringify(
+        data
+      ) +
+      ")"
+
+    )
+
+    .setMimeType(
+      ContentService
+        .MimeType
+        .JAVASCRIPT
+    );
+
+}
+
+
+function getOrCreateReceiptFolder() {
+
+  const folders =
+    DriveApp
+      .getFoldersByName(
+        CONFIG
+          .DRIVE_FOLDER_NAME
+      );
+
+
+  return folders.hasNext()
+
+    ? folders.next()
+
+    : DriveApp.createFolder(
+        CONFIG
+          .DRIVE_FOLDER_NAME
+      );
+
+}
+
+
+function getAdminEmail() {
+
+  const saved =
+    PropertiesService
+      .getScriptProperties()
+      .getProperty(
+        "ADMIN_EMAIL"
+      );
+
+
+  if (
+    saved
+  ) {
+
+    return saved;
+
+  }
+
+
+  return (
+    Session
+      .getEffectiveUser()
+      .getEmail() ||
+    ""
+  );
+
+}
+
+
+function getOrCreateSpreadsheet() {
+
+  const props =
+    PropertiesService
+      .getScriptProperties();
+
+
+  let id =
+    props.getProperty(
+      "PAYMENTS_SPREADSHEET_ID"
+    );
+
+
+  let spreadsheet =
+    null;
+
+
+  if (
+    id
+  ) {
+
+    try {
+
+      spreadsheet =
+        SpreadsheetApp
+          .openById(
+            id
+          );
+
+    } catch (
+      error
     ) {
 
-        throw new Error(
-            "رمز مدیریت اشتباه است."
-        );
+      spreadsheet =
+        null;
 
     }
 
-
-    const allowed = [
-
-        "جدید",
-
-        "در حال بررسی",
-
-        "پاسخ داده شد",
-
-        "بسته شد"
-
-    ];
+  }
 
 
-    if (
-        !allowed.includes(
-            status
-        )
-    ) {
+  if (
+    !spreadsheet
+  ) {
 
-        throw new Error(
-            "وضعیت نامعتبر است."
-        );
-
-    }
+    spreadsheet =
+      SpreadsheetApp.create(
+        "QuizDuo Payments"
+      );
 
 
-    getOrCreateSupportSheet()
+    props.setProperty(
+      "PAYMENTS_SPREADSHEET_ID",
+      spreadsheet.getId()
+    );
 
-        .getRange(
-            Number(
-                rowNumber
-            ),
-            6
-        )
-
-        .setValue(
-            status
-        );
+  }
 
 
-    SpreadsheetApp.flush();
+  return spreadsheet;
+
+}
 
 
-    return {
+/* =========================================================
+   TEST EMAIL
+========================================================= */
 
-        success:
-            true
 
-    };
+function testEmail() {
+
+  const email =
+    getAdminEmail();
+
+
+  if (
+    !email
+  ) {
+
+    throw new Error(
+      "ADMIN_EMAIL تنظیم نشده است."
+    );
+
+  }
+
+
+  GmailApp.sendEmail(
+
+    email,
+
+    "QuizDuo Test Email",
+
+    "ارسال ایمیل تست با موفقیت انجام شد."
+
+  );
 
 }
