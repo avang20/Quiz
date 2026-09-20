@@ -3,9 +3,7 @@
    ========================================================= */
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFkK02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXkIvzVyuxzJiZQ/exec";
-
-
+  "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFkK02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXIvzVyuxzJiZQ/exec";
 /* =========================================================
    GLOBAL STATE
 ========================================================= */
@@ -1145,24 +1143,69 @@ async function loadQuizData() {
 
   try {
 
-    const module =
-      await import("../data/quiz.js");
+    const [generalResponse, funResponse] =
+      await Promise.all([
+        fetch("../../data/general.json", {
+          cache: "no-store"
+        }),
+
+        fetch("../../data/fun.json", {
+          cache: "no-store"
+        })
+      ]);
+
+
+    if (!generalResponse.ok) {
+      throw new Error(
+        `Could not load ../../data/general.json (${generalResponse.status})`
+      );
+    }
+
+
+    if (!funResponse.ok) {
+      throw new Error(
+        `Could not load ../../data/fun.json (${funResponse.status})`
+      );
+    }
+
+
+    const [generalData, funData] =
+      await Promise.all([
+        generalResponse.json(),
+        funResponse.json()
+      ]);
+
 
     quizData.general =
       normalizeQuizData(
-        module.generalQuestions ||
-        module.general ||
-        module.default?.general ||
-        []
+        Array.isArray(generalData)
+          ? generalData
+          : generalData.questions ||
+            generalData.items ||
+            []
       );
+
 
     quizData.fun =
       normalizeQuizData(
-        module.funQuestions ||
-        module.fun ||
-        module.default?.fun ||
-        []
+        Array.isArray(funData)
+          ? funData
+          : funData.questions ||
+            funData.items ||
+            []
       );
+
+
+    console.log(
+      "QuizDuo quiz data loaded:",
+      {
+        general:
+          quizData.general.length,
+
+        fun:
+          quizData.fun.length
+      }
+    );
 
 
   } catch (error) {
@@ -1172,13 +1215,15 @@ async function loadQuizData() {
       error
     );
 
+
     quizData = {
       general: [],
       fun: []
     };
 
+
     toast(
-      "فایل سوالات پیدا نشد.",
+      "فایل سوالات پیدا نشد. مسیر data/general.json و data/fun.json را بررسی کنید.",
       "error"
     );
   }
@@ -1271,16 +1316,15 @@ function getStageQuestions(category, stage) {
 
 
 function getStageCount(category) {
-
-  const questions =
-    quizData[category] || [];
+  const questions = quizData[category] || [];
 
   if (!questions.length) {
     return 0;
   }
 
-  return Math.ceil(
-    questions.length / 15
+  return Math.min(
+    8,
+    Math.ceil(questions.length / 15)
   );
 }
 
