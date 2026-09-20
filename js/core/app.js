@@ -320,6 +320,12 @@ class App {
 
         this.questionTimeLeft =
             20;
+
+        this.answerLocked =
+            false;
+
+        this.quizModalOpen =
+            false;
     }
 
 
@@ -416,6 +422,11 @@ class App {
         this.renderQuizStats();
 
         this.go("home");
+
+        window.setTimeout(
+            () => this.showWelcomeOnce(),
+            600
+        );
 
         this.syncServerUpdates();
 
@@ -776,7 +787,10 @@ class App {
 
 
         setTimeout(
-            () => this.go("home"),
+            () => {
+                this.go("home");
+                this.showWelcomeOnce();
+            },
             450
         );
     }
@@ -867,218 +881,424 @@ class App {
     }
 
 
-    async renderStages() {
+    getStageBestScore(category, stage) {
 
-        const box =
-            document.getElementById(
-                "stages"
+        const key =
+            category === "general"
+                ? "stageScoresGeneral"
+                : "stageScoresFun";
+
+        const scores =
+            this.state[key] &&
+            typeof this.state[key] === "object"
+                ? this.state[key]
+                : {};
+
+        const score =
+            Number(scores[String(Number(stage))]);
+
+        return Number.isFinite(score)
+            ? score
+            : 0;
+    }
+
+
+    getHighestPassedStage(category) {
+
+        let highest = 0;
+
+        for (let stage = 1; stage <= 100; stage++) {
+            if (
+                this.getStageBestScore(category, stage) >=
+                0.75
+            ) {
+                highest = stage;
+                continue;
+            }
+
+            break;
+        }
+
+        return highest;
+    }
+
+
+    canAccessStage(category, stage) {
+
+        const numericStage =
+            Number(stage) || 1;
+
+        if (numericStage <= 1) {
+            return {
+                allowed: true,
+                reason: "stage1"
+            };
+        }
+
+        if (!this.hasActiveSubscription()) {
+            return {
+                allowed: false,
+                reason: "subscription"
+            };
+        }
+
+        const previousScore =
+            this.getStageBestScore(
+                category,
+                numericStage - 1
             );
 
+        if (previousScore < 0.75) {
+            return {
+                allowed: false,
+                reason: "previous"
+            };
+        }
+
+        return {
+            allowed: true,
+            reason: "ok"
+        };
+    }
+
+
+    openQuizModal() {
+
+        const modal =
+            document.getElementById("quizModal");
+
+        if (!modal) return;
+
+        modal.classList.remove("hidden");
+        modal.setAttribute("aria-hidden", "false");
+        document.body.classList.add("modal-open");
+        this.quizModalOpen = true;
+    }
+
+
+    closeQuizModal(renderStages = false) {
+
+        this.stopQuestionTimer();
+        this.answerLocked = false;
+        this.quizModalOpen = false;
+
+        const modal =
+            document.getElementById("quizModal");
+
+        if (modal) {
+            modal.classList.add("hidden");
+            modal.setAttribute("aria-hidden", "true");
+        }
+
+        document.body.classList.remove("modal-open");
+
+        if (renderStages) {
+            this.renderStages();
+        }
+    }
+
+
+    showWelcomeOnce() {
+
+        if (
+            !this.state.username ||
+            this.state.username === "بازیکن مهمان" ||
+            this.state.welcomeSeen === true
+        ) {
+            return;
+        }
+
+        const modal =
+            document.getElementById("welcomeModal");
+
+        if (!modal) return;
+
+        const name =
+            document.getElementById("welcomeUserName");
+
+        if (name) {
+            name.textContent =
+                this.state.username;
+        }
+
+        modal.classList.remove("hidden");
+        modal.setAttribute("aria-hidden", "false");
+        document.body.classList.add("modal-open");
+
+        const close =
+            document.getElementById("welcomeClose");
+
+        if (close && !close.dataset.bound) {
+            close.dataset.bound = "1";
+            close.addEventListener(
+                "click",
+                () => this.closeWelcome()
+            );
+        }
+    }
+
+
+    closeWelcome() {
+
+        this.state.welcomeSeen = true;
+        this.persist();
+
+        const modal =
+            document.getElementById("welcomeModal");
+
+        if (modal) {
+            modal.classList.add("hidden");
+            modal.setAttribute("aria-hidden", "true");
+        }
+
+        if (!this.quizModalOpen) {
+            document.body.classList.remove("modal-open");
+        }
+    }
+
+
+    async renderStages() {
+
+        this.closeQuizModal(false);
+
+        const box =
+            document.getElementById("stages");
 
         const category =
             this.quiz.currentCategory;
 
+        if (!box) return;
 
         box.innerHTML =
             `<div class="panel loading">
-                در حال بارگذاری سوال‌ها...
+                در حال بارگذاری مرحله‌ها...
             </div>`;
 
-
         try {
-
-            await this.quiz.loadCategory(
-                category
-            );
-
+            await this.quiz.loadCategory(category);
 
             const maxStage =
                 Math.max(
                     5,
                     ...this.quiz.questions.map(
-                        q =>
-                            Number(q.stage) || 1
+                        q => Number(q.stage) || 1
                     )
                 );
 
-            const unlocked =
-                this.hasActiveSubscription()
-                    ? maxStage
-                    : 1;
-
-
             box.innerHTML = "";
 
-
-            for (
-                let i = 1;
-                i <= maxStage;
-                i++
-            ) {
-
-                const available =
-                    i <= unlocked;
-
-
-                const completed =
-                    isStageCompleted(
-                        this.state,
+            for (let i = 1; i <= maxStage; i++) {
+                const access =
+                    this.canAccessStage(
                         category,
                         i
                     );
 
+                const completed =
+                    this.getStageBestScore(
+                        category,
+                        i
+                    ) >= 0.75;
 
                 const questions =
-                    this.quiz.getStageQuestions(
-                        i
-                    );
+                    this.quiz.getStageQuestions(i);
 
+                const previousScore =
+                    i > 1
+                        ? this.getStageBestScore(
+                            category,
+                            i - 1
+                        )
+                        : 0;
 
                 const card =
-                    document.createElement(
-                        "article"
-                    );
-
+                    document.createElement("article");
 
                 card.className =
                     `stage-card panel ${
-                        available
-                            ? ""
-                            : "locked"
-                    } ${
-                        completed
-                            ? "completed"
-                            : ""
-                    }`;
+                        access.allowed ? "" : "locked"
+                    } ${completed ? "completed" : ""}`;
 
+                let badge = "شروع";
+                let footerLeft = "رایگان";
+                let footerRight = "ورود ←";
+
+                if (i > 1) {
+                    if (!this.hasActiveSubscription()) {
+                        badge = "🔒 اشتراک لازم";
+                        footerLeft = "نیازمند اشتراک";
+                        footerRight = "🔒";
+                    } else if (previousScore < 0.75) {
+                        badge = "🔒 مرحله قبلی";
+                        footerLeft = "نیازمند حداقل ۷۵٪ در مرحله قبلی";
+                        footerRight = "🔒";
+                    } else {
+                        badge = "🔓 باز";
+                        footerLeft = "آماده بازی";
+                    }
+                } else if (completed) {
+                    badge = "✓ گذرانده شده";
+                }
 
                 card.innerHTML = `
+                    <div class="stage-glow"></div>
+
                     <div class="stage-number">
                         ${i}
                     </div>
 
-                    <div>
-                        <h3>
-                            مرحله ${i}
-                            ${
-                                completed
-                                    ? "✓"
-                                    : available
-                                        ? "🔓"
-                                        : "🔒"
-                            }
-                        </h3>
+                    <div class="stage-content">
+                        <div class="stage-topline">
+                            <span class="stage-badge">
+                                ${badge}
+                            </span>
+                            <span class="stage-icon">
+                                ${completed ? "✓" : access.allowed ? "✨" : "🔒"}
+                            </span>
+                        </div>
+
+                        <h3>مرحله ${i}</h3>
 
                         <p>
                             ${
                                 questions.length
-                                    ? `${questions.length} سوال`
+                                    ? `${questions.length} سوال چهارگزینه‌ای`
                                     : "این مرحله هنوز سوالی ندارد."
                             }
                         </p>
+
+                        ${
+                            i > 1 &&
+                            this.hasActiveSubscription() &&
+                            previousScore < 0.75
+                                ? `<small class="stage-lock-reason">
+                                    بهترین امتیاز مرحله ${i - 1}:
+                                    ${Math.round(previousScore * 100).toLocaleString("fa-IR")}٪
+                                    · حداقل لازم: ۷۵٪
+                                  </small>`
+                                : ""
+                        }
+
+                        <div class="stage-footer">
+                            <span>${footerLeft}</span>
+                            <span>${access.allowed && questions.length ? footerRight : "🔒"}</span>
+                        </div>
                     </div>
                 `;
 
-
-                if (
-                    available &&
-                    questions.length
-                ) {
-
+                if (access.allowed && questions.length) {
                     card.addEventListener(
                         "click",
-                        () =>
-                            this.startStage(i)
+                        () => this.startStage(i)
                     );
                 }
-
 
                 box.appendChild(card);
             }
 
-
-            document
-                .getElementById(
-                    "quizBox"
-                )
-                .classList
-                .add("hidden");
-
         } catch (error) {
-
             box.innerHTML =
                 `<div class="panel error">
-                    خطا در بارگذاری سوال‌ها:
-                    ${escapeHTML(
-                        error.message
-                    )}
+                    خطا در بارگذاری مرحله‌ها:
+                    ${escapeHTML(error.message)}
+                    <button
+                        id="retryStages"
+                        class="primary full"
+                        type="button"
+                        style="margin-top:12px"
+                    >
+                        تلاش دوباره
+                    </button>
                 </div>`;
+
+            document
+                .getElementById("retryStages")
+                ?.addEventListener(
+                    "click",
+                    () => this.renderStages()
+                );
         }
     }
 
 
     async startStage(stage) {
 
-        if (
-            Number(stage) > 1 &&
-            !this.hasActiveSubscription()
-        ) {
-            alert(
-                "مرحله اول رایگان است. برای باز شدن مراحل بعدی، اشتراک تأییدشده لازم است."
-            );
-            this.go("subscription");
-            return;
-        }
-
         const category =
             this.quiz.currentCategory;
 
-
-        const completed =
-            isStageCompleted(
-                this.state,
+        const access =
+            this.canAccessStage(
                 category,
                 stage
             );
 
+        if (!access.allowed) {
+            if (access.reason === "subscription") {
+                alert(
+                    "برای باز شدن این مرحله، اشتراک فعال لازم است."
+                );
+                this.go("subscription");
+            } else if (access.reason === "previous") {
+                alert(
+                    `ابتدا باید مرحله ${Number(stage) - 1} را با حداقل ۷۵٪ امتیاز رد کنی.`
+                );
+            }
+            return;
+        }
+
+        const completed =
+            this.getStageBestScore(
+                category,
+                stage
+            ) >= 0.75;
 
         if (completed) {
-
             const replay =
                 confirm(
-                    "شما قبلاً امتیاز این مرحله را کسب کرده‌اید. آیا مایلید دوباره این مرحله را بازی کنید؟\n\nبازی کردن در این مرحله نه از شما قلب کم می‌کند و نه XP اضافه می‌کند."
+                    "این مرحله را قبلاً با حداقل ۷۵٪ رد کرده‌ای. می‌خواهی دوباره بازی کنی؟\n\nبازی دوباره XP جدیدی برای قبولی قبلی اضافه نمی‌کند."
                 );
-
 
             if (!replay) {
                 return;
             }
         }
 
+        try {
+            if (
+                !this.quiz.questions.length ||
+                this.quiz.currentCategory !== category
+            ) {
+                await this.quiz.loadCategory(category);
+            }
 
-        if (
-            !this.quiz.questions.length ||
-            this.quiz.currentCategory !==
-            category
-        ) {
+            const questions =
+                this.quiz.startStage(
+                    category,
+                    stage,
+                    completed
+                );
 
-            await this.quiz.loadCategory(
-                category
+            if (!questions.length) {
+                alert(
+                    "برای این مرحله سؤال قابل نمایش پیدا نشد. دوباره تلاش کن."
+                );
+                return;
+            }
+
+            this.renderQuestion(
+                questions[0]
+            );
+
+        } catch (error) {
+            console.error(
+                "Stage start failed:",
+                error
+            );
+
+            alert(
+                "بارگذاری سؤال‌ها ناموفق بود. لطفاً دوباره تلاش کن."
             );
         }
-
-
-        const questions =
-            this.quiz.startStage(
-                category,
-                stage,
-                completed
-            );
-
-
-        this.renderQuestion(
-            questions[0]
-        );
     }
 
 
@@ -1095,100 +1315,90 @@ class App {
 
         this.stopQuestionTimer();
 
-        const limit = 20;
+        const limit =
+            20;
 
         this.questionTimeLeft =
             limit;
 
         const timer =
-            document.getElementById(
-                "questionTimer"
-            );
+            document.getElementById("questionTimer");
 
         const timerFill =
-            document.getElementById(
-                "questionTimerFill"
-            );
+            document.getElementById("questionTimerFill");
 
-        const update =
-            () => {
+        const update = () => {
+            const left =
+                Math.max(
+                    0,
+                    this.questionTimeLeft
+                );
 
-                const left =
-                    Math.max(
+            if (timer) {
+                timer.textContent =
+                    `⏱ ${left.toLocaleString("fa-IR")} ثانیه`;
+            }
+
+            if (timerFill) {
+                timerFill.style.width =
+                    `${Math.max(
                         0,
-                        this.questionTimeLeft
-                    );
-
-                if (timer) {
-                    timer.textContent =
-                        `⏱ ${left.toLocaleString("fa-IR")} ثانیه`;
-                }
-
-                if (timerFill) {
-                    timerFill.style.width =
-                        `${Math.max(
-                            0,
-                            Math.min(
-                                100,
-                                (left / limit) * 100
-                            )
-                        )}%`;
-                }
-            };
+                        Math.min(
+                            100,
+                            (left / limit) * 100
+                        )
+                    )}%`;
+            }
+        };
 
         update();
 
         this.questionTimer =
-            window.setInterval(
-                () => {
+            window.setInterval(() => {
+                if (this.answerLocked) {
+                    return;
+                }
 
-                    this.questionTimeLeft -= 1;
+                this.questionTimeLeft -= 1;
+                update();
 
-                    update();
-
-                    if (
-                        this.questionTimeLeft <= 0
-                    ) {
-
-                        this.stopQuestionTimer();
-
-                        this.answer(
-                            -1,
-                            true
-                        );
-                    }
-                },
-                1000
-            );
+                if (this.questionTimeLeft <= 0) {
+                    this.stopQuestionTimer();
+                    this.answer(-1, true);
+                }
+            }, 1000);
     }
 
 
     renderQuestion(question) {
 
         this.stopQuestionTimer();
+        this.answerLocked = false;
 
         const box =
-            document.getElementById(
-                "quizBox"
-            );
+            document.getElementById("quizBox");
 
         const normalized =
-            normalizeQuestionForUI(
-                question
-            );
+            normalizeQuestionForUI(question);
 
         if (
             !normalized ||
             !normalized.question.trim()
         ) {
-
-            box.innerHTML =
-                `<div class="quiz-box"><p>برای این مرحله سؤال معتبری پیدا نشد.</p></div>`;
-
-            box.classList.remove(
-                "hidden"
-            );
-
+            if (box) {
+                box.innerHTML =
+                    `<div class="quiz-box empty-question">
+                        <p>برای این مرحله سؤال معتبری پیدا نشد.</p>
+                        <button id="closeQuizEmpty" class="primary full" type="button">بازگشت به مراحل</button>
+                    </div>`;
+            }
+            this.openQuizModal();
+            document
+                .getElementById("closeQuizEmpty")
+                ?.addEventListener(
+                    "click",
+                    () => this.closeQuizModal(true)
+                );
             return;
         }
 
@@ -1213,22 +1423,22 @@ class App {
                 )
                 : 0;
 
-        box.classList.remove(
-            "hidden"
-        );
+        this.openQuizModal();
 
         box.innerHTML = `
             <div class="quiz-box">
+                <div class="quiz-modal-head">
+                    <div class="quiz-topline">
+                        <span>مرحله ${this.quiz.currentStage}</span>
+                        <span>سؤال ${current} از ${total}</span>
+                    </div>
 
-                <div class="quiz-topline">
-                    <span>
-                        مرحله ${this.quiz.currentStage}
-                    </span>
-
-                    <span>
-                        سؤال ${current}
-                        از ${total}
-                    </span>
+                    <button
+                        id="closeQuizQuestion"
+                        class="quiz-close-btn"
+                        type="button"
+                        aria-label="خروج از مرحله"
+                    >×</button>
                 </div>
 
                 <div class="progress-track">
@@ -1279,10 +1489,20 @@ class App {
             </div>
         `;
 
+        document
+            .getElementById("closeQuizQuestion")
+            ?.addEventListener(
+                "click",
+                () => {
+                    if (confirm("از این مرحله خارج می‌شوی و این دور نیمه‌کاره می‌ماند. ادامه می‌دهی؟")) {
+                        this.closeQuizModal(true);
+                    }
+                }
+            );
+
         box
             .querySelectorAll(".answer-btn")
             .forEach(button => {
-
                 button.addEventListener(
                     "click",
                     () =>
@@ -1294,16 +1514,16 @@ class App {
             });
 
         this.startQuestionTimer();
-
-        box.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-        });
     }
 
 
     answer(index, timedOut = false) {
 
+        if (this.answerLocked) {
+            return;
+        }
+
+        this.answerLocked = true;
         this.stopQuestionTimer();
 
         const result =
@@ -1313,15 +1533,11 @@ class App {
             );
 
         const box =
-            document.getElementById(
-                "quizBox"
-            );
+            document.getElementById("quizBox");
 
         if (box) {
             box
-                .querySelectorAll(
-                    ".answer-btn"
-                )
+                .querySelectorAll(".answer-btn")
                 .forEach(
                     button =>
                         button.disabled = true
@@ -1329,18 +1545,12 @@ class App {
         }
 
         const selectedButton =
-            box &&
-            index >= 0
+            box && index >= 0
                 ? box.querySelector(
                     `.answer-btn[data-i="${index}"]`
                   )
                 : null;
 
-        /*
-         * اگر کاربر اشتباه کند، فقط انتخاب خودش قرمز می‌شود.
-         * جواب صحیح هرگز بعد از پاسخ اشتباه یا اتمام زمان سبز نمی‌شود.
-         * اگر خودش جواب درست را انتخاب کند، همان گزینه سبز می‌شود.
-         */
         if (selectedButton) {
             selectedButton.classList.add(
                 result.correct
@@ -1359,23 +1569,18 @@ class App {
         }
 
         if (result.timedOut) {
-
             feedback.innerHTML = `
                 <div class="error">
                     ⏰ زمان تمام شد؛ این سؤال را از دست دادی.
                 </div>
             `;
-
         } else if (result.correct) {
-
             feedback.innerHTML = `
                 <div class="success">
                     ✓ پاسخ درست بود!
                 </div>
             `;
-
         } else {
-
             feedback.innerHTML = `
                 <div class="error">
                     ✗ پاسخ اشتباه بود.
@@ -1384,15 +1589,20 @@ class App {
         }
 
         if (result.finished) {
+            const percent =
+                Math.round(
+                    Number(result.percentage || 0) * 100
+                );
 
             feedback.innerHTML +=
                 result.passed
                     ? `
                         <div class="result-good">
                             🎉 مرحله با موفقیت تمام شد.
+                            <br>امتیاز این دور: <b>${percent.toLocaleString("fa-IR")}٪</b>
                             ${
                                 result.earnedXP
-                                    ? ` +${result.earnedXP} XP`
+                                    ? ` · +${result.earnedXP} XP`
                                     : ""
                             }
                         </div>
@@ -1400,9 +1610,10 @@ class App {
                     : `
                         <div class="result-bad">
                             این مرحله را رد نکردی.
+                            <br>امتیاز این دور: <b>${percent.toLocaleString("fa-IR")}٪</b> · حداقل لازم: <b>۷۵٪</b>
                             ${
                                 result.heartLost
-                                    ? " یک قلب کم شد."
+                                    ? "<br>یک قلب کم شد."
                                     : ""
                             }
                         </div>
@@ -1414,17 +1625,16 @@ class App {
                     class="primary full next-btn"
                     type="button"
                 >
-                    ادامه
+                    بازگشت به مراحل
                 </button>
             `;
 
             document
                 .getElementById("quizNext")
                 .onclick =
-                () => this.renderStages();
+                () => this.closeQuizModal(true);
 
         } else {
-
             feedback.innerHTML += `
                 <button
                     id="quizNext"
@@ -1447,7 +1657,6 @@ class App {
         this.renderQuizStats();
         this.renderProfile();
     }
-
 
 
     renderQuizStats() {
@@ -1637,18 +1846,14 @@ class App {
 
         if (dashboardGeneral) {
             dashboardGeneral.textContent =
-                Math.max(
-                    0,
-                    Number(s.generalStage || 1) - 1
-                ).toLocaleString("fa-IR");
+                this.getHighestPassedStage("general")
+                    .toLocaleString("fa-IR");
         }
 
         if (dashboardFun) {
             dashboardFun.textContent =
-                Math.max(
-                    0,
-                    Number(s.funStage || 1) - 1
-                ).toLocaleString("fa-IR");
+                this.getHighestPassedStage("fun")
+                    .toLocaleString("fa-IR");
         }
 
         if (dashboardSubscription) {
@@ -1697,9 +1902,8 @@ class App {
         if (profileStage) {
             profileStage.textContent =
                 Math.max(
-                    0,
-                    Number(s.generalStage || 1) - 1,
-                    Number(s.funStage || 1) - 1
+                    this.getHighestPassedStage("general"),
+                    this.getHighestPassedStage("fun")
                 ).toLocaleString("fa-IR");
         }
 
@@ -2984,7 +3188,8 @@ class App {
                 serverSubscription.active === true &&
                 document
                     .getElementById("quiz")
-                    ?.classList.contains("active")
+                    ?.classList.contains("active") &&
+                !this.quizModalOpen
             ) {
                 this.renderStages();
             }
