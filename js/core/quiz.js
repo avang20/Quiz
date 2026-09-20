@@ -1,5 +1,4 @@
 import { shuffle } from "./utils.js";
-
 import {
     addXP,
     markStageCompleted,
@@ -8,49 +7,20 @@ import {
 
 
 export const QUIZ_CONFIG = {
-
-    /*
-     * اگر یک مرحله ۱۵ سؤال داشته باشد:
-     * ۱۰ سؤال نمایش داده می‌شود.
-     *
-     * اگر یک مرحله ۱۸ سؤال داشته باشد:
-     * ۱۳ سؤال نمایش داده می‌شود.
-     *
-     * یعنی در هر دور ۵ سؤال کنار گذاشته می‌شوند.
-     */
-    defaultQuestionsPerStage:
-        10,
-
-    reserveQuestions:
-        5,
-
-    passingPercentage:
-        0.5,
-
-    questionTime:
-        20,
-
-    stageXP:
-        10,
-
-    failedStageHeartPenalty:
-        1
-
+    defaultQuestionsPerStage: 10,
+    reserveQuestions: 5,
+    passingPercentage: 0.5,
+    questionTime: 20,
+    stageXP: 10,
+    failedStageHeartPenalty: 1
 };
 
 
-function normalizeQuestion(
-    raw,
-    fallbackStage = 1
-) {
+function normalizeQuestion(raw, fallbackStage = 1) {
 
-    if (
-        !raw ||
-        typeof raw !== "object"
-    ) {
+    if (!raw || typeof raw !== "object") {
         return null;
     }
-
 
     let questionText =
         raw.question ??
@@ -62,21 +32,14 @@ function normalizeQuestion(
         raw.content ??
         "";
 
-
-    if (
-        questionText &&
-        typeof questionText === "object"
-    ) {
-
+    if (questionText && typeof questionText === "object") {
         questionText =
             questionText.text ??
             questionText.value ??
             questionText.title ??
             questionText.content ??
             "";
-
     }
-
 
     let rawOptions =
         raw.options ??
@@ -86,72 +49,28 @@ function normalizeQuestion(
         raw.o ??
         [];
 
-
-    if (
-        !Array.isArray(
-            rawOptions
-        )
-    ) {
-
-        rawOptions =
-            Object.values(
-                rawOptions || {}
-            );
-
+    if (!Array.isArray(rawOptions)) {
+        rawOptions = Object.values(rawOptions || {});
     }
 
+    const options = rawOptions.map(option => {
+        if (option && typeof option === "object") {
+            return {
+                text: String(
+                    option.text ??
+                    option.label ??
+                    option.value ??
+                    option.answer ??
+                    option.content ??
+                    ""
+                )
+            };
+        }
 
-    const options =
-        rawOptions.map(
-            option => {
-
-                if (
-                    option &&
-                    typeof option ===
-                        "object"
-                ) {
-
-                    return {
-
-                        text:
-                            String(
-                                option.text ??
-                                option.label ??
-                                option.value ??
-                                option.answer ??
-                                option.content ??
-                                ""
-                            ),
-
-                        original:
-                            option
-
-                    };
-
-                }
-
-
-                return {
-
-                    text:
-                        String(
-                            option ??
-                            ""
-                        ),
-
-                    original:
-                        option
-
-                };
-
-            }
-        );
-
-
-    /*
-     * ابتدا جواب صحیح را بر اساس ترتیب اصلی
-     * پیدا می‌کنیم.
-     */
+        return {
+            text: String(option ?? "")
+        };
+    });
 
     const rawAnswer =
         raw.answer ??
@@ -165,254 +84,88 @@ function normalizeQuestion(
         raw.correctOption ??
         raw.correct_option;
 
+    let correctIndex = -1;
 
-    let correctIndex =
-        -1;
-
-
-    if (
-        typeof rawAnswer ===
-            "number" &&
-        Number.isInteger(
-            rawAnswer
-        )
-    ) {
-
-        if (
-            rawAnswer >= 0 &&
-            rawAnswer <
-                options.length
-        ) {
-
-            correctIndex =
-                rawAnswer;
-
-        } else if (
-            rawAnswer > 0 &&
-            rawAnswer <=
-                options.length
-        ) {
-
-            correctIndex =
-                rawAnswer - 1;
-
+    if (typeof rawAnswer === "number" && Number.isInteger(rawAnswer)) {
+        if (rawAnswer >= 0 && rawAnswer < options.length) {
+            correctIndex = rawAnswer;
+        } else if (rawAnswer > 0 && rawAnswer <= options.length) {
+            correctIndex = rawAnswer - 1;
         }
+    } else if (typeof rawAnswer === "string") {
+        const trimmed = rawAnswer.trim();
+        const numeric = Number(trimmed);
 
-    } else if (
-        typeof rawAnswer ===
-            "string"
-    ) {
-
-        const trimmed =
-            rawAnswer.trim();
-
-
-        const numeric =
-            Number(
-                trimmed
-            );
-
-
-        if (
-            Number.isInteger(
-                numeric
-            )
-        ) {
-
-            if (
-                numeric >= 0 &&
-                numeric <
-                    options.length
-            ) {
-
-                correctIndex =
-                    numeric;
-
-            } else if (
-                numeric > 0 &&
-                numeric <=
-                    options.length
-            ) {
-
-                correctIndex =
-                    numeric - 1;
-
+        if (Number.isInteger(numeric)) {
+            if (numeric >= 0 && numeric < options.length) {
+                correctIndex = numeric;
+            } else if (numeric > 0 && numeric <= options.length) {
+                correctIndex = numeric - 1;
             }
-
         }
 
-
-        if (
-            correctIndex < 0 &&
-            /^[A-Za-z]$/.test(
-                trimmed
-            )
-        ) {
-
+        if (correctIndex < 0 && /^[A-Za-z]$/.test(trimmed)) {
             const letterIndex =
-                trimmed
-                    .toUpperCase()
-                    .charCodeAt(0) -
-                65;
+                trimmed.toUpperCase().charCodeAt(0) - 65;
 
-
-            if (
-                letterIndex >= 0 &&
-                letterIndex <
-                    options.length
-            ) {
-
-                correctIndex =
-                    letterIndex;
-
+            if (letterIndex >= 0 && letterIndex < options.length) {
+                correctIndex = letterIndex;
             }
-
         }
 
-
-        if (
-            correctIndex < 0
-        ) {
-
-            correctIndex =
-                options.findIndex(
-                    option =>
-                        option.text
-                            .trim()
-                            .toLocaleLowerCase() ===
-                        trimmed
-                            .toLocaleLowerCase()
-                );
-
+        if (correctIndex < 0) {
+            correctIndex = options.findIndex(
+                option =>
+                    option.text.trim().toLocaleLowerCase() ===
+                    trimmed.toLocaleLowerCase()
+            );
         }
-
-    } else if (
-        rawAnswer &&
-        typeof rawAnswer ===
-            "object"
-    ) {
-
+    } else if (rawAnswer && typeof rawAnswer === "object") {
         const candidate =
             rawAnswer.text ??
             rawAnswer.label ??
             rawAnswer.value ??
             rawAnswer.answer;
 
-
-        if (
-            candidate !==
-            undefined
-        ) {
-
-            correctIndex =
-                options.findIndex(
-                    option =>
-                        option.text
-                            .trim() ===
-                        String(
-                            candidate
-                        ).trim()
-                );
-
+        if (candidate !== undefined) {
+            correctIndex = options.findIndex(
+                option =>
+                    option.text.trim() === String(candidate).trim()
+            );
         }
-
     }
 
-
-    /*
-     * اگر correctOptions وجود داشته باشد،
-     * آن را هم امتحان می‌کنیم.
-     */
-
-    if (
-        correctIndex < 0
-    ) {
-
+    if (correctIndex < 0) {
         const correctOptions =
             raw.correctOptions ??
             raw.correct_options;
 
-
-        if (
-            Array.isArray(
-                correctOptions
-            ) &&
-            correctOptions.length
-        ) {
-
-            correctIndex =
-                options.findIndex(
-                    option =>
-                        String(
-                            option.text
-                        ).trim() ===
-                        String(
-                            correctOptions[0]
-                        ).trim()
-                );
-
+        if (Array.isArray(correctOptions) && correctOptions.length) {
+            correctIndex = options.findIndex(
+                option =>
+                    option.text.trim() ===
+                    String(correctOptions[0]).trim()
+            );
         }
-
     }
 
+    let shuffledOptions = options;
 
-    /*
-     * اگر جواب معتبر نباشد، سؤال را
-     * نگه می‌داریم ولی بعداً فیلتر می‌شود.
-     */
-
-    let shuffledOptions =
-        options;
-
-
-    /*
-     * گزینه‌ها را به صورت تصادفی جابه‌جا می‌کنیم.
-     *
-     * چون correctIndex هم با همان آبجکت حرکت می‌کند،
-     * پاسخ صحیح دیگر همیشه گزینه اول نخواهد بود.
-     */
-
-    if (
-        correctIndex >= 0 &&
-        correctIndex <
-            options.length
-    ) {
-
-        shuffledOptions =
-            shuffle(
-                options.map(
-                    (
-                        option,
-                        index
-                    ) => ({
-
-                        ...option,
-
-                        isCorrect:
-                            index ===
-                            correctIndex
-
-                    })
-                )
-            );
-
+    if (correctIndex >= 0 && correctIndex < options.length) {
+        shuffledOptions = shuffle(
+            options.map((option, index) => ({
+                ...option,
+                isCorrect: index === correctIndex
+            }))
+        );
     } else {
-
-        shuffledOptions =
-            shuffle(
-                options
-            );
-
+        shuffledOptions = shuffle(options);
     }
-
 
     const newCorrectIndex =
         shuffledOptions.findIndex(
-            option =>
-                option.isCorrect ===
-                true
+            option => option.isCorrect === true
         );
-
 
     const stage =
         Number(
@@ -422,133 +175,54 @@ function normalizeQuestion(
             raw.level ??
             raw.levelNumber ??
             fallbackStage
-        ) ||
-        fallbackStage;
-
+        ) || fallbackStage;
 
     return {
-
         ...raw,
-
         stage,
-
-        question:
-            String(
-                questionText ??
-                ""
-            ),
-
-        q:
-            String(
-                questionText ??
-                ""
-            ),
-
-        options:
-            shuffledOptions.map(
-                option =>
-                    String(
-                        option.text ??
-                        option
-                    )
-            ),
-
-        answer:
-            newCorrectIndex,
-
-        explanation:
-            String(
-                raw.explanation ??
-                raw.explain ??
-                raw.description ??
-                ""
-            )
-
+        question: String(questionText ?? ""),
+        q: String(questionText ?? ""),
+        options: shuffledOptions.map(option => option.text),
+        answer: newCorrectIndex,
+        explanation: String(
+            raw.explanation ??
+            raw.explain ??
+            raw.description ??
+            ""
+        )
     };
-
 }
 
 
 export class QuizEngine {
 
-    constructor(
-        state,
-        saveState
-    ) {
-
-        this.state =
-            state;
-
-
+    constructor(state, saveState) {
+        this.state = state;
         this.saveState =
-            typeof saveState ===
-                "function"
-
+            typeof saveState === "function"
                 ? saveState
-
                 : () => {};
 
-
-        this.questions =
-            [];
-
-
-        this.selectedQuestions =
-            [];
-
-
-        this.currentQuestion =
-            0;
-
-
-        this.currentCategory =
-            "general";
-
-
-        this.currentStage =
-            1;
-
-
-        this.correctAnswers =
-            0;
-
-
-        this.wrongAnswers =
-            0;
-
-
-        this.combo =
-            0;
-
-
-        this.finished =
-            false;
-
-
-        this.isReplay =
-            false;
-
-
-        this.stageRewardGiven =
-            false;
-
+        this.questions = [];
+        this.selectedQuestions = [];
+        this.currentQuestion = 0;
+        this.currentCategory = "general";
+        this.currentStage = 1;
+        this.correctAnswers = 0;
+        this.wrongAnswers = 0;
+        this.combo = 0;
+        this.finished = false;
+        this.isReplay = false;
+        this.stageRewardGiven = false;
     }
 
 
-    async loadCategory(
-        category
-    ) {
-
+    async loadCategory(category) {
         const safeCategory =
-            category === "fun"
-                ? "fun"
-                : "general";
-
+            category === "fun" ? "fun" : "general";
 
         const base =
-            document.baseURI ||
-            window.location.href;
-
+            document.baseURI || window.location.href;
 
         const url =
             new URL(
@@ -556,420 +230,202 @@ export class QuizEngine {
                 base
             );
 
-
         console.log(
             "Loading quiz data:",
             url.pathname
         );
 
-
         const response =
             await fetch(
                 url.href,
-                {
-                    cache:
-                        "no-store"
-                }
+                { cache: "no-store" }
             );
 
-
-        if (
-            !response.ok
-        ) {
-
+        if (!response.ok) {
             throw new Error(
                 `Could not load ${url.pathname}`
             );
-
         }
 
+        const data = await response.json();
+        let rawQuestions = [];
 
-        const data =
-            await response.json();
+        if (Array.isArray(data)) {
+            rawQuestions = data;
+        } else if (Array.isArray(data.questions)) {
+            rawQuestions = data.questions;
+        } else if (Array.isArray(data.items)) {
+            rawQuestions = data.items;
+        } else if (Array.isArray(data.stages)) {
+            data.stages.forEach(stageBlock => {
+                const stageNumber =
+                    Number(
+                        stageBlock.stage ??
+                        stageBlock.id ??
+                        1
+                    ) || 1;
 
+                const list =
+                    Array.isArray(stageBlock.questions)
+                        ? stageBlock.questions
+                        : [];
 
-        let rawQuestions =
-            [];
-
-
-        if (
-            Array.isArray(
-                data
-            )
-        ) {
-
-            rawQuestions =
-                data;
-
-        } else if (
-            Array.isArray(
-                data.questions
-            )
-        ) {
-
-            rawQuestions =
-                data.questions;
-
-        } else if (
-            Array.isArray(
-                data.items
-            )
-        ) {
-
-            rawQuestions =
-                data.items;
-
-        } else if (
-            Array.isArray(
-                data.stages
-            )
-        ) {
-
-            data.stages.forEach(
-                stageBlock => {
-
-                    const stageNumber =
-                        Number(
-                            stageBlock.stage ??
-                            stageBlock.id ??
-                            1
-                        ) ||
-                        1;
-
-
-                    const list =
-                        Array.isArray(
-                            stageBlock.questions
-                        )
-                            ? stageBlock.questions
-                            : [];
-
-
-                    list.forEach(
-                        question => {
-
-                            rawQuestions.push({
-
-                                ...question,
-
-                                stage:
-                                    question.stage ??
-                                    stageNumber
-
-                            });
-
-                        }
-                    );
-
-                }
-            );
-
+                list.forEach(question => {
+                    rawQuestions.push({
+                        ...question,
+                        stage:
+                            question.stage ??
+                            stageNumber
+                    });
+                });
+            });
         }
-
 
         this.questions =
             rawQuestions
-                .map(
-                    question =>
-                        normalizeQuestion(
-                            question,
-                            1
-                        )
+                .map(question =>
+                    normalizeQuestion(
+                        question,
+                        1
+                    )
                 )
-                .filter(
-                    question =>
-
-                        question &&
-
-                        question.question
-                            .trim() &&
-
-                        question.options
-                            .length >= 2 &&
-
-                        question.answer >= 0 &&
-
-                        question.answer <
-                            question.options
-                                .length
-
+                .filter(question =>
+                    question &&
+                    question.question.trim() &&
+                    question.options.length >= 2 &&
+                    question.answer >= 0 &&
+                    question.answer < question.options.length
                 );
 
-
-        this.currentCategory =
-            safeCategory;
-
+        this.currentCategory = safeCategory;
 
         console.log(
             `Loaded ${this.questions.length} ${safeCategory} questions`
         );
 
-
         return this.questions;
-
     }
 
 
-    getStageQuestions(
-        stage
-    ) {
-
+    getStageQuestions(stage) {
         return this.questions.filter(
             question =>
-                Number(
-                    question.stage
-                ) ===
-                Number(
-                    stage
-                )
+                Number(question.stage) ===
+                Number(stage)
         );
-
     }
 
 
-    getQuestionsForThisRound(
-        stage
-    ) {
-
+    getQuestionsForThisRound(stage) {
         const stageQuestions =
-            this.getStageQuestions(
-                stage
-            );
-
+            this.getStageQuestions(stage);
 
         if (
             stageQuestions.length <=
             QUIZ_CONFIG.defaultQuestionsPerStage
         ) {
-
-            return shuffle(
-                stageQuestions
-            );
-
+            return shuffle(stageQuestions);
         }
-
-
-        /*
-         * قانون اصلی:
-         *
-         * 15 -> 10
-         * 16 -> 11
-         * 17 -> 12
-         * 18 -> 13
-         *
-         * یعنی همیشه 5 سؤال کنار گذاشته می‌شود.
-         */
 
         const count =
             stageQuestions.length -
             QUIZ_CONFIG.reserveQuestions;
 
-
-        return shuffle(
-            stageQuestions
-        ).slice(
-            0,
-            count
-        );
-
+        return shuffle(stageQuestions).slice(0, count);
     }
 
 
-    startStage(
-        category,
-        stage,
-        replay = false
-    ) {
-
-        this.currentCategory =
-            category;
-
-
-        this.currentStage =
-            Number(
-                stage
-            ) ||
-            1;
-
-
-        this.isReplay =
-            Boolean(
-                replay
-            );
-
-
-        this.currentQuestion =
-            0;
-
-
-        this.correctAnswers =
-            0;
-
-
-        this.wrongAnswers =
-            0;
-
-
-        this.combo =
-            0;
-
-
-        this.finished =
-            false;
-
-
-        this.stageRewardGiven =
-            false;
-
+    startStage(category, stage, replay = false) {
+        this.currentCategory = category;
+        this.currentStage = Number(stage) || 1;
+        this.isReplay = Boolean(replay);
+        this.currentQuestion = 0;
+        this.correctAnswers = 0;
+        this.wrongAnswers = 0;
+        this.combo = 0;
+        this.finished = false;
+        this.stageRewardGiven = false;
 
         this.selectedQuestions =
             this.getQuestionsForThisRound(
                 this.currentStage
             );
 
-
         console.log(
             "Starting stage:",
             this.currentStage,
-
             "total stage questions:",
-            this.getStageQuestions(
-                this.currentStage
-            ).length,
-
+            this.getStageQuestions(this.currentStage).length,
             "questions this round:",
             this.selectedQuestions.length
         );
 
-
         return this.selectedQuestions;
-
     }
 
 
     getCurrentQuestion() {
-
         return (
             this.selectedQuestions[
                 this.currentQuestion
-            ] ||
-            null
+            ] || null
         );
-
     }
 
 
     getQuestionCount() {
-
         return this.selectedQuestions.length;
-
     }
 
 
-    answer(
-        answerIndex,
-        timedOut = false
-    ) {
-
-        const question =
-            this.getCurrentQuestion();
-
+    answer(answerIndex, timedOut = false) {
+        const question = this.getCurrentQuestion();
 
         if (!question) {
-
             return {
-
-                finished:
-                    true,
-
-                correct:
-                    false,
-
-                passed:
-                    false,
-
-                total:
-                    this.selectedQuestions.length
-
+                finished: true,
+                correct: false,
+                passed: false,
+                total: this.selectedQuestions.length
             };
-
         }
-
 
         const correct =
             !timedOut &&
-            Number(
-                answerIndex
-            ) ===
-            Number(
-                question.answer
-            );
+            Number(answerIndex) ===
+                Number(question.answer);
 
-
-        if (
-            correct
-        ) {
-
+        if (correct) {
             this.correctAnswers++;
-
             this.combo++;
-
         } else {
-
             this.wrongAnswers++;
-
-            this.combo =
-                0;
-
+            this.combo = 0;
         }
 
-
         this.currentQuestion++;
-
 
         const finished =
             this.currentQuestion >=
             this.selectedQuestions.length;
 
+        let passed = false;
+        let earnedXP = 0;
+        let heartLost = false;
+        let newlyCompleted = false;
 
-        let passed =
-            false;
-
-
-        let earnedXP =
-            0;
-
-
-        let heartLost =
-            false;
-
-
-        let newlyCompleted =
-            false;
-
-
-        if (
-            finished
-        ) {
-
+        if (finished) {
             const percentage =
                 this.selectedQuestions.length
-
                     ? this.correctAnswers /
                       this.selectedQuestions.length
-
                     : 0;
-
 
             passed =
                 percentage >=
                 QUIZ_CONFIG.passingPercentage;
 
-
-            if (
-                passed
-            ) {
-
+            if (passed) {
                 const alreadyCompleted =
                     isStageCompleted(
                         this.state,
@@ -977,21 +433,17 @@ export class QuizEngine {
                         this.currentStage
                     );
 
-
                 if (
                     !this.isReplay &&
                     !alreadyCompleted
                 ) {
-
                     addXP(
                         this.state,
                         QUIZ_CONFIG.stageXP
                     );
 
-
                     earnedXP =
                         QUIZ_CONFIG.stageXP;
-
 
                     markStageCompleted(
                         this.state,
@@ -999,117 +451,50 @@ export class QuizEngine {
                         this.currentStage
                     );
 
-
-                    newlyCompleted =
-                        true;
-
-
-                    this.stageRewardGiven =
-                        true;
-
+                    newlyCompleted = true;
+                    this.stageRewardGiven = true;
                 }
-
-            } else if (
-                !this.isReplay
-            ) {
-
-                if (
-                    Number(
-                        this.state.hearts
-                    ) > 0
-                ) {
-
-                    this.state.hearts =
-                        Math.max(
-
-                            0,
-
-                            Number(
-                                this.state.hearts
-                            ) -
+            } else if (!this.isReplay) {
+                if (Number(this.state.hearts) > 0) {
+                    this.state.hearts = Math.max(
+                        0,
+                        Number(this.state.hearts) -
                             QUIZ_CONFIG.failedStageHeartPenalty
+                    );
 
-                        );
-
-
-                    heartLost =
-                        true;
-
+                    heartLost = true;
                 }
-
             }
-
         }
 
-
-        this.finished =
-            finished;
-
-
-        this.saveState(
-            this.state
-        );
-
+        this.finished = finished;
+        this.saveState(this.state);
 
         return {
-
             correct,
-
-            timedOut:
-
-                Boolean(
-                    timedOut
-                ),
-
+            timedOut: Boolean(timedOut),
             finished,
-
             passed,
-
             earnedXP,
-
             heartLost,
-
             newlyCompleted,
-
-            replay:
-                this.isReplay,
-
-            combo:
-                this.combo,
-
-            correctAnswers:
-                this.correctAnswers,
-
-            wrongAnswers:
-                this.wrongAnswers,
-
-            total:
-                this.selectedQuestions.length,
-
+            replay: this.isReplay,
+            combo: this.combo,
+            correctAnswers: this.correctAnswers,
+            wrongAnswers: this.wrongAnswers,
+            total: this.selectedQuestions.length,
             percentage:
-
                 this.selectedQuestions.length
-
                     ? this.correctAnswers /
                       this.selectedQuestions.length
-
                     : 0,
-
-            explanation:
-                question.explanation ||
-                ""
-
+            explanation: question.explanation || ""
         };
-
     }
-
 }
 
 
 export default {
-
     QuizEngine,
-
     QUIZ_CONFIG
-
 };
