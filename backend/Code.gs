@@ -109,6 +109,7 @@ function doPost(e) {
     let emailSent = false;
     let emailError = '';
 
+    // خطای مجوز Gmail نباید ثبت فیش را خراب کند.
     try {
       sendReceiptEmail(
         data,
@@ -118,20 +119,26 @@ function doPost(e) {
       );
       emailSent = true;
     } catch (error) {
-      emailError = error && error.message
-        ? error.message
-        : String(error);
-      console.warn('Receipt email was not sent:', emailError);
+      emailError =
+        error && error.message
+          ? error.message
+          : String(error);
+
+      console.warn(
+        'Receipt email was not sent:',
+        emailError
+      );
     }
 
     return jsonResponse({
       success: true,
       testCodeApplied,
       emailSent,
-      emailError,
+      // خطای داخلی ایمیل به کاربر نمایش داده نمی‌شود.
+      emailError: '',
       message: testCodeApplied
         ? 'فیش دریافت شد و کد تست خصوصی نیز تأیید شد.'
-        : 'فیش با موفقیت برای بررسی ارسال شد.'
+        : 'فیش با موفقیت برای بررسی ثبت شد.'
     }); }   /* =========================================================    SUPPORT - USER MESSAGE ========================================================= */  function handleSupport(data) {
   const username = String(data.username || '').trim();
   const phone = String(data.phone || '').trim();
@@ -286,7 +293,13 @@ function closeSupportConversation(data) {
 
 /* =========================================================    USER UPDATES ========================================================= */  function getUserUpdates(data) {    const username =     String(data.username || '').trim();    if (     !username ||     username === 'بازیکن مهمان'   ) {     return jsonResponse({       success: true,       payments: [],       support: []     });   }    const payments =     getUserPaymentUpdates(username);    const support = getUserSupportUpdates(username);
   const subscription = getUserSubscription(username);
-  return jsonResponse({ success: true, payments, support, subscription }); }   /* =========================================================    USER PAYMENT UPDATES ========================================================= */  function getUserPaymentUpdates(username) {    const sheet =     getOrCreateSheet();    SpreadsheetApp.flush();    const values =     sheet.getDataRange().getValues();    if (values.length <= 1) {     return [];   }    return values     .slice(1)     .map((row, index) => ({        rowNumber: index + 2,        timestamp:         row[0]           ? new Date(row[0]).toISOString()           : '',        username:         String(row[1] || ''),        phone:         row[2] || '',        planId:         row[3] || '',        planName:         row[4] || '',        amount:         row[6] || 0,        status:         row[11] ||         'در انتظار بررسی',        userMessage:         row[12] || '',        statusTimestamp:         row[13]           ? new Date(row[13]).toISOString()           : ''      }))     .filter(item =>       item.username.toLowerCase() ===       username.toLowerCase()     )     .reverse(); }   /* =========================================================    USER SUPPORT UPDATES ========================================================= */  function getUserSupportUpdates(username) {
+  return jsonResponse({
+    success: true,
+    username,
+    payments,
+    support,
+    subscription
+  }); }   /* =========================================================    USER PAYMENT UPDATES ========================================================= */  function getUserPaymentUpdates(username) {    const sheet =     getOrCreateSheet();    SpreadsheetApp.flush();    const values =     sheet.getDataRange().getValues();    if (values.length <= 1) {     return [];   }    return values     .slice(1)     .map((row, index) => ({        rowNumber: index + 2,        timestamp:         row[0]           ? new Date(row[0]).toISOString()           : '',        username:         String(row[1] || ''),        phone:         row[2] || '',        planId:         row[3] || '',        planName:         row[4] || '',        amount:         row[6] || 0,        status:         row[11] ||         'در انتظار بررسی',        userMessage:         row[12] || '',        statusTimestamp:         row[13]           ? new Date(row[13]).toISOString()           : ''      }))     .filter(item =>       item.username.toLowerCase() ===       username.toLowerCase()     )     .reverse(); }   /* =========================================================    USER SUPPORT UPDATES ========================================================= */  function getUserSupportUpdates(username) {
   const sheet = getOrCreateSupportSheet();
   SpreadsheetApp.flush();
   const values = sheet.getDataRange().getValues();
