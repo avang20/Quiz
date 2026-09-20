@@ -323,6 +323,9 @@ class App {
         this.serverSyncTimer =
             null;
 
+        this.heartTimer =
+            null;
+
         this.questionTimer =
             null;
 
@@ -372,10 +375,26 @@ class App {
         this.state.dailyLoginRewardDay = Math.min(day, 7);
         this.state.dailyLoginRewardXP = reward;
 
+        let infiniteHeartsGranted = false;
+        let infiniteHeartsUntil = Number(this.state.infiniteHeartsUntil || 0);
+
+        if (day === 7) {
+            const twoHoursFromNow = Date.now() + 2 * 60 * 60 * 1000;
+            infiniteHeartsUntil = Math.max(
+                infiniteHeartsUntil,
+                twoHoursFromNow
+            );
+            this.state.infiniteHeartsUntil = infiniteHeartsUntil;
+            this.state.heartRefillAt = null;
+            infiniteHeartsGranted = true;
+        }
+
         return {
             day: Math.min(day, 7),
             reward,
-            streak: Number(this.state.streak || 1)
+            streak: Number(this.state.streak || 1),
+            infiniteHeartsGranted,
+            infiniteHeartsUntil
         };
     }
 
@@ -389,8 +408,13 @@ class App {
                 ? "روز هفتم و بعد از آن"
                 : `روز ${Number(reward.day).toLocaleString("fa-IR")}`;
 
+        const infiniteText =
+            reward.infiniteHeartsGranted
+                ? " · ♾️ قلب بی‌نهایت برای ۲ ساعت فعال شد!"
+                : "";
+
         const message =
-            `🔥 ${dayText}: +${Number(reward.reward).toLocaleString("fa-IR")} XP دریافت کردی!`;
+            `🔥 ${dayText}: +${Number(reward.reward).toLocaleString("fa-IR")} XP دریافت کردی!${infiniteText}`;
 
         let toast = document.getElementById("quizduoDailyRewardToast");
 
@@ -418,6 +442,145 @@ class App {
         }, 4200);
     }
 
+
+    getMaxHearts() {
+        return this.isPremiumActive() ? 8 : 5;
+    }
+
+
+    isInfiniteHeartsActive(now = Date.now()) {
+        return Number(this.state.infiniteHeartsUntil || 0) > now;
+    }
+
+
+    formatHeartCountdown(milliseconds) {
+        const totalSeconds = Math.max(0, Math.ceil(Number(milliseconds || 0) / 1000));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return [hours, minutes, seconds]
+                .map((value, index) => index === 0 ? String(value) : String(value).padStart(2, "0"))
+                .join(":")
+                .replace(/\\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
+        }
+
+        return [minutes, seconds]
+            .map(value => String(value).padStart(2, "0"))
+            .join(":")
+            .replace(/\\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
+    }
+
+
+    applyHeartRefill() {
+        const now = Date.now();
+        const maxHearts = this.getMaxHearts();
+        let changed = false;
+
+        this.state.maxHearts = maxHearts;
+        this.state.hearts = Math.max(
+            0,
+            Math.min(Number(this.state.hearts || 0), maxHearts)
+        );
+
+        if (this.isInfiniteHeartsActive(now)) {
+            this.state.heartRefillAt = null;
+            return changed;
+        }
+
+        if (Number(this.state.infiniteHeartsUntil || 0) > 0) {
+            this.state.infiniteHeartsUntil = null;
+            changed = true;
+        }
+
+        if (this.state.hearts >= maxHearts) {
+            if (this.state.heartRefillAt !== null) {
+                this.state.heartRefillAt = null;
+                changed = true;
+            }
+            return changed;
+        }
+
+        let refillAt = Number(this.state.heartRefillAt || 0);
+
+        if (!refillAt) {
+            refillAt = now + 20 * 60 * 1000;
+            this.state.heartRefillAt = refillAt;
+            changed = true;
+        }
+
+        if (now >= refillAt) {
+            const interval = 20 * 60 * 1000;
+            const gained = Math.floor((now - refillAt) / interval) + 1;
+            const before = Number(this.state.hearts || 0);
+            const after = Math.min(maxHearts, before + gained);
+
+            if (after !== before) {
+                this.state.hearts = after;
+                changed = true;
+            }
+
+            if (after >= maxHearts) {
+                this.state.heartRefillAt = null;
+            } else {
+                this.state.heartRefillAt = refillAt + gained * interval;
+            }
+
+            changed = true;
+        }
+
+        return changed;
+    }
+
+
+    getHeartStatusText() {
+        const now = Date.now();
+
+        if (this.isInfiniteHeartsActive(now)) {
+            const remaining =
+                Number(this.state.infiniteHeartsUntil || 0) - now;
+
+            return `❤️ ∞ · ${this.formatHeartCountdown(remaining)}`;
+        }
+
+        const hearts = Number(this.state.hearts || 0);
+        const maxHearts = this.getMaxHearts();
+
+        if (hearts < maxHearts) {
+            const refillAt = Number(this.state.heartRefillAt || 0);
+            const remaining = refillAt > now
+                ? refillAt - now
+                : 20 * 60 * 1000;
+
+            return `❤️ ${hearts.toLocaleString("fa-IR")}/${maxHearts.toLocaleString("fa-IR")} · قلب بعدی ${this.formatHeartCountdown(remaining)}`;
+        }
+
+        return `❤️ ${hearts.toLocaleString("fa-IR")}/${maxHearts.toLocaleString("fa-IR")}`;
+    }
+
+
+    startHeartSystem() {
+        if (this.heartTimer) {
+            return;
+        }
+
+        const initialChanged = this.applyHeartRefill();
+        if (initialChanged) {
+            this.persist();
+        }
+
+        this.heartTimer = window.setInterval(() => {
+            const changed = this.applyHeartRefill();
+
+            this.renderProfile();
+            this.renderQuizStats();
+
+            if (changed) {
+                this.persist();
+            }
+        }, 1000);
+    }
 
     persist() {
 
@@ -523,6 +686,9 @@ class App {
                 900
             );
         }
+
+        this.applyHeartRefill();
+        this.startHeartSystem();
 
         window.setTimeout(
             () => this.showFirstSiteWelcomeOnce(),
@@ -842,6 +1008,8 @@ class App {
             this.state.username =
                 name;
 
+            this.applyHeartRefill();
+
             const dailyReward =
                 this.applyDailyLoginReward();
 
@@ -885,6 +1053,8 @@ class App {
 
             this.state.username =
                 existing.username;
+
+            this.applyHeartRefill();
 
             const dailyReward =
                 this.applyDailyLoginReward();
@@ -1496,16 +1666,31 @@ class App {
             return;
         }
 
+        this.applyHeartRefill();
+
         const completed =
             this.getStageBestScore(
                 category,
                 stage
             ) >= 0.75;
 
+        if (
+            !completed &&
+            !this.isInfiniteHeartsActive() &&
+            Number(this.state.hearts || 0) <= 0
+        ) {
+            alert(
+                "قلبت به ۰ رسیده است. هر ۲۰ دقیقه یک قلب برمی‌گردد؛ یا با جایزه روز هفتم ۲ ساعت قلب بی‌نهایت بگیر."
+            );
+            return;
+        }
+
         if (completed) {
             const replay =
                 confirm(
-                    "این مرحله را قبلاً با حداقل ۷۵٪ رد کرده‌ای. می‌خواهی دوباره بازی کنی؟\n\nبازی دوباره XP جدیدی برای قبولی قبلی اضافه نمی‌کند."
+                    "این مرحله را قبلاً با حداقل ۷۵٪ رد کرده‌ای. می‌خواهی دوباره بازی کنی؟
+
+بازی دوباره XP جدیدی برای قبولی قبلی اضافه نمی‌کند."
                 );
 
             if (!replay) {
@@ -1920,7 +2105,7 @@ class App {
         if (el) {
 
             el.textContent =
-                `XP ${this.state.xp} · ❤️ ${this.state.hearts}`;
+                `XP ${Number(this.state.xp || 0).toLocaleString("fa-IR")} · ${this.getHeartStatusText()}`;
         }
     }
 
@@ -1985,20 +2170,13 @@ class App {
 
         this.state.maxHearts = premium ? 8 : 5;
 
-        if (premium) {
-            this.state.hearts = Math.min(
-                Math.max(
-                    Number(this.state.hearts || 0),
-                    1
-                ),
-                this.state.maxHearts
-            );
-        } else {
-            this.state.hearts = Math.min(
+        this.state.hearts = Math.max(
+            0,
+            Math.min(
                 Number(this.state.hearts || 0),
                 this.state.maxHearts
-            );
-        }
+            )
+        );
 
         this.updatePremiumUI();
     }
@@ -2179,7 +2357,9 @@ class App {
 
         if (dashboardHearts) {
             dashboardHearts.textContent =
-                Number(s.hearts || 0).toLocaleString("fa-IR");
+                this.isInfiniteHeartsActive()
+                    ? "∞"
+                    : `${Number(s.hearts || 0).toLocaleString("fa-IR")}/${this.getMaxHearts().toLocaleString("fa-IR")}`;
         }
 
         if (dashboardStreak) {
@@ -3631,6 +3811,7 @@ class App {
                 );
 
             this.applySubscriptionTierFeatures();
+            this.applyHeartRefill();
 
             if (
                 this.isPremiumActive() &&
@@ -3638,6 +3819,7 @@ class App {
             ) {
                 this.state.hearts =
                     this.state.maxHearts;
+                this.state.heartRefillAt = null;
             }
 
             if (before !== after) {
