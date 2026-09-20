@@ -211,6 +211,16 @@ class App {
         };
 
 
+        /*
+         * وضعیت واقعی اشتراک از سرور می‌آید.
+         * مقدار localStorage فقط برای نمایش موقت است
+         * و نباید باعث باز شدن مراحل شود.
+         */
+        this.state.subscriptionInfo =
+            this.state.subscriptionInfo ||
+            null;
+
+
         this.serverSyncTimer =
             null;
     }
@@ -270,21 +280,12 @@ class App {
 
         document
             .getElementById(
-                "themeToggle"
-            )
-            ?.addEventListener(
-                "click",
-                () => this.toggleTheme()
-            );
-
-
-        document
-            .getElementById(
                 "authButton"
             )
             ?.addEventListener(
                 "click",
-                () => this.go("auth")
+                () =>
+                    this.go("auth")
             );
 
 
@@ -560,9 +561,9 @@ class App {
 
         const existing =
             users.find(
-                u =>
+                user =>
                     String(
-                        u.username
+                        user.username
                     ).toLowerCase() ===
                     name.toLowerCase()
             );
@@ -573,40 +574,39 @@ class App {
             if (existing) {
 
                 msg.textContent =
-                    "این نام کاربری قبلاً استفاده شده است.";
+                    "این نام کاربری قبلاً ثبت شده است.";
 
                 return;
             }
 
 
-            if (
-                !/^09\d{9}$/.test(phone)
-            ) {
+            const user = {
 
-                msg.textContent =
-                    "شماره تماس را به شکل 09123456789 وارد کنید.";
-
-                return;
-            }
-
-
-            users.push({
-
-                username: name,
+                username:
+                    name,
 
                 password,
 
                 phone,
 
                 createdAt:
-                    Date.now()
-            });
+                    new Date().toISOString()
+            };
 
 
-            saveUsers(users);
+            users.push(
+                user
+            );
 
 
-            setCurrentUser(name);
+            saveUsers(
+                users
+            );
+
+
+            setCurrentUser(
+                name
+            );
 
 
             this.state =
@@ -620,54 +620,94 @@ class App {
                 name;
 
 
-            this.persist();
+            this.state.subscription =
+                "free";
 
 
-            msg.textContent =
-                "حساب با موفقیت ساخته شد.";
-
-        } else {
-
-            if (
-                !existing ||
-                existing.password !== password
-            ) {
-
-                msg.textContent =
-                    "نام کاربری یا رمز عبور اشتباه است.";
-
-                return;
-            }
+            this.state.subscriptionStatus =
+                "inactive";
 
 
-            setCurrentUser(
-                existing.username
-            );
+            this.state.subscriptionInfo =
+                null;
 
 
-            this.state =
-                loadState(
-                    createDefaultState(),
-                    existing.username
+            this.quiz =
+                new QuizEngine(
+                    this.state,
+                    () => this.persist()
                 );
 
 
-            this.state.username =
-                existing.username;
-
-
             this.persist();
 
+            this.renderProfile();
 
-            msg.textContent =
-                "ورود موفق بود.";
+            this.renderQuizStats();
+
+            this.go("home");
+
+            this.syncServerUpdates();
+
+            return;
         }
 
 
-        setTimeout(
-            () => this.go("home"),
-            450
+        if (!existing) {
+
+            msg.textContent =
+                "حسابی با این نام کاربری پیدا نشد.";
+
+            return;
+        }
+
+
+        if (
+            String(
+                existing.password
+            ) !==
+            String(password)
+        ) {
+
+            msg.textContent =
+                "رمز عبور اشتباه است.";
+
+            return;
+        }
+
+
+        setCurrentUser(
+            name
         );
+
+
+        this.state =
+            loadState(
+                createDefaultState(),
+                name
+            );
+
+
+        this.state.username =
+            name;
+
+
+        this.quiz =
+            new QuizEngine(
+                this.state,
+                () => this.persist()
+            );
+
+
+        this.persist();
+
+        this.renderProfile();
+
+        this.renderQuizStats();
+
+        this.go("home");
+
+        this.syncServerUpdates();
     }
 
 
@@ -742,6 +782,23 @@ class App {
                 );
 
 
+            const hasActiveSubscription =
+                this.hasActiveSubscription();
+
+
+            /*
+             * بدون اشتراک فقط مرحله ۱ باز است.
+             *
+             * حتی اگر مرحله ۱ قبلاً تمام شده باشد،
+             * مقدار generalStage/funStage دیگر باعث
+             * باز شدن مرحله ۲ نمی‌شود.
+             */
+            const accessibleStage =
+                hasActiveSubscription
+                    ? unlocked
+                    : 1;
+
+
             const maxStage =
                 Math.max(
                     5,
@@ -762,7 +819,7 @@ class App {
             ) {
 
                 const available =
-                    i <= unlocked;
+                    i <= accessibleStage;
 
 
                 const completed =
@@ -821,6 +878,17 @@ class App {
                                     : "این مرحله هنوز سوالی ندارد."
                             }
                         </p>
+
+                        ${
+                            !available && i > 1
+                                ? `
+                                    <small>
+                                        برای باز کردن این مرحله
+                                        اشتراک فعال لازم است.
+                                    </small>
+                                  `
+                                : ""
+                        }
                     </div>
                 `;
 
@@ -862,7 +930,92 @@ class App {
     }
 
 
+    hasActiveSubscription() {
+
+        const subscription =
+            this.state.subscriptionInfo;
+
+
+        if (
+            !subscription ||
+            subscription.active !== true
+        ) {
+
+            return false;
+        }
+
+
+        if (!subscription.expiry) {
+
+            return false;
+        }
+
+
+        const expiry =
+            new Date(
+                subscription.expiry
+            );
+
+
+        return (
+            !isNaN(
+                expiry.getTime()
+            ) &&
+            expiry.getTime() >=
+            Date.now()
+        );
+    }
+
+
+    requireStageAccess(stage) {
+
+        if (
+            Number(stage) <= 1
+        ) {
+
+            return true;
+        }
+
+
+        if (
+            this.hasActiveSubscription()
+        ) {
+
+            return true;
+        }
+
+
+        alert(
+            "برای ورود به مراحل بعدی ابتدا ثبت‌نام کنید و یک اشتراک فعال داشته باشید."
+        );
+
+
+        this.go(
+            "subscription"
+        );
+
+
+        return false;
+    }
+
+
     async startStage(stage) {
+
+        /*
+         * این بررسی علاوه بر UI انجام می‌شود
+         * تا حتی اگر کاربر از کنسول مرورگر هم
+         * بخواهد مرحله ۲ به بعد را اجرا کند،
+         * تا زمانی که اشتراک فعال ندارد اجازه ورود نداشته باشد.
+         */
+        if (
+            !this.requireStageAccess(
+                stage
+            )
+        ) {
+
+            return;
+        }
+
 
         const category =
             this.quiz.currentCategory;
@@ -930,29 +1083,15 @@ class App {
             );
 
 
-        if (
-            !normalized ||
-            !normalized.question.trim()
-        ) {
+        if (!normalized) {
 
             box.innerHTML =
-                "<p>برای این مرحله سوال معتبری پیدا نشد.</p>";
-
-            box.classList.remove(
-                "hidden"
-            );
+                `<div class="panel error">
+                    سوالی برای نمایش وجود ندارد.
+                </div>`;
 
             return;
         }
-
-
-        const options =
-            normalized.options.filter(
-                option =>
-                    option !== null &&
-                    option !== undefined &&
-                    String(option).trim() !== ""
-            );
 
 
         box.classList.remove(
@@ -961,86 +1100,120 @@ class App {
 
 
         box.innerHTML = `
+            <div class="panel quiz-question">
 
-            <div class="quiz-top">
+                <div class="quiz-question-title">
 
-                <span>
-                    مرحله ${this.quiz.currentStage}
-                </span>
+                    ${escapeHTML(
+                        normalized.question
+                    )}
 
-                <span>
-                    سوال ${
-                        this.quiz.currentQuestion + 1
+                </div>
+
+                <div class="quiz-options">
+
+                    ${
+                        normalized.options
+                            .map(
+                                (option, index) => `
+
+                                    <button
+                                        class="quiz-option"
+                                        data-answer-index="${index}"
+                                    >
+                                        ${escapeHTML(
+                                            String(option)
+                                        )}
+                                    </button>
+
+                                `
+                            )
+                            .join("")
                     }
-                    از
-                    ${this.quiz.getQuestionCount()}
-                </span>
+
+                </div>
 
             </div>
-
-
-            <h3>
-                ${escapeHTML(
-                    normalized.question
-                )}
-            </h3>
-
-
-            <div class="options">
-
-                ${options.map(
-                    (option, index) => `
-                        <button
-                            class="option"
-                            data-i="${index}"
-                        >
-                            ${escapeHTML(
-                                String(option)
-                            )}
-                        </button>
-                    `
-                ).join("")}
-
-            </div>
-
-
-            <div
-                id="quizFeedback"
-                class="quiz-feedback"
-            ></div>
         `;
 
 
         box
             .querySelectorAll(
-                ".option"
+                "[data-answer-index]"
             )
-            .forEach(btn => {
+            .forEach(
+                button => {
 
-                btn.addEventListener(
-                    "click",
-                    () =>
-                        this.answer(
-                            Number(
-                                btn.dataset.i
-                            )
-                        )
-                );
-            });
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            const index =
+                                Number(
+                                    button.dataset.answerIndex
+                                );
+
+                            this.answerQuestion(
+                                index
+                            );
+                        }
+                    );
+                }
+            );
 
 
         box.scrollIntoView({
             behavior: "smooth",
-            block: "center"
+            block: "start"
         });
     }
 
 
-    answer(index) {
+    answerQuestion(
+        answerIndex
+    ) {
 
         const result =
-            this.quiz.answer(index);
+            this.quiz.answer(
+                answerIndex
+            );
 
+
+        if (
+            result &&
+            result.finished
+        ) {
+
+            this.renderQuizResult(
+                result
+            );
+
+            return;
+        }
+
+
+        const nextQuestion =
+            this.quiz.currentQuestion();
+
+
+        if (nextQuestion) {
+
+            this.renderQuestion(
+                nextQuestion
+            );
+
+        } else {
+
+            this.renderQuizResult(
+                result
+            );
+        }
+    }
+
+
+    renderQuizResult(
+        result
+    ) {
 
         const box =
             document.getElementById(
@@ -1048,127 +1221,146 @@ class App {
             );
 
 
-        box
-            .querySelectorAll(
-                ".option"
-            )
-            .forEach(
-                button =>
-                    button.disabled = true
-            );
+        if (!result) {
 
-
-        const feedback =
-            document.getElementById(
-                "quizFeedback"
-            );
-
-
-        feedback.innerHTML =
-            result.correct
-
-                ? `<div class="success">
-                    ✓ پاسخ درست بود!
-                   </div>`
-
-                : `<div class="error">
-                    ✗ پاسخ درست نبود.
-                   </div>`;
-
-
-        if (result.explanation) {
-
-            feedback.innerHTML +=
-                `<div class="explanation">
-                    ${escapeHTML(
-                        result.explanation
-                    )}
+            box.innerHTML =
+                `<div class="panel">
+                    آزمون به پایان رسید.
                 </div>`;
+
+            return;
         }
 
 
-        if (result.finished) {
-
-            feedback.innerHTML +=
-                result.passed
-
-                    ? `<div class="result-good">
-                        🎉 مرحله را با موفقیت تمام کردی!
-                        ${
-                            result.earnedXP
-                                ? `+${result.earnedXP} XP`
-                                : ""
-                        }
-                       </div>`
-
-                    : `<div class="result-bad">
-                        این مرحله را رد نکردی.
-                        ${
-                            result.heartLost
-                                ? "یک قلب کم شد."
-                                : ""
-                        }
-                       </div>`;
+        const percentage =
+            Math.round(
+                Number(
+                    result.percentage || 0
+                ) * 100
+            );
 
 
-            feedback.innerHTML +=
-                `<button
-                    id="quizNext"
-                    class="primary full"
-                >
-                    ادامه
-                </button>`;
+        box.innerHTML = `
+
+            <div class="panel quiz-result">
+
+                <h2>
+                    ${
+                        result.passed
+                            ? "🎉 مرحله با موفقیت تمام شد!"
+                            : "آزمون تمام شد"
+                    }
+                </h2>
+
+                <p>
+                    پاسخ صحیح:
+                    ${result.correctAnswers || 0}
+                    از
+                    ${result.total || 0}
+                </p>
+
+                <p>
+                    درصد:
+                    ${percentage}٪
+                </p>
+
+                ${
+                    result.earnedXP
+                        ? `
+                            <p>
+                                XP دریافتی:
+                                ${result.earnedXP}
+                            </p>
+                          `
+                        : ""
+                }
+
+                ${
+                    result.newlyCompleted
+                        ? `
+                            <p>
+                                مرحله بعدی ثبت شد.
+                            </p>
+                          `
+                        : ""
+                }
+
+                <div class="actions">
+
+                    <button
+                        class="primary"
+                        id="backToStages"
+                    >
+                        بازگشت به مراحل
+                    </button>
+
+                </div>
+
+            </div>
+        `;
 
 
-            document
-                .getElementById(
-                    "quizNext"
-                )
-                .onclick =
-                () =>
-                    this.renderStages();
+        document
+            .getElementById(
+                "backToStages"
+            )
+            .addEventListener(
+                "click",
+                () => {
 
-        } else {
-
-            feedback.innerHTML +=
-                `<button
-                    id="quizNext"
-                    class="primary full"
-                >
-                    سوال بعدی
-                </button>`;
-
-
-            document
-                .getElementById(
-                    "quizNext"
-                )
-                .onclick =
-                () =>
-                    this.renderQuestion(
-                        this.quiz.getCurrentQuestion()
+                    this.go(
+                        "quiz"
                     );
-        }
+
+                    this.renderStages();
+                }
+            );
 
 
-        this.renderQuizStats();
-
-        this.renderProfile();
+        this.persist();
     }
 
 
     renderQuizStats() {
 
-        const el =
+        const s =
+            this.state;
+
+
+        const xp =
             document.getElementById(
-                "quizStats"
+                "quizXP"
+            );
+
+        const level =
+            document.getElementById(
+                "quizLevel"
+            );
+
+        const hearts =
+            document.getElementById(
+                "quizHearts"
             );
 
 
-        if (el) {
+        if (xp) {
 
-            el.textContent =
-                `XP ${this.state.xp} · ❤️ ${this.state.hearts}`;
+            xp.textContent =
+                s.xp || 0;
+        }
+
+
+        if (level) {
+
+            level.textContent =
+                s.level || 1;
+        }
+
+
+        if (hearts) {
+
+            hearts.textContent =
+                s.hearts ?? 0;
         }
     }
 
@@ -1179,91 +1371,105 @@ class App {
             this.state;
 
 
-        const name =
+        const profileName =
             document.getElementById(
                 "profileName"
             );
 
+        const profileScore =
+            document.getElementById(
+                "profileScore"
+            );
 
-        if (!name) {
-            return;
+        const profileStreak =
+            document.getElementById(
+                "profileStreak"
+            );
+
+        const profileStage =
+            document.getElementById(
+                "profileStage"
+            );
+
+        const subscriptionStatus =
+            document.getElementById(
+                "subscriptionStatus"
+            );
+
+        const authButton =
+            document.getElementById(
+                "authButton"
+            );
+
+
+        if (profileName) {
+
+            profileName.textContent =
+                s.username;
         }
 
 
-        name.textContent =
-            s.username ||
-            "بازیکن مهمان";
+        if (profileScore) {
+
+            profileScore.textContent =
+                s.xp || 0;
+        }
 
 
-        document
-            .getElementById(
-                "profileScore"
-            )
-            .textContent =
-            s.xp || 0;
+        if (profileStreak) {
+
+            profileStreak.textContent =
+                s.streak || 0;
+        }
 
 
-        document
-            .getElementById(
-                "profileStreak"
-            )
-            .textContent =
-            s.streak || 0;
+        if (profileStage) {
+
+            profileStage.textContent =
+                Math.max(
+                    1,
+                    s.generalStage || 1,
+                    s.funStage || 1
+                ) - 1;
+        }
 
 
-        document
-            .getElementById(
-                "profileStage"
-            )
-            .textContent =
-            Math.max(
-                1,
-                s.generalStage || 1,
-                s.funStage || 1
-            ) - 1;
+        if (subscriptionStatus) {
+
+            const active =
+                this.hasActiveSubscription();
 
 
-        const status =
-            s.subscriptionStatus ===
-            "active"
+            const status =
+                active
 
-                ? (
-                    s.subscriptionPlan ===
-                    "nineMonth"
-                        ? "Premium 👑"
-                        : "اشتراکی"
-                  )
+                    ? (
+                        s.subscriptionPlan ===
+                        "nineMonth"
 
-                : (
-                    s.subscription ===
-                    "premium"
-                        ? "Premium 👑"
-                        : s.subscription ===
-                          "paid"
-                            ? "اشتراکی"
-                            : "رایگان"
-                  );
+                            ? "Premium 👑"
+
+                            : "اشتراکی"
+                      )
+
+                    : "رایگان";
 
 
-        document
-            .getElementById(
-                "subscriptionStatus"
-            )
-            .textContent =
-            status;
+            subscriptionStatus.textContent =
+                status;
+        }
 
 
-        document
-            .getElementById(
-                "authButton"
-            )
-            .textContent =
-            s.username ===
-            "بازیکن مهمان"
+        if (authButton) {
 
-                ? "ورود / ثبت‌نام"
+            authButton.textContent =
+                s.username ===
+                "بازیکن مهمان"
 
-                : s.username;
+                    ? "ورود / ثبت‌نام"
+
+                    : s.username;
+        }
     }
 
 
@@ -1601,40 +1807,38 @@ class App {
 
 
                 msg.textContent =
-                    "کد تست خصوصی تأیید شد؛ مبلغ نهایی ۱۰۰٬۰۰۰ تومان است.";
-
-            } else {
-
-                this.testFixedAmount =
-                    null;
-
-                this.discountPercent =
-                    0;
+                    "کد تخفیف با موفقیت اعمال شد.";
 
 
-                msg.textContent =
-                    "کد تخفیف معتبر نیست.";
+                this.updateFinalPrice();
+
+                return;
             }
-
-        } catch (error) {
-
-            console.error(error);
 
 
             this.testFixedAmount =
                 null;
-
 
             this.discountPercent =
                 0;
 
 
             msg.textContent =
-                "بررسی کد انجام نشد.";
+                "کد تخفیف معتبر نیست.";
+
+
+            this.updateFinalPrice();
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
+
+
+            msg.textContent =
+                "بررسی کد تخفیف انجام نشد.";
         }
-
-
-        this.updateFinalPrice();
     }
 
 
@@ -1645,48 +1849,71 @@ class App {
         }
 
 
-        const base =
+        const plan =
             subscriptionPlans[
                 this.selectedPlan
-            ].price;
+            ];
 
 
-        const final =
-            this.testFixedAmount ??
-            Math.round(
-                base *
-                (
-                    1 -
-                    this.discountPercent /
-                    100
-                )
+        let finalAmount =
+            Number(
+                plan.price
             );
 
 
-        document
-            .getElementById(
-                "finalPrice"
-            )
-            .textContent =
-            money(final);
-    }
+        if (
+            this.testFixedAmount !==
+            null
+        ) {
 
+            finalAmount =
+                Number(
+                    this.testFixedAmount
+                );
 
-    renderPaymentState() {
+        } else if (
+            this.discountPercent
+        ) {
 
-        if (this.selectedPlan) {
-            this.updateFinalPrice();
+            finalAmount =
+                Math.round(
+                    finalAmount *
+                    (
+                        1 -
+                        (
+                            this.discountPercent /
+                            100
+                        )
+                    )
+                );
         }
+
+
+        const element =
+            document.getElementById(
+                "finalPrice"
+            );
+
+
+        if (element) {
+
+            element.textContent =
+                money(
+                    finalAmount
+                );
+        }
+
+
+        return finalAmount;
     }
 
 
     async submitPayment() {
 
-        const msg =
-            document
-                .getElementById(
-                    "paymentMessage"
-                );
+        const message =
+            document.getElementById(
+                "paymentMessage"
+            );
 
 
         if (
@@ -1694,8 +1921,12 @@ class App {
             "بازیکن مهمان"
         ) {
 
-            msg.textContent =
-                "ابتدا وارد حساب شوید یا ثبت‌نام کنید.";
+            message.textContent =
+                "برای خرید اشتراک ابتدا ثبت‌نام یا وارد حساب شوید.";
+
+            this.go(
+                "auth"
+            );
 
             return;
         }
@@ -1703,7 +1934,7 @@ class App {
 
         if (!this.selectedPlan) {
 
-            msg.textContent =
+            message.textContent =
                 "ابتدا یک پلن انتخاب کنید.";
 
             return;
@@ -1712,20 +1943,8 @@ class App {
 
         if (!this.paymentFile) {
 
-            msg.textContent =
-                "لطفاً تصویر فیش پرداخت را انتخاب کنید.";
-
-            return;
-        }
-
-
-        if (
-            !this.paymentFile.type
-                .startsWith("image/")
-        ) {
-
-            msg.textContent =
-                "فقط فایل تصویری مجاز است.";
+            message.textContent =
+                "لطفاً تصویر فیش را انتخاب کنید.";
 
             return;
         }
@@ -1736,14 +1955,14 @@ class App {
             5 * 1024 * 1024
         ) {
 
-            msg.textContent =
-                "حجم تصویر باید کمتر از ۵ مگابایت باشد.";
+            message.textContent =
+                "حجم فایل نباید بیشتر از ۵ مگابایت باشد.";
 
             return;
         }
 
 
-        msg.textContent =
+        message.textContent =
             "در حال ارسال فیش...";
 
 
@@ -1755,32 +1974,8 @@ class App {
                 );
 
 
-            const plan =
-                subscriptionPlans[
-                    this.selectedPlan
-                ];
-
-
-            const enteredCode =
-                document
-                    .getElementById(
-                        "discountCode"
-                    )
-                    .value
-                    .trim()
-                    .toUpperCase();
-
-
-            const normalAmount =
-                this.testFixedAmount ??
-                Math.round(
-                    plan.price *
-                    (
-                        1 -
-                        this.discountPercent /
-                        100
-                    )
-                );
+            const amount =
+                this.updateFinalPrice();
 
 
             const data =
@@ -1793,25 +1988,29 @@ class App {
                         this.state.username,
 
                     phone:
-                        this.getRegisteredPhone(),
+                        this.getCurrentPhone(),
 
                     plan:
                         this.selectedPlan,
 
                     planName:
-                        plan.name,
+                        subscriptionPlans[
+                            this.selectedPlan
+                        ].name,
 
-                    amount:
-                        normalAmount,
-
-                    originalAmount:
-                        plan.price,
+                    amount,
 
                     discountPercent:
                         this.discountPercent,
 
                     discountCode:
-                        enteredCode,
+                        document
+                            .getElementById(
+                                "discountCode"
+                            )
+                            .value
+                            .trim()
+                            .toUpperCase(),
 
                     fileName:
                         this.paymentFile.name,
@@ -1828,13 +2027,18 @@ class App {
 
                 throw new Error(
                     data.message ||
-                    "ارسال ناموفق بود."
+                    "ارسال فیش ناموفق بود."
                 );
             }
 
 
-            msg.textContent =
-                "فیش با موفقیت ارسال شد و در انتظار بررسی است.";
+            message.textContent =
+                data.message ||
+                "فیش با موفقیت ارسال شد.";
+
+
+            this.paymentFile =
+                null;
 
 
             document
@@ -1852,34 +2056,33 @@ class App {
                 "فایلی انتخاب نشده است";
 
 
-            this.paymentFile =
-                null;
-
-
             await this.syncServerUpdates();
 
         } catch (error) {
 
             console.error(
-                "Payment error:",
                 error
             );
 
 
-            msg.textContent =
+            message.textContent =
                 error.message ||
-                "ارسال فیش انجام نشد.";
+                "ارسال فیش ناموفق بود.";
         }
     }
 
 
-    getRegisteredPhone() {
+    getCurrentPhone() {
 
-        const user =
-            getUsers().find(
-                u =>
+        const users =
+            getUsers();
+
+
+        const current =
+            users.find(
+                user =>
                     String(
-                        u.username
+                        user.username
                     ).toLowerCase() ===
                     String(
                         this.state.username
@@ -1887,27 +2090,50 @@ class App {
             );
 
 
-        return user?.phone || "";
+        return current
+            ? current.phone || ""
+            : "";
     }
 
 
-    fileToBase64(file) {
+    fileToBase64(
+        file
+    ) {
 
         return new Promise(
-            (resolve, reject) => {
+            (
+                resolve,
+                reject
+            ) => {
 
                 const reader =
                     new FileReader();
 
 
-                reader.onload = () =>
-                    resolve(
-                        String(
-                            reader.result
-                        )
-                            .split(",")[1] ||
-                        ""
-                    );
+                reader.onload =
+                    () => {
+
+                        const result =
+                            String(
+                                reader.result ||
+                                ""
+                            );
+
+
+                        const comma =
+                            result.indexOf(
+                                ","
+                            );
+
+
+                        resolve(
+                            comma >= 0
+                                ? result.slice(
+                                    comma + 1
+                                  )
+                                : result
+                        );
+                    };
 
 
                 reader.onerror =
@@ -1924,77 +2150,53 @@ class App {
 
     initChat() {
 
-        this.loadChat();
-
-
-        document
-            .getElementById(
-                "sendChat"
-            )
-            .addEventListener(
-                "click",
-                () => {
-
-                    const input =
-                        document
-                            .getElementById(
-                                "chatInput"
-                            );
-
-
-                    const text =
-                        input.value.trim();
-
-
-                    if (!text) {
-                        return;
-                    }
-
-
-                    const arr =
-                        JSON.parse(
-                            localStorage.getItem(
-                                "quizduo_chat"
-                            ) ||
-                            "[]"
-                        );
-
-
-                    arr.push({
-
-                        username:
-                            this.state.username,
-
-                        text,
-
-                        date:
-                            Date.now()
-                    });
-
-
-                    localStorage.setItem(
-                        "quizduo_chat",
-                        JSON.stringify(arr)
-                    );
-
-
-                    input.value = "";
-
-
-                    this.loadChat();
-                }
+        const input =
+            document.getElementById(
+                "chatInput"
             );
+
+
+        const button =
+            document.getElementById(
+                "chatSend"
+            );
+
+
+        if (!input || !button) {
+            return;
+        }
+
+
+        button.addEventListener(
+            "click",
+            () =>
+                this.sendChatMessage()
+        );
+
+
+        input.addEventListener(
+            "keydown",
+            event => {
+
+                if (
+                    event.key ===
+                    "Enter"
+                ) {
+
+                    event.preventDefault();
+
+                    this.sendChatMessage();
+                }
+            }
+        );
     }
 
 
-    loadChat() {
+    sendChatMessage() {
 
-        const arr =
-            JSON.parse(
-                localStorage.getItem(
-                    "quizduo_chat"
-                ) ||
-                "[]"
+        const input =
+            document.getElementById(
+                "chatInput"
             );
 
 
@@ -2004,54 +2206,82 @@ class App {
             );
 
 
-        if (!messages) {
+        if (!input || !messages) {
             return;
         }
 
 
-        messages.innerHTML =
-            arr.map(
-                message => `
+        const text =
+            input.value.trim();
 
-                    <div class="chat-message">
 
-                        <b>
-                            ${escapeHTML(
-                                message.username
-                            )}
-                        </b>
+        if (!text) {
+            return;
+        }
 
-                        <p>
-                            ${escapeHTML(
-                                message.text
-                            )}
-                        </p>
 
-                    </div>
-                `
-            ).join("");
+        const item =
+            document.createElement(
+                "div"
+            );
+
+
+        item.className =
+            "chat-message";
+
+
+        item.innerHTML = `
+            <b>
+                شما
+            </b>
+
+            <span>
+                ${escapeHTML(text)}
+            </span>
+        `;
+
+
+        messages.appendChild(
+            item
+        );
+
+
+        input.value =
+            "";
+
+
+        messages.scrollTop =
+            messages.scrollHeight;
     }
 
 
     initSupport() {
 
-        const send =
+        const form =
             document.getElementById(
-                "supportSend"
+                "supportForm"
             );
 
 
-        if (send) {
+        if (!form) {
+            return;
+        }
 
-            send.addEventListener(
+
+        const submit =
+            document.getElementById(
+                "supportSubmit"
+            );
+
+
+        if (submit) {
+
+            submit.addEventListener(
                 "click",
                 () =>
                     this.submitSupport()
             );
         }
-
-
-        this.ensureUserPanels();
 
 
         document.addEventListener(
@@ -2066,9 +2296,12 @@ class App {
 
                 if (replyButton) {
 
+                    const id =
+                        replyButton.dataset.supportReply;
+
+
                     this.sendSupportReply(
-                        replyButton.dataset
-                            .supportReply
+                        id
                     );
 
                     return;
@@ -2083,217 +2316,80 @@ class App {
 
                 if (closeButton) {
 
-                    this.closeSupport(
-                        closeButton.dataset
-                            .supportClose
+                    const id =
+                        closeButton.dataset.supportClose;
+
+
+                    this.closeSupportConversation(
+                        id
                     );
-                }
-
-
-                const refresh =
-                    event.target.closest(
-                        "#refreshUserUpdates"
-                    );
-
-
-                if (refresh) {
-
-                    this.syncServerUpdates();
                 }
             }
         );
     }
 
 
-    ensureUserPanels() {
-
-        const support =
-            document.getElementById(
-                "support"
-            );
-
-
-        const subscription =
-            document.getElementById(
-                "subscription"
-            );
-
-
-        if (
-            support &&
-            !document.getElementById(
-                "supportConversationsPanel"
-            )
-        ) {
-
-            const panel =
-                document.createElement(
-                    "div"
-                );
-
-
-            panel.id =
-                "supportConversationsPanel";
-
-
-            panel.className =
-                "panel user-updates-panel";
-
-
-            panel.innerHTML = `
-
-                <div class="section-heading">
-
-                    <div>
-
-                        <span class="eyebrow">
-                            گفتگوهای من
-                        </span>
-
-                        <h3>
-                            وضعیت پشتیبانی
-                        </h3>
-
-                    </div>
-
-                    <button
-                        id="refreshUserUpdates"
-                        class="secondary"
-                    >
-                        به‌روزرسانی
-                    </button>
-
-                </div>
-
-                <div
-                    id="supportConversationsContent"
-                >
-                    <p class="message">
-                        برای مشاهده گفتگوها وارد حساب شوید.
-                    </p>
-                </div>
-            `;
-
-
-            support.insertBefore(
-                panel,
-                support.querySelector(
-                    ".panel"
-                )
-            );
-        }
-
-
-        if (
-            subscription &&
-            !document.getElementById(
-                "subscriptionPaymentsPanel"
-            )
-        ) {
-
-            const panel =
-                document.createElement(
-                    "div"
-                );
-
-
-            panel.id =
-                "subscriptionPaymentsPanel";
-
-
-            panel.className =
-                "panel user-updates-panel";
-
-
-            panel.innerHTML = `
-
-                <div class="section-heading">
-
-                    <div>
-
-                        <span class="eyebrow">
-                            گزارش اشتراک
-                        </span>
-
-                        <h3>
-                            پرداخت‌های من
-                        </h3>
-
-                    </div>
-
-                </div>
-
-                <div
-                    id="subscriptionPaymentsContent"
-                >
-                    <p class="message">
-                        در حال بررسی...
-                    </p>
-                </div>
-            `;
-
-
-            subscription.insertBefore(
-                panel,
-                subscription.querySelector(
-                    ".subscription-hero"
-                )?.nextSibling ||
-                subscription.firstChild
-            );
-        }
-    }
-
-
     async submitSupport() {
-
-        const subject =
-            document
-                .getElementById(
-                    "supportSubject"
-                )
-                .value
-                .trim();
-
-
-        const text =
-            document
-                .getElementById(
-                    "supportText"
-                )
-                .value
-                .trim();
-
-
-        const msg =
-            document
-                .getElementById(
-                    "supportMsg"
-                );
-
 
         if (
             this.state.username ===
             "بازیکن مهمان"
         ) {
 
-            msg.textContent =
-                "ابتدا وارد حساب شوید یا ثبت‌نام کنید.";
+            this.go(
+                "auth"
+            );
 
             return;
         }
 
 
-        if (!subject || !text) {
+        const subject =
+            document
+                .getElementById(
+                    "supportSubject"
+                )
+                ?.value
+                .trim() ||
+            "";
 
-            msg.textContent =
-                "موضوع و پیام را وارد کنید.";
+
+        const message =
+            document
+                .getElementById(
+                    "supportMessage"
+                )
+                ?.value
+                .trim() ||
+            "";
+
+
+        const msg =
+            document.getElementById(
+                "supportMsg"
+            );
+
+
+        if (
+            !subject ||
+            !message
+        ) {
+
+            if (msg) {
+
+                msg.textContent =
+                    "موضوع و پیام را وارد کنید.";
+            }
 
             return;
         }
 
 
-        msg.textContent =
-            "در حال ارسال درخواست...";
+        if (msg) {
+
+            msg.textContent =
+                "در حال ارسال...";
+        }
 
 
         try {
@@ -2308,102 +2404,9 @@ class App {
                         this.state.username,
 
                     phone:
-                        this.getRegisteredPhone(),
+                        this.getCurrentPhone(),
 
                     subject,
-
-                    message:
-                        text
-                });
-
-
-            if (!data.success) {
-
-                throw new Error(
-                    data.message ||
-                    "ارسال درخواست ناموفق بود."
-                );
-            }
-
-
-            document
-                .getElementById(
-                    "supportSubject"
-                )
-                .value = "";
-
-
-            document
-                .getElementById(
-                    "supportText"
-                )
-                .value = "";
-
-
-            msg.textContent =
-                data.message ||
-                "گفت‌وگو ایجاد شد.";
-
-
-            await this.syncServerUpdates();
-
-        } catch (error) {
-
-            console.error(
-                "Support error:",
-                error
-            );
-
-
-            msg.textContent =
-                error.message ||
-                "ارسال درخواست پشتیبانی ناموفق بود.";
-        }
-    }
-
-
-    async sendSupportReply(
-        conversationId
-    ) {
-
-        const textarea =
-            document.querySelector(
-                `[data-support-input="${CSS.escape(
-                    conversationId
-                )}"]`
-            );
-
-
-        if (!textarea) {
-            return;
-        }
-
-
-        const message =
-            textarea.value.trim();
-
-
-        if (!message) {
-            return;
-        }
-
-
-        textarea.disabled =
-            true;
-
-
-        try {
-
-            const data =
-                await this.serverRequest({
-
-                    action:
-                        "supportUserReply",
-
-                    username:
-                        this.state.username,
-
-                    conversationId,
 
                     message
                 });
@@ -2418,62 +2421,35 @@ class App {
             }
 
 
-            textarea.value = "";
+            if (msg) {
 
-
-            await this.syncServerUpdates();
-
-        } catch (error) {
-
-            alert(
-                error.message ||
-                "ارسال پیام ناموفق بود."
-            );
-
-        } finally {
-
-            textarea.disabled =
-                false;
-        }
-    }
-
-
-    async closeSupport(
-        conversationId
-    ) {
-
-        const ok =
-            confirm(
-                "آیا مطمئن هستید که می‌خواهید این گفت‌وگو را به پایان برسانید؟ بعد از اتمام، امکان ارسال پیام جدید در همین گفت‌وگو وجود ندارد."
-            );
-
-
-        if (!ok) {
-            return;
-        }
-
-
-        try {
-
-            const data =
-                await this.serverRequest({
-
-                    action:
-                        "closeSupport",
-
-                    username:
-                        this.state.username,
-
-                    conversationId
-                });
-
-
-            if (!data.success) {
-
-                throw new Error(
+                msg.textContent =
                     data.message ||
-                    "اتمام گفت‌وگو ناموفق بود."
+                    "پیام شما ثبت شد.";
+            }
+
+
+            const subjectInput =
+                document.getElementById(
+                    "supportSubject"
                 );
+
+
+            const messageInput =
+                document.getElementById(
+                    "supportMessage"
+                );
+
+
+            if (subjectInput) {
+                subjectInput.value =
+                    "";
+            }
+
+
+            if (messageInput) {
+                messageInput.value =
+                    "";
             }
 
 
@@ -2481,15 +2457,53 @@ class App {
 
         } catch (error) {
 
-            alert(
-                error.message ||
-                "اتمام گفت‌وگو ناموفق بود."
+            console.error(
+                error
             );
+
+
+            if (msg) {
+
+                msg.textContent =
+                    error.message ||
+                    "ارسال پیام ناموفق بود.";
+            }
         }
     }
 
 
-    async serverRequest(payload) {
+    async sendSupportReply(
+        conversationId
+    ) {
+
+        /*
+         * نسخه فعلی Code.gs هر پیام را یک رکورد مستقل
+         * ذخیره می‌کند.
+         *
+         * بنابراین اگر نسخه جدید سرور thread/conversationId
+         * نداشت، این قابلیت عمداً غیرفعال می‌ماند تا
+         * داده اشتباه به سرور ارسال نشود.
+         */
+
+        console.warn(
+            "Reply conversations are managed by the admin panel."
+        );
+    }
+
+
+    async closeSupportConversation(
+        conversationId
+    ) {
+
+        console.warn(
+            "Conversation closing is managed by the admin panel."
+        );
+    }
+
+
+    async serverRequest(
+        payload
+    ) {
 
         let response;
 
@@ -2500,7 +2514,9 @@ class App {
                 await fetch(
                     APPS_SCRIPT_URL,
                     {
-                        method: "POST",
+
+                        method:
+                            "POST",
 
                         headers: {
                             "Content-Type":
@@ -2568,7 +2584,30 @@ class App {
             "بازیکن مهمان"
         ) {
 
+            /*
+             * مهمان هیچ اشتراک فعالی ندارد.
+             * بنابراین حتی اگر localStorage قبلاً
+             * مقدار دیگری داشته باشد، دسترسی فقط
+             * مرحله ۱ خواهد بود.
+             */
+            this.state.subscriptionInfo =
+                null;
+
+            this.state.subscriptionStatus =
+                "inactive";
+
+            this.state.subscriptionPlan =
+                null;
+
+            this.state.subscription =
+                "free";
+
+
+            this.renderStagesIfVisible();
+
             this.renderUserPanels();
+
+            this.renderProfile();
 
             return;
         }
@@ -2614,51 +2653,86 @@ class App {
             };
 
 
-            const approved =
-                this.lastServerUpdates
-                    .payments
-                    .find(
-                        p =>
-                            p.status ===
-                            "تأیید شد"
-                    );
+            /*
+             * وضعیت اشتراک مستقیماً از سرور گرفته می‌شود.
+             *
+             * اگر اشتراک منقضی شده باشد:
+             * active = false
+             *
+             * اگر هنوز فعال باشد:
+             * active = true
+             */
+            const serverSubscription =
+                data.subscription ||
+                null;
 
 
-            if (approved) {
-
-                const changed =
-                    this.state.subscriptionPlan !==
-                        approved.planId ||
-
-                    this.state.subscriptionStatus !==
-                        "active";
-
-
-                this.state.subscriptionStatus =
-                    "active";
+            const active =
+                Boolean(
+                    serverSubscription &&
+                    serverSubscription.active &&
+                    serverSubscription.expiry &&
+                    new Date(
+                        serverSubscription.expiry
+                    ).getTime() >=
+                    Date.now()
+                );
 
 
-                this.state.subscriptionPlan =
-                    approved.planId;
+            this.state.subscriptionInfo =
+                serverSubscription
+                    ? {
+                        ...serverSubscription,
+                        active
+                    }
+                    : null;
 
 
-                this.state.subscriptionName =
-                    approved.planName;
+            this.state.subscriptionStatus =
+                active
+                    ? "active"
+                    : "inactive";
 
 
-                this.state.subscription =
-                    approved.planId ===
-                    "nineMonth"
-
-                        ? "premium"
-
-                        : "paid";
+            this.state.subscriptionPlan =
+                active
+                    ? serverSubscription.planId
+                    : null;
 
 
-                if (changed) {
-                    this.persist();
-                }
-            }
+            this.state.subscriptionName =
+                active
+                    ? serverSubscription.planName
+                    : null;
+
+
+            this.state.subscription =
+                active
+                    ? (
+                        serverSubscription.planId ===
+                        "nineMonth"
+
+                            ? "premium"
+
+                            : "paid"
+                      )
+                    : "free";
+
+
+            /*
+             * وضعیت سرور را در localStorage هم ذخیره می‌کنیم.
+             * اما دسترسی مراحل همیشه با hasActiveSubscription()
+             * و expiry واقعی بررسی می‌شود.
+             */
+            this.persist();
+
+
+            /*
+             * اگر کاربر در صفحه مراحل باشد،
+             * بعد از تأیید پرداخت همان لحظه مراحل
+             * دوباره render می‌شوند.
+             */
+            this.renderStagesIfVisible();
 
 
             this.renderUserPanels();
@@ -2680,7 +2754,204 @@ class App {
     }
 
 
-    renderUserPanels(error = null) {
+    renderStagesIfVisible() {
+
+        const quizPage =
+            document.getElementById(
+                "quiz"
+            );
+
+
+        if (
+            quizPage &&
+            quizPage.classList.contains(
+                "active"
+            )
+        ) {
+
+            this.renderStages();
+        }
+    }
+
+
+    ensureUserPanels() {
+
+        const subscriptionPage =
+            document.getElementById(
+                "subscription"
+            );
+
+
+        const supportPage =
+            document.getElementById(
+                "support"
+            );
+
+
+        if (
+            subscriptionPage &&
+            !document.getElementById(
+                "subscriptionPaymentsContent"
+            )
+        ) {
+
+            const panel =
+                document.createElement(
+                    "div"
+                );
+
+
+            panel.className =
+                "panel user-updates-panel";
+
+
+            panel.innerHTML = `
+
+                <div class="section-heading">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            وضعیت پرداخت‌ها
+                        </span>
+
+                        <h2>
+                            اشتراک‌های من
+                        </h2>
+
+                    </div>
+
+                </div>
+
+                <div
+                    id="subscriptionPaymentsContent"
+                ></div>
+
+            `;
+
+
+            subscriptionPage.appendChild(
+                panel
+            );
+        }
+
+
+        if (
+            supportPage &&
+            !document.getElementById(
+                "supportConversationsContent"
+            )
+        ) {
+
+            const panel =
+                document.createElement(
+                    "div"
+                );
+
+
+            panel.className =
+                "panel user-updates-panel";
+
+
+            panel.innerHTML = `
+
+                <div class="section-heading">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            پیام‌ها
+                        </span>
+
+                        <h2>
+                            پیام‌های پشتیبانی
+                        </h2>
+
+                    </div>
+
+                </div>
+
+                <div
+                    id="supportConversationsContent"
+                ></div>
+
+            `;
+
+
+            supportPage.appendChild(
+                panel
+            );
+        }
+    }
+
+
+    renderPaymentState() {
+
+        const content =
+            document.getElementById(
+                "subscriptionPaymentsContent"
+            );
+
+
+        if (!content) {
+            return;
+        }
+
+
+        const active =
+            this.hasActiveSubscription();
+
+
+        const subscription =
+            this.state.subscriptionInfo;
+
+
+        if (active && subscription) {
+
+            content.insertAdjacentHTML(
+                "afterbegin",
+                `
+                    <div
+                        class="panel subscription-active-box"
+                        data-active-subscription="true"
+                    >
+                        <strong>
+                            اشتراک فعال است 👑
+                        </strong>
+
+                        <p>
+                            ${escapeHTML(
+                                subscription.planName ||
+                                "اشتراک"
+                            )}
+                        </p>
+
+                        ${
+                            subscription.expiry
+                                ? `
+                                    <p>
+                                        تاریخ پایان:
+                                        ${escapeHTML(
+                                            new Date(
+                                                subscription.expiry
+                                            ).toLocaleString(
+                                                "fa-IR"
+                                            )
+                                        )}
+                                    </p>
+                                  `
+                                : ""
+                        }
+                    </div>
+                `
+            );
+        }
+    }
+
+
+    renderUserPanels(
+        error = null
+    ) {
 
         this.ensureUserPanels();
 
@@ -2747,37 +3018,29 @@ class App {
 
             } else {
 
+                /*
+                 * هر اشتراک / پرداخت دقیقاً یک کارت مستقل دارد.
+                 */
                 paymentContent.innerHTML =
                     payments
                         .map(
                             item => {
 
-                                let statusClass =
-                                    "pending";
-
-
-                                if (
+                                const statusClass =
                                     item.status ===
                                     "تأیید شد"
-                                ) {
 
-                                    statusClass =
-                                        "success";
-                                }
+                                        ? "approved"
 
+                                        : item.status ===
+                                          "رد شد"
 
-                                if (
-                                    item.status ===
-                                    "رد شد"
-                                ) {
+                                            ? "rejected"
 
-                                    statusClass =
-                                        "danger";
-                                }
+                                            : "pending";
 
 
                                 const duration =
-                                    item.planName ||
                                     this.getPlanDuration(
                                         item.planId
                                     );
@@ -2807,7 +3070,8 @@ class App {
 
                                             <span class="status-badge">
                                                 ${escapeHTML(
-                                                    item.status
+                                                    item.status ||
+                                                    "در انتظار بررسی"
                                                 )}
                                             </span>
 
@@ -2831,6 +3095,36 @@ class App {
                                                     )
                                                 )}
                                             </span>
+
+                                            ${
+                                                item.subscriptionStart
+                                                    ? `
+                                                        <span>
+                                                            ▶️ شروع:
+                                                            ${escapeHTML(
+                                                                formatDate(
+                                                                    item.subscriptionStart
+                                                                )
+                                                            )}
+                                                        </span>
+                                                      `
+                                                    : ""
+                                            }
+
+                                            ${
+                                                item.subscriptionExpiry
+                                                    ? `
+                                                        <span>
+                                                            ⏳ پایان:
+                                                            ${escapeHTML(
+                                                                formatDate(
+                                                                    item.subscriptionExpiry
+                                                                )
+                                                            )}
+                                                        </span>
+                                                      `
+                                                    : ""
+                                            }
 
                                         </div>
 
@@ -2880,11 +3174,17 @@ class App {
 
                 supportContent.innerHTML =
                     `<p class="message">
-                        هنوز گفت‌وگوی پشتیبانی ندارید.
+                        هنوز پیام پشتیبانی ندارید.
                     </p>`;
 
             } else {
 
+                /*
+                 * Code.gs جدید هر پیام را به‌صورت یک رکورد
+                 * مستقل برمی‌گرداند؛ بنابراین هر پیام یک کارت
+                 * جداگانه دارد و پاسخ ادمین داخل همان کارت
+                 * نمایش داده می‌شود.
+                 */
                 supportContent.innerHTML =
                     support
                         .map(
@@ -2905,78 +3205,19 @@ class App {
         formatDate
     ) {
 
-        const thread =
-            Array.isArray(
-                conversation.thread
-            )
-                ? conversation.thread
-                : [];
-
-
         const status =
             conversation.status ||
-            "در حال بررسی";
+            "جدید";
 
 
         const closed =
-            status === "بسته شد";
+            status ===
+            "بسته شد";
 
 
-        const messagesHtml =
-            thread
-                .map(
-                    item => `
-
-                        <div
-                            class="support-message ${
-                                item.sender ===
-                                "admin"
-                                    ? "admin-message"
-                                    : "user-message"
-                            }"
-                        >
-
-                            <div class="support-message-author">
-
-                                ${
-                                    item.sender ===
-                                    "admin"
-                                        ? "پشتیبانی QuizDuo"
-                                        : "شما"
-                                }
-
-                            </div>
-
-                            <div class="support-message-text">
-
-                                ${escapeHTML(
-                                    item.text || ""
-                                )}
-
-                            </div>
-
-                            <small>
-
-                                ${escapeHTML(
-                                    formatDate(
-                                        item.timestamp
-                                    )
-                                )}
-
-                            </small>
-
-                        </div>
-                    `
-                )
-                .join("");
-
-
-        const shortText =
-            conversation.message
-                ? String(
-                    conversation.message
-                  ).slice(0, 120)
-                : "";
+        const reply =
+            conversation.adminReply ||
+            "";
 
 
         return `
@@ -2990,7 +3231,7 @@ class App {
                     <div>
 
                         <span class="eyebrow">
-                            گفت‌وگوی پشتیبانی
+                            پیام پشتیبانی
                         </span>
 
                         <h3>
@@ -3004,40 +3245,96 @@ class App {
 
 
                     <span class="status-badge">
-
                         ${escapeHTML(
                             status
                         )}
-
                     </span>
 
                 </div>
 
 
-                <p class="support-summary">
+                <div class="update-card-info">
 
-                    ${escapeHTML(
-                        shortText
-                    )}
+                    <span>
+                        🕒
+                        ${escapeHTML(
+                            formatDate(
+                                conversation.timestamp
+                            )
+                        )}
+                    </span>
 
-                    ${
-                        String(
-                            conversation.message || ""
-                        ).length > 120
-                            ? "..."
-                            : ""
-                    }
-
-                </p>
+                </div>
 
 
                 <div class="support-thread">
 
+                    <div
+                        class="support-message user-message"
+                    >
+
+                        <div
+                            class="support-message-author"
+                        >
+                            شما
+                        </div>
+
+                        <div
+                            class="support-message-text"
+                        >
+                            ${escapeHTML(
+                                conversation.message ||
+                                ""
+                            )}
+                        </div>
+
+                    </div>
+
+
                     ${
-                        messagesHtml ||
-                        `<p class="message">
-                            هنوز پیامی ثبت نشده است.
-                         </p>`
+                        reply
+
+                            ? `
+                                <div
+                                    class="support-message admin-message"
+                                >
+
+                                    <div
+                                        class="support-message-author"
+                                    >
+                                        پشتیبانی QuizDuo
+                                    </div>
+
+                                    <div
+                                        class="support-message-text"
+                                    >
+                                        ${escapeHTML(
+                                            reply
+                                        )}
+                                    </div>
+
+                                    ${
+                                        conversation.replyTimestamp
+                                            ? `
+                                                <small>
+                                                    ${escapeHTML(
+                                                        formatDate(
+                                                            conversation.replyTimestamp
+                                                        )
+                                                    )}
+                                                </small>
+                                              `
+                                            : ""
+                                    }
+
+                                </div>
+                              `
+
+                            : `
+                                <p class="message">
+                                    هنوز پاسخی از پشتیبانی دریافت نشده است.
+                                </p>
+                              `
                     }
 
                 </div>
@@ -3047,52 +3344,14 @@ class App {
                     closed
 
                         ? `
-
                             <div class="closed-conversation">
 
-                                این گفت‌وگو توسط شما به پایان رسیده است.
-
-                            </div>
-
-                          `
-
-                        : `
-
-                            <div class="support-reply-box">
-
-                                <textarea
-                                    data-support-input="${escapeHTML(
-                                        conversation.conversationId
-                                    )}"
-                                    placeholder="پیام بعدی خود را در همین گفت‌وگو بنویسید..."
-                                ></textarea>
-
-
-                                <div class="support-actions">
-
-                                    <button
-                                        class="primary"
-                                        data-support-reply="${escapeHTML(
-                                            conversation.conversationId
-                                        )}"
-                                    >
-                                        ارسال پیام
-                                    </button>
-
-
-                                    <button
-                                        class="secondary"
-                                        data-support-close="${escapeHTML(
-                                            conversation.conversationId
-                                        )}"
-                                    >
-                                        اتمام گفت‌وگو
-                                    </button>
-
-                                </div>
+                                این پیام توسط پشتیبانی بسته شده است.
 
                             </div>
                           `
+
+                        : ""
                 }
 
             </article>
