@@ -23,6 +23,7 @@ export const DEFAULT_STATE = {
     subscriptionName: "",
     subscriptionExpiry: null,
     subscriptionStart: null,
+    premiumActive: false,
     subscriptionInfo: {
         active: false,
         planId: "",
