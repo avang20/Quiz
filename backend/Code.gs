@@ -1844,3 +1844,136 @@ function testEmail() {
       '</div>'
   });
 }
+function getUserUpdates(data) {
+
+  return jsonResponse(
+    getUserUpdatesObject(
+      data
+    )
+  );
+}
+
+
+function getUserUpdatesObject(data) {
+
+  const username =
+    String(
+      data.username || ''
+    ).trim();
+
+
+  if (
+    !username ||
+    username ===
+      'بازیکن مهمان'
+  ) {
+
+    return {
+
+      success:
+        true,
+
+      payments:
+        [],
+
+      support:
+        [],
+
+      subscription: {
+
+        active:
+          false,
+
+        planId:
+          '',
+
+        planName:
+          '',
+
+        start:
+          null,
+
+        expiry:
+          null
+
+      }
+
+    };
+  }
+
+
+  const payments =
+    getUserPaymentUpdates(
+      username
+    );
+
+
+  const support =
+    getUserSupportUpdates(
+      username
+    );
+
+
+  const subscription =
+    getUserSubscription(
+      username
+    );
+
+
+  return {
+
+    success:
+      true,
+
+    payments,
+
+    support,
+
+    subscription
+
+  };
+}
+
+
+function jsonpResponse(
+  callback,
+  data
+) {
+
+  const safeCallback =
+    String(
+      callback || ''
+    )
+      .replace(
+        /[^a-zA-Z0-9_$\.]/g,
+        ''
+      );
+
+
+  if (!safeCallback) {
+
+    return jsonResponse({
+
+      success:
+        false,
+
+      message:
+        'callback نامعتبر است.'
+
+    });
+  }
+
+
+  return ContentService
+    .createTextOutput(
+
+      safeCallback +
+      '(' +
+      JSON.stringify(data) +
+      ')'
+
+    )
+    .setMimeType(
+      ContentService.MimeType.JAVASCRIPT
+    );
+}
