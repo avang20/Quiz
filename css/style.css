@@ -612,3 +612,88 @@ select {
     line-height: 1.7;
   }
 }
+
+
+/* =========================================================
+   PREMIUM ACTIVE STATE
+========================================================= */
+.premium-feature-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-inline-start: 8px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    opacity: 0.8;
+}
+
+.premium-feature-status.active {
+    opacity: 1;
+}
+
+.premium-feature-item {
+    position: relative;
+    transition: transform .18s ease, opacity .18s ease, border-color .18s ease;
+    opacity: .62;
+}
+
+.premium-feature-item.is-active {
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+.premium-feature-item.is-active::after {
+    content: "✓";
+    position: absolute;
+    inset-inline-end: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: 900;
+}
+
+/* =========================================================
+   SUPPORT LONG REPLIES / ADMIN THREADS
+========================================================= */
+.support-reply-box textarea,
+.admin-support-reply {
+    min-height: 150px;
+    max-height: 420px;
+    resize: vertical;
+    width: 100%;
+    line-height: 1.9;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.admin-support-thread {
+    display: grid;
+    gap: 10px;
+    margin: 16px 0;
+    max-height: 560px;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.admin-support-message {
+    padding: 12px 14px;
+    border-radius: 16px;
+    line-height: 1.9;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.admin-support-message.user {
+    background: rgba(59, 130, 246, .10);
+}
+
+.admin-support-message.admin {
+    background: rgba(16, 185, 129, .10);
+}
+
+.admin-support-message small {
+    display: block;
+    margin-top: 6px;
+    opacity: .65;
+}
