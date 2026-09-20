@@ -178,3 +178,437 @@ body.modal-open{overflow:hidden}
 
 @media(max-width:900px){.leaderboard-grid{grid-template-columns:1fr}.leaderboard-current-period{align-items:flex-start;flex-direction:column}}
 @media(max-width:600px){.leaderboard-period-switcher{display:grid;grid-template-columns:repeat(3,1fr)}.leaderboard-period-switcher button{padding:10px 7px}.daily-reward-toast{bottom:14px}}
+
+/* =========================================================
+   QuizDuo Responsive Mobile + Tablet Layer
+   This block intentionally comes last so it overrides older
+   desktop-oriented rules without changing existing features.
+   ========================================================= */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+input,
+textarea,
+select {
+  max-width: 100%;
+}
+
+/* Tablets and smaller laptops */
+@media (max-width: 1050px) {
+  .site-header {
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    padding: 12px 3%;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    margin-inline-end: auto;
+  }
+
+  .header-actions {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+
+  .main-nav {
+    order: 3;
+    flex: 1 0 100%;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 2px 0 5px;
+  }
+
+  .main-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .main-nav button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .page {
+    width: 100%;
+    max-width: 1200px;
+    padding-inline: 3%;
+  }
+
+  .hero {
+    gap: 20px;
+    padding: 34px;
+  }
+
+  .feature-grid,
+  .benefit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .profile-grid,
+  .user-dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .user-dashboard-sidebar {
+    position: static;
+  }
+
+  .dashboard-menu {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .subscription-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .leaderboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Phones and small tablets */
+@media (max-width: 768px) {
+  .site-header {
+    position: sticky;
+    top: 0;
+    padding: 10px 12px 8px;
+    gap: 8px 10px;
+  }
+
+  .brand {
+    font-size: 1.15rem;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .header-actions .primary,
+  .header-actions .secondary,
+  .header-actions .dark-action {
+    min-height: 42px;
+    padding: 9px 11px;
+    font-size: .78rem;
+  }
+
+  .main-nav {
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+
+  .main-nav button {
+    min-height: 40px;
+    padding: 8px 11px;
+    font-size: .8rem;
+  }
+
+  .page {
+    padding: 24px 14px 48px;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 25px 18px;
+    border-radius: 22px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.15rem, 12vw, 3.25rem);
+  }
+
+  .hero p {
+    line-height: 1.9;
+  }
+
+  .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .hero-actions button {
+    width: 100%;
+  }
+
+  .premium-preview {
+    min-width: 0;
+    width: 100%;
+    padding: 20px 16px;
+  }
+
+  .feature-grid,
+  .benefit-grid,
+  .referral-grid,
+  .subscription-grid,
+  .dashboard-menu,
+  .dashboard-progress-grid,
+  .dashboard-stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .feature-card,
+  .benefit-card {
+    padding: 18px;
+  }
+
+  .stage-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stage-card {
+    min-height: 0;
+    padding: 17px;
+  }
+
+  .stage-footer {
+    flex-wrap: wrap;
+  }
+
+  .panel {
+    max-width: 100%;
+  }
+
+  .auth-panel,
+  .payment-panel,
+  .user-dashboard-sidebar,
+  .dashboard-progress-card {
+    padding: 18px;
+  }
+
+  .subscription-hero {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 24px 18px;
+  }
+
+  .premium-orb {
+    width: 92px;
+    height: 92px;
+    font-size: 3rem;
+    align-self: center;
+  }
+
+  .subscription-scroll {
+    gap: 12px;
+    padding-inline: 2px;
+  }
+
+  .subscription-card {
+    flex-basis: min(280px, 86vw);
+  }
+
+  .payment-header,
+  .sub-section-title,
+  .dashboard-subscription-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .payment-header .secure-badge,
+  .dashboard-subscription-card .primary {
+    width: 100%;
+  }
+
+  .discount-row,
+  .row {
+    flex-direction: column;
+  }
+
+  .discount-row button,
+  .row button {
+    width: 100%;
+  }
+
+  .quiz-modal {
+    padding: 8px;
+  }
+
+  .quiz-modal-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 95dvh;
+    border-radius: 20px;
+  }
+
+  .quiz-modal-card .quiz-box,
+  .quiz-card {
+    padding: 18px;
+  }
+
+  .quiz-question {
+    font-size: clamp(1.08rem, 5vw, 1.42rem);
+    line-height: 1.85;
+  }
+
+  .quiz-options-grid,
+  .answers {
+    grid-template-columns: 1fr !important;
+  }
+
+  .quiz-option,
+  .answer-btn {
+    min-height: 58px;
+  }
+
+  .leaderboard-period-switcher {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .leaderboard-period-switcher button {
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 6px;
+    font-size: .8rem;
+  }
+
+  .leaderboard-current-period {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .leaderboard-card {
+    padding: 16px;
+  }
+
+  .leader-entry {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .leader-entry-main strong,
+  .leader-entry-main small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .daily-reward-toast {
+    width: calc(100vw - 24px);
+    min-width: 0;
+    max-width: 420px;
+    bottom: 12px;
+    padding: 13px 14px;
+  }
+
+  .welcome-modal {
+    padding: 10px;
+  }
+
+  .welcome-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    overflow: auto;
+    padding: 22px 16px;
+    border-radius: 20px;
+  }
+
+  .welcome-points {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 430px) {
+  .site-header {
+    padding-inline: 9px;
+  }
+
+  .brand {
+    font-size: 1.05rem;
+  }
+
+  .header-actions .secondary {
+    display: none;
+  }
+
+  .header-actions .primary {
+    font-size: .74rem;
+    padding-inline: 10px;
+  }
+
+  .main-nav button {
+    padding-inline: 10px;
+    font-size: .76rem;
+  }
+
+  .page {
+    padding-inline: 10px;
+  }
+
+  .hero {
+    padding: 22px 14px;
+  }
+
+  .panel,
+  .feature-card,
+  .benefit-card,
+  .subscription-card {
+    border-radius: 18px;
+  }
+
+  .quiz-modal-card {
+    border-radius: 16px;
+  }
+
+  .quiz-modal-card .quiz-box,
+  .quiz-card {
+    padding: 15px;
+  }
+
+  .quiz-close-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 1.35rem;
+  }
+
+  .leaderboard-card-head p {
+    line-height: 1.7;
+  }
+}
