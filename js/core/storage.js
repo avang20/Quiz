@@ -1,156 +1,517 @@
-const STATE_PREFIX = "quizduo_state_";
-const USERS_KEY = "quizduo_users";
-const CURRENT_USER_KEY = "quizduo_current_user";
-const LEADERBOARD_KEY = "quizduo_leaderboard";
+import { shuffle } from "./utils.js";
+import {
+    addXP,
+    markStageCompleted,
+    isStageCompleted
+} from "./state.js";
 
-function userKey(username) {
-    return (
-        STATE_PREFIX +
-        encodeURIComponent(
-            String(username || "guest").toLowerCase()
-        )
-    );
-}
 
-function normalizeStageScoreMap(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return {};
+export const QUIZ_CONFIG = {
+    defaultQuestionsPerStage: 10,
+    reserveQuestions: 5,
+    passingPercentage: 0.75,
+    questionTime: 20,
+    stageXP: 10,
+    failedStageHeartPenalty: 1
+};
+
+
+function normalizeQuestion(raw, fallbackStage = 1) {
+
+    if (!raw || typeof raw !== "object") {
+        return null;
     }
-    const result = {};
-    Object.entries(value).forEach(([stage, score]) => {
-        const numeric = Number(score);
-        if (Number.isFinite(numeric)) {
-            result[String(stage)] = Math.max(0, Math.min(1, numeric));
+
+    let questionText =
+        raw.question ??
+        raw.questionText ??
+        raw.q ??
+        raw.text ??
+        raw.title ??
+        raw.prompt ??
+        raw.content ??
+        "";
+
+    if (questionText && typeof questionText === "object") {
+        questionText =
+            questionText.text ??
+            questionText.value ??
+            questionText.title ??
+            questionText.content ??
+            "";
+    }
+
+    let rawOptions =
+        raw.options ??
+        raw.choices ??
+        raw.answers ??
+        raw.variants ??
+        raw.o ??
+        [];
+
+    if (!Array.isArray(rawOptions)) {
+        rawOptions = Object.values(rawOptions || {});
+    }
+
+    const options = rawOptions.map(option => {
+        if (option && typeof option === "object") {
+            return {
+                text: String(
+                    option.text ??
+                    option.label ??
+                    option.value ??
+                    option.answer ??
+                    option.content ??
+                    ""
+                )
+            };
         }
-    });
-    return result;
-}
-
-export function loadState(defaultState, username = "guest") {
-    try {
-        const saved = localStorage.getItem(userKey(username));
-
-        if (!saved) {
-            return structuredClone(defaultState);
-        }
-
-        const parsed = JSON.parse(saved);
-        const base = structuredClone(defaultState);
 
         return {
-            ...base,
-            ...parsed,
-            completedGeneralStages:
-                Array.isArray(parsed.completedGeneralStages)
-                    ? parsed.completedGeneralStages.map(Number)
-                    : [],
-            completedFunStages:
-                Array.isArray(parsed.completedFunStages)
-                    ? parsed.completedFunStages.map(Number)
-                    : [],
-            stageScoresGeneral:
-                normalizeStageScoreMap(parsed.stageScoresGeneral),
-            stageScoresFun:
-                normalizeStageScoreMap(parsed.stageScoresFun),
-            subscriptionInfo:
-                parsed.subscriptionInfo &&
-                typeof parsed.subscriptionInfo === "object"
-                    ? parsed.subscriptionInfo
-                    : base.subscriptionInfo,
-            welcomeSeen:
-                parsed.welcomeSeen === true
+            text: String(option ?? "")
         };
-    } catch (error) {
-        console.error("QuizDuo state error:", error);
-        return structuredClone(defaultState);
-    }
-}
-
-export function saveState(state, username = state.username || "guest") {
-    try {
-        localStorage.setItem(
-            userKey(username),
-            JSON.stringify(state)
-        );
-        return true;
-    } catch (error) {
-        console.error("Could not save state:", error);
-        return false;
-    }
-}
-
-export function getCurrentUser() {
-    return localStorage.getItem(CURRENT_USER_KEY) || null;
-}
-
-export function setCurrentUser(username) {
-    localStorage.setItem(CURRENT_USER_KEY, username);
-}
-
-export function logoutUser() {
-    localStorage.removeItem(CURRENT_USER_KEY);
-}
-
-export function getUsers() {
-    try {
-        const users = JSON.parse(
-            localStorage.getItem(USERS_KEY) || "[]"
-        );
-        return Array.isArray(users) ? users : [];
-    } catch {
-        return [];
-    }
-}
-
-export function saveUsers(users) {
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-export function getLeaderboard() {
-    try {
-        const board = JSON.parse(
-            localStorage.getItem(LEADERBOARD_KEY) || "[]"
-        );
-        return Array.isArray(board) ? board : [];
-    } catch {
-        return [];
-    }
-}
-
-export function updateLeaderboard(state) {
-    if (
-        !state.username ||
-        state.username === "بازیکن مهمان"
-    ) {
-        return;
-    }
-
-    const username = String(state.username);
-    const key = username.toLowerCase();
-
-    const board = getLeaderboard().filter(
-        item =>
-            String(item.username || "").toLowerCase() !== key
-    );
-
-    board.push({
-        username,
-        xp: Number(state.xp || 0),
-        level: Number(state.level || 1),
-        generalStage: Number(state.generalStage || 1),
-        funStage: Number(state.funStage || 1),
-        updatedAt: Date.now()
     });
 
-    board.sort(
-        (a, b) =>
-            Number(b.xp || 0) - Number(a.xp || 0) ||
-            Number(b.level || 1) - Number(a.level || 1) ||
-            Number(b.updatedAt || 0) - Number(a.updatedAt || 0)
-    );
+    const rawAnswer =
+        raw.answer ??
+        raw.correctAnswer ??
+        raw.correct_answer ??
+        raw.correct ??
+        raw.answerIndex ??
+        raw.answer_index ??
+        raw.correctIndex ??
+        raw.correct_index ??
+        raw.correctOption ??
+        raw.correct_option;
 
-    localStorage.setItem(
-        LEADERBOARD_KEY,
-        JSON.stringify(board.slice(0, 100))
-    );
+    let correctIndex = -1;
+
+    if (typeof rawAnswer === "number" && Number.isInteger(rawAnswer)) {
+        if (rawAnswer >= 0 && rawAnswer < options.length) {
+            correctIndex = rawAnswer;
+        } else if (rawAnswer > 0 && rawAnswer <= options.length) {
+            correctIndex = rawAnswer - 1;
+        }
+    } else if (typeof rawAnswer === "string") {
+        const trimmed = rawAnswer.trim();
+        const numeric = Number(trimmed);
+
+        if (Number.isInteger(numeric)) {
+            if (numeric >= 0 && numeric < options.length) {
+                correctIndex = numeric;
+            } else if (numeric > 0 && numeric <= options.length) {
+                correctIndex = numeric - 1;
+            }
+        }
+
+        if (correctIndex < 0 && /^[A-Za-z]$/.test(trimmed)) {
+            const letterIndex =
+                trimmed.toUpperCase().charCodeAt(0) - 65;
+
+            if (letterIndex >= 0 && letterIndex < options.length) {
+                correctIndex = letterIndex;
+            }
+        }
+
+        if (correctIndex < 0) {
+            correctIndex = options.findIndex(
+                option =>
+                    option.text.trim().toLocaleLowerCase() ===
+                    trimmed.toLocaleLowerCase()
+            );
+        }
+    } else if (rawAnswer && typeof rawAnswer === "object") {
+        const candidate =
+            rawAnswer.text ??
+            rawAnswer.label ??
+            rawAnswer.value ??
+            rawAnswer.answer;
+
+        if (candidate !== undefined) {
+            correctIndex = options.findIndex(
+                option =>
+                    option.text.trim() === String(candidate).trim()
+            );
+        }
+    }
+
+    if (correctIndex < 0) {
+        const correctOptions =
+            raw.correctOptions ??
+            raw.correct_options;
+
+        if (Array.isArray(correctOptions) && correctOptions.length) {
+            correctIndex = options.findIndex(
+                option =>
+                    option.text.trim() ===
+                    String(correctOptions[0]).trim()
+            );
+        }
+    }
+
+    let shuffledOptions = options;
+
+    if (correctIndex >= 0 && correctIndex < options.length) {
+        shuffledOptions = shuffle(
+            options.map((option, index) => ({
+                ...option,
+                isCorrect: index === correctIndex
+            }))
+        );
+    } else {
+        shuffledOptions = shuffle(options);
+    }
+
+    const newCorrectIndex =
+        shuffledOptions.findIndex(
+            option => option.isCorrect === true
+        );
+
+    const stage =
+        Number(
+            raw.stage ??
+            raw.stageNumber ??
+            raw.stage_number ??
+            raw.level ??
+            raw.levelNumber ??
+            fallbackStage
+        ) || fallbackStage;
+
+    return {
+        ...raw,
+        stage,
+        question: String(questionText ?? ""),
+        q: String(questionText ?? ""),
+        options: shuffledOptions.map(option => option.text),
+        answer: newCorrectIndex,
+        explanation: String(
+            raw.explanation ??
+            raw.explain ??
+            raw.description ??
+            ""
+        )
+    };
 }
+
+
+export class QuizEngine {
+
+    constructor(state, saveState) {
+        this.state = state;
+        this.saveState =
+            typeof saveState === "function"
+                ? saveState
+                : () => {};
+
+        this.questions = [];
+        this.selectedQuestions = [];
+        this.currentQuestion = 0;
+        this.currentCategory = "general";
+        this.currentStage = 1;
+        this.correctAnswers = 0;
+        this.wrongAnswers = 0;
+        this.combo = 0;
+        this.finished = false;
+        this.isReplay = false;
+        this.stageRewardGiven = false;
+    }
+
+
+    async loadCategory(category) {
+        const safeCategory =
+            category === "fun" ? "fun" : "general";
+
+        const base =
+            document.baseURI || window.location.href;
+
+        const url =
+            new URL(
+                `data/${safeCategory}.json`,
+                base
+            );
+
+        console.log(
+            "Loading quiz data:",
+            url.pathname
+        );
+
+        const response =
+            await fetch(
+                url.href,
+                { cache: "no-store" }
+            );
+
+        if (!response.ok) {
+            throw new Error(
+                `Could not load ${url.pathname}`
+            );
+        }
+
+        const data = await response.json();
+        let rawQuestions = [];
+
+        if (Array.isArray(data)) {
+            rawQuestions = data;
+        } else if (Array.isArray(data.questions)) {
+            rawQuestions = data.questions;
+        } else if (Array.isArray(data.items)) {
+            rawQuestions = data.items;
+        } else if (Array.isArray(data.stages)) {
+            data.stages.forEach(stageBlock => {
+                const stageNumber =
+                    Number(
+                        stageBlock.stage ??
+                        stageBlock.id ??
+                        1
+                    ) || 1;
+
+                const list =
+                    Array.isArray(stageBlock.questions)
+                        ? stageBlock.questions
+                        : [];
+
+                list.forEach(question => {
+                    rawQuestions.push({
+                        ...question,
+                        stage:
+                            question.stage ??
+                            stageNumber
+                    });
+                });
+            });
+        }
+
+        this.questions =
+            rawQuestions
+                .map(question =>
+                    normalizeQuestion(
+                        question,
+                        1
+                    )
+                )
+                .filter(question =>
+                    question &&
+                    question.question.trim() &&
+                    question.options.length >= 2 &&
+                    question.answer >= 0 &&
+                    question.answer < question.options.length
+                );
+
+        this.currentCategory = safeCategory;
+
+        console.log(
+            `Loaded ${this.questions.length} ${safeCategory} questions`
+        );
+
+        return this.questions;
+    }
+
+
+    getStageQuestions(stage) {
+        return this.questions.filter(
+            question =>
+                Number(question.stage) ===
+                Number(stage)
+        );
+    }
+
+
+    getQuestionsForThisRound(stage) {
+        const stageQuestions =
+            this.getStageQuestions(stage);
+
+        if (
+            stageQuestions.length <=
+            QUIZ_CONFIG.defaultQuestionsPerStage
+        ) {
+            return shuffle(stageQuestions);
+        }
+
+        const count =
+            stageQuestions.length -
+            QUIZ_CONFIG.reserveQuestions;
+
+        return shuffle(stageQuestions).slice(0, count);
+    }
+
+
+    startStage(category, stage, replay = false) {
+        this.currentCategory = category;
+        this.currentStage = Number(stage) || 1;
+        this.isReplay = Boolean(replay);
+        this.currentQuestion = 0;
+        this.correctAnswers = 0;
+        this.wrongAnswers = 0;
+        this.combo = 0;
+        this.finished = false;
+        this.stageRewardGiven = false;
+
+        this.selectedQuestions =
+            this.getQuestionsForThisRound(
+                this.currentStage
+            );
+
+        console.log(
+            "Starting stage:",
+            this.currentStage,
+            "total stage questions:",
+            this.getStageQuestions(this.currentStage).length,
+            "questions this round:",
+            this.selectedQuestions.length
+        );
+
+        return this.selectedQuestions;
+    }
+
+
+    getCurrentQuestion() {
+        return (
+            this.selectedQuestions[
+                this.currentQuestion
+            ] || null
+        );
+    }
+
+
+    getQuestionCount() {
+        return this.selectedQuestions.length;
+    }
+
+
+    answer(answerIndex, timedOut = false) {
+        const question = this.getCurrentQuestion();
+
+        if (!question) {
+            return {
+                finished: true,
+                correct: false,
+                passed: false,
+                total: this.selectedQuestions.length
+            };
+        }
+
+        const correct =
+            !timedOut &&
+            Number(answerIndex) ===
+                Number(question.answer);
+
+        if (correct) {
+            this.correctAnswers++;
+            this.combo++;
+        } else {
+            this.wrongAnswers++;
+            this.combo = 0;
+        }
+
+        this.currentQuestion++;
+
+        const finished =
+            this.currentQuestion >=
+            this.selectedQuestions.length;
+
+        let passed = false;
+        let earnedXP = 0;
+        let heartLost = false;
+        let newlyCompleted = false;
+
+        if (finished) {
+            const percentage =
+                this.selectedQuestions.length
+                    ? this.correctAnswers /
+                      this.selectedQuestions.length
+                    : 0;
+
+            passed =
+                percentage >=
+                QUIZ_CONFIG.passingPercentage;
+
+            const scoreKey =
+                this.currentCategory === "general"
+                    ? "stageScoresGeneral"
+                    : "stageScoresFun";
+
+            if (!this.state[scoreKey] || typeof this.state[scoreKey] !== "object") {
+                this.state[scoreKey] = {};
+            }
+
+            const stageKey = String(this.currentStage);
+            const previousBest =
+                Number(this.state[scoreKey][stageKey] || 0);
+
+            if (percentage > previousBest) {
+                this.state[scoreKey][stageKey] = percentage;
+            }
+
+            if (passed) {
+                const alreadyCompleted =
+                    isStageCompleted(
+                        this.state,
+                        this.currentCategory,
+                        this.currentStage
+                    );
+
+                if (
+                    !this.isReplay &&
+                    !alreadyCompleted
+                ) {
+                    addXP(
+                        this.state,
+                        QUIZ_CONFIG.stageXP
+                    );
+
+                    earnedXP =
+                        QUIZ_CONFIG.stageXP;
+
+                    markStageCompleted(
+                        this.state,
+                        this.currentCategory,
+                        this.currentStage
+                    );
+
+                    newlyCompleted = true;
+                    this.stageRewardGiven = true;
+                }
+            } else if (!this.isReplay) {
+                if (Number(this.state.hearts) > 0) {
+                    this.state.hearts = Math.max(
+                        0,
+                        Number(this.state.hearts) -
+                            QUIZ_CONFIG.failedStageHeartPenalty
+                    );
+
+                    heartLost = true;
+                }
+            }
+        }
+
+        this.finished = finished;
+        this.saveState(this.state);
+
+        return {
+            correct,
+            timedOut: Boolean(timedOut),
+            finished,
+            passed,
+            earnedXP,
+            heartLost,
+            newlyCompleted,
+            replay: this.isReplay,
+            combo: this.combo,
+            correctAnswers: this.correctAnswers,
+            wrongAnswers: this.wrongAnswers,
+            total: this.selectedQuestions.length,
+            percentage:
+                this.selectedQuestions.length
+                    ? this.correctAnswers /
+                      this.selectedQuestions.length
+                    : 0,
+            explanation: ""
+        };
+    }
+}
+
+
+export default {
+    QuizEngine,
+    QUIZ_CONFIG
+};
