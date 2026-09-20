@@ -15,6 +15,8 @@ export const DEFAULT_STATE = {
     dailyLoginRewardDate: null,
     dailyLoginRewardDay: 0,
     dailyLoginRewardXP: 0,
+    heartRefillAt: null,
+    infiniteHeartsUntil: null,
     maxHearts: 5,
     theme: "light",
     subscription: "free",
