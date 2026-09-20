@@ -97,3 +97,56 @@ body.modal-open{overflow:hidden}
 .welcome-note{padding:13px 15px;border-radius:15px;background:rgba(32,184,173,.08);border:1px solid rgba(32,184,173,.16);color:var(--muted);margin-bottom:18px}
 .welcome-button{min-height:50px;font-size:1rem}
 @media(max-width:700px){.quiz-modal{padding:10px}.quiz-modal-card{width:100%;max-height:94vh;border-radius:22px}.quiz-modal-card .quiz-box{padding:20px}.welcome-card{padding:24px}.welcome-points{grid-template-columns:1fr}.welcome-card h2{font-size:1.55rem}}
+
+
+/* ===== Enhanced Profile Dashboard ===== */
+.user-dashboard-layout{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
+.user-dashboard-sidebar{position:sticky;top:95px;padding:24px;background:linear-gradient(155deg,var(--card),var(--soft))}
+.dashboard-avatar{width:72px;height:72px;border-radius:22px;display:grid;place-items:center;margin-bottom:12px;font-size:2rem;background:linear-gradient(135deg,var(--teal),var(--purple));color:#fff;box-shadow:0 15px 35px rgba(115,87,232,.2)}
+.user-dashboard-sidebar h3{margin:4px 0 3px;font-size:1.2rem}
+.user-dashboard-sidebar>p{margin:0 0 18px;color:var(--muted);font-size:.85rem}
+.dashboard-menu{display:grid;gap:9px;margin-top:10px}
+.dashboard-nav-item{position:relative;display:grid;grid-template-columns:42px 1fr 18px;align-items:center;gap:10px;width:100%;min-height:66px;padding:10px 11px;border:1px solid var(--border);border-radius:17px;background:rgba(255,255,255,.58);color:var(--text);text-align:right;transition:transform .2s,box-shadow .2s,border-color .2s,background .2s}
+.dashboard-nav-item:hover{transform:translateX(-3px);border-color:#9ad8d5;box-shadow:0 12px 25px rgba(30,40,60,.08);background:var(--card)}
+.dashboard-nav-item.active{background:linear-gradient(135deg,rgba(32,184,173,.13),rgba(115,87,232,.12));border-color:rgba(32,184,173,.42);box-shadow:0 12px 28px rgba(32,184,173,.1)}
+.dashboard-nav-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:var(--soft);font-size:1.25rem}
+.dashboard-nav-item.active .dashboard-nav-icon{background:linear-gradient(135deg,var(--teal),var(--purple));color:#fff}
+.dashboard-nav-copy{display:flex;flex-direction:column;gap:1px;min-width:0}
+.dashboard-nav-copy b{font-size:.91rem}
+.dashboard-nav-copy small{font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dashboard-nav-arrow{color:var(--muted);font-size:1rem;font-weight:900;transition:transform .2s,color .2s}
+.dashboard-nav-item:hover .dashboard-nav-arrow{transform:translateX(-3px);color:var(--primary2)}
+.user-dashboard-main{min-width:0}
+.dashboard-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+.dashboard-stat{position:relative;overflow:hidden;padding:18px;min-height:112px;background:linear-gradient(145deg,var(--card),var(--soft))}
+.dashboard-stat::after{content:"";position:absolute;width:70px;height:70px;left:-28px;bottom:-30px;border-radius:50%;background:radial-gradient(circle,rgba(32,184,173,.16),transparent 68%);pointer-events:none}
+.dashboard-stat span{display:block;color:var(--muted);font-size:.78rem;font-weight:800}
+.dashboard-stat strong{display:block;margin-top:4px;font-size:1.7rem}
+.dashboard-stat small{color:var(--muted)}
+.dashboard-progress-grid{grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.dashboard-progress-card{padding:20px;background:linear-gradient(145deg,var(--card),var(--soft))}
+.dashboard-progress-card .section-heading{margin-bottom:10px}
+.dashboard-progress-card .section-heading span{font-size:.83rem;color:var(--muted)}
+.dashboard-progress-card p{min-height:54px;color:var(--muted);font-size:.85rem;line-height:1.9}
+.dashboard-progress-card .secondary{margin-top:5px;min-height:46px}
+.dashboard-subscription-card{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:20px 22px;background:linear-gradient(135deg,rgba(32,184,173,.08),rgba(115,87,232,.08),var(--card))}
+.dashboard-subscription-card p{margin:5px 0 0;color:var(--muted);font-size:.84rem}
+.dashboard-subscription-card .primary{white-space:nowrap}
+
+/* ===== Lightweight Celebration Effects ===== */
+.welcome-card{animation:welcomePop .48s cubic-bezier(.17,.89,.32,1.28)}
+@keyframes welcomePop{0%{opacity:0;transform:translateY(20px) scale(.92)}100%{opacity:1;transform:translateY(0) scale(1)}}
+.welcome-card::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(circle at 20% 20%,rgba(32,184,173,.14),transparent 28%),radial-gradient(circle at 80% 12%,rgba(115,87,232,.13),transparent 25%)}
+.celebration-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:4}
+.confetti-piece{position:absolute;top:-18px;left:var(--x);width:9px;height:16px;border-radius:2px;opacity:0;animation:confettiFall var(--duration) linear var(--delay) forwards;transform:rotate(0deg)}
+.confetti-0{background:#20b8ad}.confetti-1{background:#7357e8}.confetti-2{background:#f3b63f}.confetti-3{background:#ef6b73}.confetti-4{background:#4c9df5}.confetti-5{background:#ff7ab6}
+@keyframes confettiFall{0%{opacity:0;transform:translate3d(0,0,0) rotate(0deg)}10%{opacity:1}100%{opacity:0;transform:translate3d(var(--drift),110vh,0) rotate(var(--spin))}}
+.welcome-icon{position:relative;z-index:5;filter:drop-shadow(0 8px 18px rgba(32,184,173,.18));animation:welcomeFloat 2.7s ease-in-out infinite}
+@keyframes welcomeFloat{50%{transform:translateY(-6px) rotate(-2deg)}}
+.welcome-card .welcome-points{position:relative;z-index:5}
+.welcome-card .welcome-points div{transition:transform .2s,box-shadow .2s}
+.welcome-card .welcome-points div:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(30,40,60,.08)}
+.welcome-card #welcomeNote,.welcome-card #welcomeClose{position:relative;z-index:5}
+
+@media(max-width:900px){.user-dashboard-layout{grid-template-columns:1fr}.user-dashboard-sidebar{position:static}.dashboard-menu{grid-template-columns:1fr 1fr}.dashboard-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.dashboard-menu,.dashboard-progress-grid,.dashboard-stat-grid{grid-template-columns:1fr}.dashboard-subscription-card{align-items:flex-start;flex-direction:column}.dashboard-subscription-card .primary{width:100%}.dashboard-nav-item{min-height:62px}}
