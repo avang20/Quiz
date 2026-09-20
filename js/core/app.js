@@ -2,263 +2,198 @@
    QuizDuo - Core Application
    ========================================================= */
 
-const API_URL =
-  "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFkK02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXIvzVyuxzJiZQ/exec";
+import {
+  createDefaultState,
+  addXP,
+  getUnlockedStage,
+  isStageCompleted,
+  markStageCompleted
+} from "./state.js";
+
+import {
+  loadState,
+  saveState,
+  getCurrentUser,
+  setCurrentUser,
+  logoutUser,
+  getUsers,
+  saveUsers
+} from "./storage.js";
+
+import {
+  updateStreak,
+  escapeHTML
+} from "./utils.js";
+
+import {
+  QuizEngine
+} from "./quiz.js";
+
+
 /* =========================================================
-   GLOBAL STATE
+   CONFIG
 ========================================================= */
 
-const STORAGE_KEY = "quizduo_state_v2";
-const USERS_KEY = "quizduo_users_v2";
-const THEME_KEY = "quizduo_theme";
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbwQNOpTNYI6jD2obOFKk02eEjSZd2OzkPiwvBgN_xnDgsZ90B3a_FCmXIvzVyuxzJiZQ/exec";
 
-let quizData = {
-  general: [],
-  fun: []
-};
 
-let state = loadState();
+/* =========================================================
+   STATE
+========================================================= */
 
-let currentCategory = "general";
-let currentStage = null;
-let currentQuestionIndex = 0;
-let currentQuizScore = 0;
-let currentQuizXP = 0;
-let selectedPlan = null;
-let discountValue = 0;
-let discountCodeUsed = "";
+const savedUsername =
+  getCurrentUser() || "guest";
+
+const state =
+  loadState(
+    createDefaultState(),
+    savedUsername
+  );
 
 let authMode = "login";
 
+let currentCategory =
+  "general";
 
-/* =========================================================
-   PLAN CONFIG
-========================================================= */
+let currentStage =
+  null;
 
-const PLANS = {
-  monthly: {
-    id: "monthly",
-    title: "اشتراک ماهانه",
-    durationMonths: 1,
-    price: 100000,
-    premium: false
-  },
+let selectedPlan =
+  null;
 
-  quarterly: {
-    id: "quarterly",
-    title: "اشتراک سه‌ماهه",
-    durationMonths: 3,
-    price: 270000,
-    premium: false
-  },
+let discountValue =
+  0;
 
-  sixMonth: {
-    id: "sixMonth",
-    title: "اشتراک شش‌ماهه",
-    durationMonths: 7,
-    price: 480000,
-    premium: false,
-    giftMonths: 1
-  },
-
-  nineMonth: {
-    id: "nineMonth",
-    title: "اشتراک نه‌ماهه Premium",
-    durationMonths: 11,
-    price: 660000,
-    premium: true,
-    giftMonths: 2
-  }
-};
+let discountCodeUsed =
+  "";
 
 
 /* =========================================================
-   DOM HELPERS
+   QUIZ ENGINE
 ========================================================= */
 
-const $ = (selector, parent = document) =>
+const quiz =
+  new QuizEngine(
+    state,
+    () => saveState(
+      state,
+      state.username || "guest"
+    )
+  );
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+const $ = (
+  selector,
+  parent = document
+) =>
   parent.querySelector(selector);
 
-const $$ = (selector, parent = document) =>
+
+const $$ = (
+  selector,
+  parent = document
+) =>
   [...parent.querySelectorAll(selector)];
 
 
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-
 function formatNumber(value) {
-  return Number(value || 0).toLocaleString("fa-IR");
+
+  return Number(
+    value || 0
+  ).toLocaleString("fa-IR");
+
 }
 
 
-function showMessage(element, text, type = "") {
-  if (!element) return;
+function toast(
+  message,
+  type = ""
+) {
 
-  element.textContent = text;
-  element.className = `message ${type}`.trim();
-}
-
-
-function toast(message, type = "") {
-  let container = $(".toast-container");
+  let container =
+    $(".toast-container");
 
   if (!container) {
-    container = document.createElement("div");
-    container.className = "toast-container";
-    document.body.appendChild(container);
-  }
 
-  const item = document.createElement("div");
-  item.className = `toast ${type}`.trim();
-  item.textContent = message;
+    container =
+      document.createElement("div");
 
-  container.appendChild(item);
+    container.className =
+      "toast-container";
 
-  setTimeout(() => {
-    item.remove();
-  }, 3500);
-}
-
-
-/* =========================================================
-   DEFAULT STATE
-========================================================= */
-
-function defaultState() {
-  return {
-    user: null,
-
-    xp: 0,
-    hearts: 5,
-    streak: 0,
-
-    progress: {
-      general: 0,
-      fun: 0
-    },
-
-    completedStages: {
-      general: [],
-      fun: []
-    },
-
-    subscription: {
-      active: false,
-      planId: "",
-      title: "",
-      startDate: "",
-      expiryDate: "",
-      premium: false,
-      status: "free"
-    },
-
-    notifications: [],
-
-    supportTickets: [],
-
-    chatMessages: [],
-
-    lastSync: 0
-  };
-}
-
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-
-    if (!raw) {
-      return defaultState();
-    }
-
-    const saved = JSON.parse(raw);
-
-    return deepMerge(defaultState(), saved);
-  } catch (error) {
-    console.warn("Could not load QuizDuo state:", error);
-    return defaultState();
-  }
-}
-
-
-function deepMerge(base, extra) {
-  if (!extra || typeof extra !== "object") {
-    return base;
-  }
-
-  const output = Array.isArray(base)
-    ? [...base]
-    : { ...base };
-
-  Object.keys(extra).forEach((key) => {
-
-    if (
-      extra[key] &&
-      typeof extra[key] === "object" &&
-      !Array.isArray(extra[key]) &&
-      base[key] &&
-      typeof base[key] === "object" &&
-      !Array.isArray(base[key])
-    ) {
-      output[key] = deepMerge(base[key], extra[key]);
-    } else {
-      output[key] = extra[key];
-    }
-
-  });
-
-  return output;
-}
-
-
-function saveState() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(state)
-  );
-}
-
-
-/* =========================================================
-   USER STORAGE
-========================================================= */
-
-function loadLocalUsers() {
-  try {
-    return JSON.parse(
-      localStorage.getItem(USERS_KEY) || "[]"
+    document.body.appendChild(
+      container
     );
-  } catch {
-    return [];
   }
-}
 
+  const item =
+    document.createElement("div");
 
-function saveLocalUsers(users) {
-  localStorage.setItem(
-    USERS_KEY,
-    JSON.stringify(users)
+  item.className =
+    `toast ${type}`.trim();
+
+  item.textContent =
+    message;
+
+  container.appendChild(
+    item
+  );
+
+  setTimeout(
+    () => item.remove(),
+    3500
   );
 }
 
 
+function showMessage(
+  element,
+  text,
+  type = ""
+) {
+
+  if (!element) return;
+
+  element.textContent =
+    text;
+
+  element.className =
+    `message ${type}`.trim();
+}
+
+
 /* =========================================================
-   AUTH
+   AUTH COMPATIBILITY
 ========================================================= */
+
+function getUsername() {
+
+  return (
+    state.username ||
+    "بازیکن مهمان"
+  );
+
+}
+
 
 function isLoggedIn() {
-  return Boolean(state.user);
+
+  return (
+    !!state.username &&
+    state.username !==
+      "بازیکن مهمان"
+  );
+
 }
 
 
 function requireLogin() {
+
   if (isLoggedIn()) {
     return true;
   }
@@ -268,166 +203,227 @@ function requireLogin() {
     "warning"
   );
 
-  navigate("auth");
+  openAuth("login");
+
   return false;
 }
 
 
-function openAuth(mode = "login") {
+function normalizeUsername(
+  value
+) {
 
-  authMode = mode;
+  return String(
+    value || ""
+  )
+    .trim()
+    .toLowerCase();
 
-  const title = $("#authTitle");
-  const submit = $("#authSubmit");
-  const toggle = $("#toggleAuth");
-  const phoneField = $("#phoneField");
+}
+
+
+function openAuth(
+  mode = "login"
+) {
+
+  authMode =
+    mode;
+
+  const title =
+    $("#authTitle");
+
+  const submit =
+    $("#authSubmit");
+
+  const toggle =
+    $("#toggleAuth");
+
+  const phoneField =
+    $("#phoneField");
+
 
   if (mode === "register") {
 
-    if (title) {
-      title.textContent = "ساخت حساب";
-    }
+    if (title)
+      title.textContent =
+        "ساخت حساب";
 
-    if (submit) {
-      submit.textContent = "ثبت‌نام";
-    }
+    if (submit)
+      submit.textContent =
+        "ثبت‌نام";
 
-    if (toggle) {
-      toggle.textContent = "قبلاً حساب دارم";
-    }
+    if (toggle)
+      toggle.textContent =
+        "قبلاً حساب دارم";
 
-    phoneField?.classList.remove("hidden");
+    phoneField?.classList.remove(
+      "hidden"
+    );
 
   } else {
 
-    if (title) {
-      title.textContent = "ورود";
-    }
+    if (title)
+      title.textContent =
+        "ورود";
 
-    if (submit) {
-      submit.textContent = "ورود";
-    }
+    if (submit)
+      submit.textContent =
+        "ورود";
 
-    if (toggle) {
-      toggle.textContent = "ساخت حساب جدید";
-    }
+    if (toggle)
+      toggle.textContent =
+        "ساخت حساب جدید";
 
-    phoneField?.classList.add("hidden");
+    phoneField?.classList.add(
+      "hidden"
+    );
   }
 
   navigate("auth");
 }
 
 
-function normalizeUsername(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
+/* =========================================================
+   LOCAL AUTH
+========================================================= */
 
+function registerUser(
+  name,
+  phone,
+  password
+) {
 
-function localRegister(name, phone, password) {
+  const users =
+    getUsers();
 
-  const username = normalizeUsername(name);
+  const normalized =
+    normalizeUsername(name);
 
-  if (!username || !password) {
+  if (!normalized || !password) {
+
     throw new Error(
       "نام کاربری و رمز عبور الزامی است."
     );
   }
 
-  const users = loadLocalUsers();
-
-  const exists = users.some(
-    (u) => normalizeUsername(u.name) === username
-  );
+  const exists =
+    users.some(
+      user =>
+        normalizeUsername(
+          user.name
+        ) === normalized
+    );
 
   if (exists) {
+
     throw new Error(
       "این نام کاربری قبلاً ثبت شده است."
     );
   }
 
   const user = {
-    id:
-      "local_" +
-      Date.now() +
-      "_" +
-      Math.random()
-        .toString(36)
-        .slice(2, 8),
 
-    name: name.trim(),
-    phone: String(phone || "").trim(),
+    id:
+      `user_${Date.now()}`,
+
+    name:
+      String(name).trim(),
+
+    phone:
+      String(phone || "").trim(),
+
     password,
-    createdAt: new Date().toISOString()
+
+    createdAt:
+      new Date().toISOString()
   };
 
   users.push(user);
-  saveLocalUsers(users);
+
+  saveUsers(users);
 
   return user;
 }
 
 
-function localLogin(name, password) {
+function loginUser(
+  name,
+  password
+) {
 
-  const username = normalizeUsername(name);
+  const normalized =
+    normalizeUsername(name);
 
-  const users = loadLocalUsers();
-
-  return users.find(
-    (u) =>
-      normalizeUsername(u.name) === username &&
-      u.password === password
+  return getUsers().find(
+    user =>
+      normalizeUsername(
+        user.name
+      ) === normalized &&
+      user.password === password
   );
+
 }
 
 
 async function handleAuthSubmit() {
 
-  const name = $("#authName")?.value.trim();
-  const phone = $("#authPhone")?.value.trim();
-  const password = $("#authPassword")?.value;
+  const name =
+    $("#authName")
+      ?.value
+      .trim();
 
-  const message = $("#authMsg");
+  const phone =
+    $("#authPhone")
+      ?.value
+      .trim();
+
+  const password =
+    $("#authPassword")
+      ?.value;
+
+  const message =
+    $("#authMsg");
+
 
   if (!name || !password) {
+
     showMessage(
       message,
       "نام کاربری و رمز عبور را وارد کنید.",
       "error"
     );
+
     return;
   }
 
 
   try {
 
-    if (authMode === "register") {
+    let user;
+
+
+    if (
+      authMode ===
+      "register"
+    ) {
 
       if (!phone) {
+
         showMessage(
           message,
           "شماره تماس را وارد کنید.",
           "error"
         );
+
         return;
       }
 
-      const user = localRegister(
-        name,
-        phone,
-        password
-      );
-
-      state.user = {
-        id: user.id,
-        name: user.name,
-        phone: user.phone
-      };
-
-      saveState();
+      user =
+        registerUser(
+          name,
+          phone,
+          password
+        );
 
       showMessage(
         message,
@@ -435,58 +431,70 @@ async function handleAuthSubmit() {
         "success"
       );
 
-      await syncUser();
-
-      updateUI();
-
-      setTimeout(() => {
-        navigate("profile");
-      }, 400);
-
     } else {
 
-      const user = localLogin(
-        name,
-        password
-      );
+      user =
+        loginUser(
+          name,
+          password
+        );
 
       if (!user) {
+
         showMessage(
           message,
           "نام کاربری یا رمز عبور اشتباه است.",
           "error"
         );
+
         return;
       }
-
-      state.user = {
-        id: user.id,
-        name: user.name,
-        phone: user.phone
-      };
-
-      saveState();
 
       showMessage(
         message,
         "ورود موفق بود.",
         "success"
       );
-
-      await syncUser();
-
-      updateUI();
-
-      setTimeout(() => {
-        navigate("profile");
-      }, 400);
     }
+
+
+    state.username =
+      user.name;
+
+    state.userId =
+      user.id;
+
+    state.phone =
+      user.phone;
+
+    setCurrentUser(
+      user.name
+    );
+
+    updateStreak(
+      state
+    );
+
+    saveState(
+      state,
+      user.name
+    );
+
+    updateUI();
+
+    await syncUser();
+
+    setTimeout(
+      () => navigate("profile"),
+      300
+    );
 
   } catch (error) {
 
     showMessage(
       message,
-      error.message || "خطایی رخ داد.",
+      error.message ||
+        "خطایی رخ داد.",
       "error"
     );
   }
@@ -495,11 +503,24 @@ async function handleAuthSubmit() {
 
 function logout() {
 
-  state.user = null;
+  logoutUser();
 
-  state.subscription = defaultState().subscription;
+  state.username =
+    "بازیکن مهمان";
 
-  saveState();
+  state.userId =
+    null;
+
+  state.phone =
+    "";
+
+  state.subscription =
+    "free";
+
+  saveState(
+    state,
+    "guest"
+  );
 
   updateUI();
 
@@ -516,53 +537,81 @@ function logout() {
    NAVIGATION
 ========================================================= */
 
-function navigate(pageId) {
+function navigate(
+  pageId
+) {
 
-  const page = document.getElementById(pageId);
-
-  if (!page) {
-    return;
-  }
-
-  $$(".page").forEach((section) => {
-    section.classList.remove("active");
-  });
-
-  page.classList.add("active");
-
-  $$(".main-nav button").forEach((button) => {
-
-    button.classList.toggle(
-      "active",
-      button.dataset.page === pageId
+  const page =
+    document.getElementById(
+      pageId
     );
 
-  });
+  if (!page) return;
+
+
+  $$(".page").forEach(
+    section =>
+      section.classList.remove(
+        "active"
+      )
+  );
+
+
+  page.classList.add(
+    "active"
+  );
+
+
+  $$(".main-nav button").forEach(
+    button => {
+
+      button.classList.toggle(
+        "active",
+        button.dataset.page ===
+          pageId
+      );
+
+    }
+  );
+
+
+  if (
+    pageId === "quiz"
+  ) {
+
+    renderStages();
+
+  } else if (
+    pageId === "profile"
+  ) {
+
+    renderProfile();
+
+  } else if (
+    pageId === "leaderboard"
+  ) {
+
+    renderLeaderboard();
+
+  } else if (
+    pageId === "subscription"
+  ) {
+
+    renderSubscription();
+
+  } else if (
+    pageId === "chat"
+  ) {
+
+    renderChat();
+
+  }
+
 
   window.scrollTo({
     top: 0,
     behavior: "smooth"
   });
-
-  if (pageId === "quiz") {
-    renderStages();
-  }
-
-  if (pageId === "leaderboard") {
-    renderLeaderboard();
-  }
-
-  if (pageId === "profile") {
-    renderDashboard();
-  }
-
-  if (pageId === "subscription") {
-    renderSubscription();
-  }
-
-  if (pageId === "chat") {
-    renderChat();
-  }
 }
 
 
@@ -570,54 +619,119 @@ function navigate(pageId) {
    SUBSCRIPTION
 ========================================================= */
 
+const PLANS = {
+
+  monthly: {
+    id: "monthly",
+    title: "اشتراک ماهانه",
+    price: 100000
+  },
+
+  quarterly: {
+    id: "quarterly",
+    title: "اشتراک سه‌ماهه",
+    price: 270000
+  },
+
+  sixMonth: {
+    id: "sixMonth",
+    title: "اشتراک شش‌ماهه",
+    price: 480000
+  },
+
+  nineMonth: {
+    id: "nineMonth",
+    title: "اشتراک نه‌ماهه Premium",
+    price: 660000,
+    premium: true
+  }
+
+};
+
+
 function isSubscriptionActive() {
 
-  const subscription = state.subscription;
+  const subscription =
+    state.subscription;
 
-  if (!subscription?.active) {
-    return false;
-  }
-
-  if (!subscription.expiryDate) {
-    return false;
-  }
-
-  const expiry = new Date(
-    subscription.expiryDate
-  );
 
   if (
-    Number.isNaN(expiry.getTime()) ||
-    expiry <= new Date()
+    typeof subscription ===
+    "string"
   ) {
 
-    state.subscription.active = false;
-    state.subscription.status = "expired";
+    return (
+      subscription ===
+      "active"
+    );
+  }
 
-    saveState();
+
+  if (
+    !subscription ||
+    typeof subscription !==
+      "object"
+  ) {
 
     return false;
   }
 
-  return true;
+
+  if (
+    subscription.active ===
+    true
+  ) {
+
+    if (
+      !subscription.expiryDate
+    ) {
+
+      return true;
+    }
+
+    const expiry =
+      new Date(
+        subscription.expiryDate
+      );
+
+    return (
+      !Number.isNaN(
+        expiry.getTime()
+      ) &&
+      expiry > new Date()
+    );
+  }
+
+
+  return (
+    subscription.status ===
+      "active" ||
+    subscription.status ===
+      "approved"
+  );
 }
 
 
 function hasFullAccess() {
+
   return isSubscriptionActive();
+
 }
 
 
-function canAccessStage(stageNumber) {
+function canAccessStage(
+  stage
+) {
 
   /*
-   * EXACT FREE ACCESS RULE:
-   *
-   * Stage 1 = free
-   * Stage 2+ = approved active subscription required
+   * مرحله ۱ برای همه رایگان است.
+   * مرحله ۲ به بعد فقط با اشتراک تأییدشده.
    */
 
-  if (Number(stageNumber) === 1) {
+  if (
+    Number(stage) === 1
+  ) {
+
     return true;
   }
 
@@ -625,217 +739,312 @@ function canAccessStage(stageNumber) {
 }
 
 
-function subscriptionLabel() {
+/* =========================================================
+   QUIZ DATA
+========================================================= */
 
-  if (!isSubscriptionActive()) {
-    return "رایگان";
+async function loadCategory(
+  category
+) {
+
+  try {
+
+    await quiz.loadCategory(
+      category
+    );
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      error
+    );
+
+    toast(
+      `فایل data/${category}.json پیدا نشد.`,
+      "error"
+    );
+
+    return false;
   }
-
-  if (state.subscription.premium) {
-    return "Premium 👑";
-  }
-
-  return state.subscription.title || "فعال";
-}
-
-
-function calculateExpiry(startDate, months) {
-
-  const date = new Date(startDate);
-
-  date.setMonth(
-    date.getMonth() + Number(months || 0)
-  );
-
-  return date;
-}
-
-
-function activateSubscriptionFromServer(subscription) {
-
-  if (!subscription) {
-    return;
-  }
-
-  const active =
-    subscription.active === true ||
-    subscription.status === "active" ||
-    subscription.status === "approved";
-
-  state.subscription = {
-    active,
-    planId: subscription.planId || "",
-    title: subscription.title || "",
-    startDate: subscription.startDate || "",
-    expiryDate: subscription.expiryDate || "",
-    premium:
-      subscription.premium === true ||
-      subscription.planId === "nineMonth",
-    status:
-      subscription.status ||
-      (active ? "active" : "free")
-  };
-
-  saveState();
-}
-
-
-function renderSubscription() {
-
-  $$(".select-plan").forEach((button) => {
-
-    const planId = button.dataset.plan;
-    const plan = PLANS[planId];
-
-    if (!plan) return;
-
-    button.textContent =
-      plan.premium
-        ? "انتخاب Premium"
-        : "انتخاب";
-
-  });
-
-  updatePaymentInfo();
 }
 
 
 /* =========================================================
-   PAYMENT
+   STAGES
 ========================================================= */
 
-function selectPlan(planId) {
+async function renderStages() {
 
-  if (!PLANS[planId]) {
+  const container =
+    $("#stages");
+
+  if (!container) {
     return;
   }
 
-  if (!requireLogin()) {
-    return;
-  }
 
-  selectedPlan = PLANS[planId];
-  discountValue = 0;
-  discountCodeUsed = "";
-
-  const discountInput = $("#discountCode");
-
-  if (discountInput) {
-    discountInput.value = "";
-  }
-
-  showPaymentPanel();
-
-  updatePaymentInfo();
-}
+  container.innerHTML = `
+    <div class="panel loading">
+      در حال بارگذاری مراحل...
+    </div>
+  `;
 
 
-function showPaymentPanel() {
-
-  const panel = $("#paymentPanel");
-
-  if (!panel) return;
-
-  panel.classList.remove("hidden");
-
-  panel.scrollIntoView({
-    behavior: "smooth",
-    block: "start"
-  });
-}
-
-
-function closePaymentPanel() {
-
-  $("#paymentPanel")?.classList.add("hidden");
-
-  selectedPlan = null;
-  discountValue = 0;
-  discountCodeUsed = "";
-
-  const discountMessage =
-    $("#discountMessage");
-
-  if (discountMessage) {
-    showMessage(
-      discountMessage,
-      ""
+  const loaded =
+    await loadCategory(
+      currentCategory
     );
-  }
-}
 
+  if (!loaded) {
 
-function updatePaymentInfo() {
+    container.innerHTML = `
+      <div class="panel">
+        امکان بارگذاری سوالات وجود ندارد.
+      </div>
+    `;
 
-  if (!selectedPlan) {
     return;
   }
 
-  const selectedTitle =
-    $("#selectedPlanTitle");
 
-  const selectedAmount =
-    $("#selectedAmount");
+  const questions =
+    quiz.questions || [];
 
-  const finalPrice =
-    $("#finalPrice");
 
-  const account =
-    $("#accountNumber");
+  if (!questions.length) {
 
-  if (selectedTitle) {
-    selectedTitle.textContent =
-      selectedPlan.title;
+    container.innerHTML = `
+      <div class="panel">
+        برای این بخش هنوز سوالی ثبت نشده است.
+      </div>
+    `;
+
+    return;
   }
 
-  if (selectedAmount) {
-    selectedAmount.textContent =
-      `${formatNumber(selectedPlan.price)} تومان`;
-  }
 
-  if (finalPrice) {
-    const amount =
-      Math.max(
-        0,
-        selectedPlan.price - discountValue
+  const stages = [
+    ...new Set(
+      questions
+        .map(
+          question =>
+            Number(
+              question.stage
+            ) || 1
+        )
+    )
+  ].sort(
+    (a, b) => a - b
+  );
+
+
+  container.innerHTML =
+    "";
+
+
+  stages.forEach(
+    stage => {
+
+      const stageQuestions =
+        quiz.getStageQuestions(
+          stage
+        );
+
+
+      const completed =
+        isStageCompleted(
+          state,
+          currentCategory,
+          stage
+        );
+
+
+      const unlocked =
+        canAccessStage(
+          stage
+        );
+
+
+      const card =
+        document.createElement(
+          "article"
+        );
+
+
+      card.className =
+        [
+          "stage-card",
+          completed
+            ? "completed"
+            : "",
+          !unlocked
+            ? "locked"
+            : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+
+      card.innerHTML = `
+
+        <span class="stage-lock">
+          ${
+            unlocked
+              ? completed
+                ? "✅"
+                : "▶️"
+              : "🔒"
+          }
+        </span>
+
+        <div>
+
+          <div class="stage-number">
+            ${stage}
+          </div>
+
+          <h3>
+            مرحله ${stage}
+          </h3>
+
+          <p>
+            ${formatNumber(
+              stageQuestions.length
+            )}
+            سؤال
+          </p>
+
+        </div>
+
+        <button
+          class="${
+            unlocked
+              ? "primary"
+              : "secondary"
+          }"
+          data-stage="${stage}"
+        >
+          ${
+            unlocked
+              ? completed
+                ? "بازی دوباره"
+                : "شروع مرحله"
+              : "🔒 نیاز به اشتراک"
+          }
+        </button>
+
+      `;
+
+
+      const button =
+        $("button", card);
+
+
+      button?.addEventListener(
+        "click",
+        () => {
+
+          if (
+            !canAccessStage(
+              stage
+            )
+          ) {
+
+            toast(
+              "برای مرحله ۲ به بعد اشتراک تأییدشده لازم است.",
+              "warning"
+            );
+
+            navigate(
+              "subscription"
+            );
+
+            return;
+          }
+
+
+          startStage(
+            currentCategory,
+            stage,
+            completed
+          );
+        }
       );
 
-    finalPrice.textContent =
-      `${formatNumber(amount)} تومان`;
-  }
 
-  /*
-   * The actual bank/account value should come
-   * from Code.gs/general.json if configured.
-   * This placeholder is intentionally visible
-   * until the server provides the configured value.
-   */
+      container.appendChild(
+        card
+      );
+    }
+  );
 
-  if (account) {
-    account.textContent =
-      window.QUIZDUO_CONFIG?.accountNumber ||
-      "اطلاعات حساب در بخش پرداخت";
-  }
+
+  updateQuizStats();
 }
 
 
-async function applyDiscountCode() {
+/* =========================================================
+   CATEGORY
+========================================================= */
 
-  if (!selectedPlan) {
+function setCategory(
+  category
+) {
+
+  if (
+    category !==
+      "general" &&
+    category !==
+      "fun"
+  ) {
+
     return;
   }
 
-  const input = $("#discountCode");
-  const message = $("#discountMessage");
 
-  const code =
-    input?.value.trim();
+  currentCategory =
+    category;
 
-  if (!code) {
 
-    showMessage(
-      message,
-      "کد تخفیف را وارد کنید.",
+  $$(
+    "[data-category-tab]"
+  ).forEach(
+    button => {
+
+      button.classList.toggle(
+        "active",
+        button.dataset.categoryTab ===
+          category
+      );
+
+    }
+  );
+
+
+  renderStages();
+}
+
+
+/* =========================================================
+   QUIZ
+========================================================= */
+
+async function startStage(
+  category,
+  stage,
+  replay = false
+) {
+
+  if (
+    !canAccessStage(
+      stage
+    )
+  ) {
+
+    toast(
+      "این مرحله قفل است.",
       "warning"
     );
 
@@ -843,120 +1052,941 @@ async function applyDiscountCode() {
   }
 
 
-  try {
+  currentCategory =
+    category;
 
-    const response =
-      await postJSON({
-        action: "discount",
-        code,
-        planId: selectedPlan.id,
-        username: state.user?.name || "",
-        userId: state.user?.id || ""
-      });
+  currentStage =
+    stage;
 
 
-    if (response?.success) {
+  const loaded =
+    await loadCategory(
+      category
+    );
 
-      discountValue =
-        Number(response.discountAmount || 0);
-
-      discountCodeUsed = code;
-
-      showMessage(
-        message,
-        response.message ||
-          "کد تخفیف اعمال شد.",
-        "success"
-      );
-
-      updatePaymentInfo();
-
-      return;
-    }
+  if (!loaded) {
+    return;
+  }
 
 
-    /*
-     * Local fallback for common test codes.
-     * Server-side validation remains authoritative.
-     */
+  const questions =
+    quiz.startStage(
+      category,
+      stage,
+      replay
+    );
 
-    const localCodes = {
-      QUIZ10: 10,
-      DUO10: 10
-    };
 
-    const percent =
-      localCodes[code.toUpperCase()];
+  if (
+    !questions.length
+  ) {
 
-    if (percent) {
-
-      discountValue =
-        Math.round(
-          selectedPlan.price * percent / 100
-        );
-
-      discountCodeUsed =
-        code.toUpperCase();
-
-      showMessage(
-        message,
-        `${percent}٪ تخفیف اعمال شد.`,
-        "success"
-      );
-
-      updatePaymentInfo();
-
-    } else {
-
-      discountValue = 0;
-      discountCodeUsed = "";
-
-      showMessage(
-        message,
-        response?.message ||
-          "کد تخفیف معتبر نیست.",
-        "error"
-      );
-
-      updatePaymentInfo();
-    }
-
-  } catch (error) {
-
-    showMessage(
-      message,
-      "امکان بررسی کد تخفیف وجود ندارد.",
+    toast(
+      "این مرحله سؤال قابل اجرا ندارد.",
       "error"
     );
+
+    return;
+  }
+
+
+  const box =
+    $("#quizBox");
+
+  if (!box) return;
+
+
+  box.classList.remove(
+    "hidden"
+  );
+
+
+  renderQuestion();
+
+
+  box.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+
+function renderQuestion() {
+
+  const box =
+    $("#quizBox");
+
+  if (!box) return;
+
+
+  const question =
+    quiz.getCurrentQuestion();
+
+
+  if (!question) {
+
+    finishQuiz();
+    return;
+  }
+
+
+  const number =
+    quiz.currentQuestion + 1;
+
+
+  const total =
+    quiz.getQuestionCount();
+
+
+  const progress =
+    Math.round(
+      ((number - 1) /
+        total) *
+        100
+    );
+
+
+  box.innerHTML = `
+
+    <div class="quiz-question">
+
+      <div class="section-heading">
+
+        <div>
+
+          <span class="eyebrow">
+            مرحله ${currentStage}
+          </span>
+
+          <h3>
+            سؤال ${number}
+            از ${total}
+          </h3>
+
+        </div>
+
+        <span class="quiz-score">
+          درست:
+          ${formatNumber(
+            quiz.correctAnswers
+          )}
+        </span>
+
+      </div>
+
+
+      <div class="quiz-progress">
+        <div
+          style="width:${progress}%"
+        ></div>
+      </div>
+
+
+      <h3>
+        ${escapeHTML(
+          question.question
+        )}
+      </h3>
+
+
+      <div class="quiz-options">
+
+        ${question.options
+          .map(
+            (option, index) => `
+              <button
+                class="quiz-option"
+                data-option-index="${index}"
+              >
+                ${escapeHTML(
+                  option
+                )}
+              </button>
+            `
+          )
+          .join("")}
+
+      </div>
+
+
+      <div
+        id="answerFeedback"
+        class="message"
+      ></div>
+
+
+      <div class="quiz-footer">
+
+        <span>
+          ❤️
+          ${formatNumber(
+            state.hearts
+          )}
+        </span>
+
+        <button
+          id="exitQuiz"
+          class="dark-action"
+        >
+          خروج
+        </button>
+
+      </div>
+
+    </div>
+  `;
+
+
+  $$(".quiz-option", box)
+    .forEach(
+      button => {
+
+        button.addEventListener(
+          "click",
+          () =>
+            answerQuestion(
+              Number(
+                button.dataset
+                  .optionIndex
+              )
+            )
+        );
+
+      }
+    );
+
+
+  $("#exitQuiz")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        box.classList.add(
+          "hidden"
+        );
+
+        renderStages();
+      }
+    );
+}
+
+
+function answerQuestion(
+  index
+) {
+
+  const buttons =
+    $$(".quiz-option");
+
+
+  buttons.forEach(
+    button =>
+      button.disabled =
+        true
+  );
+
+
+  const result =
+    quiz.answer(
+      index
+    );
+
+
+  const feedback =
+    $("#answerFeedback");
+
+
+  if (
+    result.correct
+  ) {
+
+    buttons[index]
+      ?.classList.add(
+        "correct"
+      );
+
+    showMessage(
+      feedback,
+      "✅ پاسخ درست بود!",
+      "success"
+    );
+
+  } else {
+
+    buttons[index]
+      ?.classList.add(
+        "wrong"
+      );
+
+    if (
+      result.correctAnswers !==
+      undefined
+    ) {
+
+      const question =
+        quiz.selectedQuestions[
+          quiz.currentQuestion - 1
+        ];
+
+      if (
+        question
+      ) {
+
+        buttons[
+          question.answer
+        ]?.classList.add(
+          "correct"
+        );
+
+        showMessage(
+          feedback,
+          `❌ پاسخ نادرست بود. پاسخ درست: ${
+            question.options[
+              question.answer
+            ] || "نامشخص"
+          }`,
+          "error"
+        );
+      }
+    }
+  }
+
+
+  if (
+    result.explanation
+  ) {
+
+    const explanation =
+      document.createElement(
+        "p"
+      );
+
+    explanation.className =
+      "muted";
+
+    explanation.textContent =
+      result.explanation;
+
+    feedback?.appendChild(
+      explanation
+    );
+  }
+
+
+  updateUI();
+
+
+  setTimeout(
+    () => {
+
+      if (
+        result.finished
+      ) {
+
+        finishQuiz(
+          result
+        );
+
+      } else {
+
+        renderQuestion();
+
+      }
+
+    },
+    900
+  );
+}
+
+
+function finishQuiz(
+  result = null
+) {
+
+  const box =
+    $("#quizBox");
+
+  if (!box) return;
+
+
+  const passed =
+    result?.passed ?? true;
+
+
+  if (
+    result?.newlyCompleted
+  ) {
+
+    toast(
+      `مرحله ${currentStage} با موفقیت تکمیل شد!`,
+      "success"
+    );
+  }
+
+
+  if (
+    result?.heartLost
+  ) {
+
+    toast(
+      "به دلیل رد شدن مرحله، یک قلب کم شد.",
+      "warning"
+    );
+  }
+
+
+  saveState(
+    state,
+    state.username ||
+      "guest"
+  );
+
+
+  box.innerHTML = `
+
+    <div class="access-denied">
+
+      <span class="lock">
+        ${
+          passed
+            ? "🎉"
+            : "😕"
+        }
+      </span>
+
+      <h3>
+        ${
+          passed
+            ? `مرحله ${currentStage} تمام شد!`
+            : "مرحله قبول نشد"
+        }
+      </h3>
+
+      ${
+        result
+          ? `
+            <p>
+              پاسخ‌های درست:
+              <b>
+                ${formatNumber(
+                  result.correctAnswers
+                )}
+              </b>
+              از
+              ${formatNumber(
+                result.total
+              )}
+            </p>
+
+            <p>
+              XP:
+              <b>
+                ${formatNumber(
+                  result.earnedXP
+                )}
+              </b>
+            </p>
+          `
+          : ""
+      }
+
+      <button
+        id="backToStages"
+        class="primary"
+      >
+        بازگشت به مراحل
+      </button>
+
+    </div>
+  `;
+
+
+  $("#backToStages")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        box.classList.add(
+          "hidden"
+        );
+
+        renderStages();
+      }
+    );
+
+
+  updateUI();
+
+
+  if (
+    state.username &&
+    state.username !==
+      "بازیکن مهمان"
+  ) {
+
+    syncProgress();
   }
 }
 
 
-function fileToBase64(file) {
+/* =========================================================
+   QUIZ STATS
+========================================================= */
 
-  return new Promise((resolve, reject) => {
+function updateQuizStats() {
 
-    const reader = new FileReader();
+  const element =
+    $("#quizStats");
 
-    reader.onload = () => {
+  if (!element) return;
 
-      const result =
-        String(reader.result || "");
 
-      const comma =
-        result.indexOf(",");
+  const completed =
+    state[
+      currentCategory ===
+      "general"
+        ? "completedGeneralStages"
+        : "completedFunStages"
+    ];
 
-      resolve(
-        comma >= 0
-          ? result.slice(comma + 1)
-          : result
+
+  const count =
+    Array.isArray(
+      completed
+    )
+      ? completed.length
+      : 0;
+
+
+  const total =
+    quiz.questions?.length
+      ? Math.max(
+          ...quiz.questions.map(
+            q =>
+              Number(
+                q.stage
+              ) || 1
+          )
+        )
+      : 0;
+
+
+  element.textContent =
+    `تکمیل‌شده: ${formatNumber(
+      count
+    )} از ${formatNumber(
+      total
+    )}`;
+}
+
+
+/* =========================================================
+   PROFILE
+========================================================= */
+
+function renderProfile() {
+
+  const name =
+    $("#dashboardName");
+
+  const xp =
+    $("#dashboardXP");
+
+  const hearts =
+    $("#dashboardHearts");
+
+  const streak =
+    $("#dashboardStreak");
+
+  const general =
+    $("#dashboardGeneralStage");
+
+  const fun =
+    $("#dashboardFunStage");
+
+
+  if (name)
+    name.textContent =
+      getUsername();
+
+
+  if (xp)
+    xp.textContent =
+      formatNumber(
+        state.xp
       );
-    };
 
-    reader.onerror = reject;
 
-    reader.readAsDataURL(file);
-  });
+  if (hearts)
+    hearts.textContent =
+      formatNumber(
+        state.hearts
+      );
+
+
+  if (streak)
+    streak.textContent =
+      formatNumber(
+        state.streak
+      );
+
+
+  if (general)
+    general.textContent =
+      formatNumber(
+        state.generalStage - 1
+      );
+
+
+  if (fun)
+    fun.textContent =
+      formatNumber(
+        state.funStage - 1
+      );
+
+
+  const badge =
+    $("#dashboardAccessBadge");
+
+  const title =
+    $("#dashboardSubscriptionTitle");
+
+  const text =
+    $("#dashboardSubscriptionText");
+
+  const sub =
+    $("#dashboardSubscription");
+
+
+  if (
+    isSubscriptionActive()
+  ) {
+
+    badge?.classList.remove(
+      "free"
+    );
+
+    badge?.classList.add(
+      "premium"
+    );
+
+    if (badge)
+      badge.textContent =
+        "🔓 اشتراک فعال";
+
+    if (sub)
+      sub.textContent =
+        "اشتراک فعال";
+
+    if (title)
+      title.textContent =
+        "اشتراک فعال است";
+
+    if (text)
+      text.textContent =
+        "همه مراحل برای شما باز هستند.";
+
+  } else {
+
+    badge?.classList.add(
+      "free"
+    );
+
+    badge?.classList.remove(
+      "premium"
+    );
+
+    if (badge)
+      badge.textContent =
+        "🔒 فقط ۱ مرحله رایگان";
+
+    if (sub)
+      sub.textContent =
+        "رایگان — ۱ مرحله";
+
+    if (title)
+      title.textContent =
+        "حساب رایگان";
+
+    if (text)
+      text.textContent =
+        "حساب رایگان فقط به مرحله ۱ دسترسی دارد.";
+  }
+}
+
+
+/* =========================================================
+   LEADERBOARD
+========================================================= */
+
+function renderLeaderboard() {
+
+  const body =
+    $("#leaderBody");
+
+  if (!body) return;
+
+
+  const users =
+    getUsers();
+
+
+  const entries =
+    users.map(
+      user => {
+
+        const saved =
+          loadState(
+            createDefaultState(),
+            user.name
+          );
+
+        return {
+          name:
+            user.name,
+
+          xp:
+            Number(
+              saved.xp || 0
+            ),
+
+          stage:
+            Math.max(
+              Number(
+                saved.generalStage || 1
+              ) - 1,
+
+              Number(
+                saved.funStage || 1
+              ) - 1
+            )
+        };
+      }
+    );
+
+
+  if (
+    isLoggedIn()
+  ) {
+
+    entries.push({
+      name:
+        state.username,
+
+      xp:
+        Number(
+          state.xp || 0
+        ),
+
+      stage:
+        Math.max(
+          Number(
+            state.generalStage || 1
+          ) - 1,
+
+          Number(
+            state.funStage || 1
+          ) - 1
+        )
+    });
+  }
+
+
+  entries.sort(
+    (a, b) =>
+      b.xp - a.xp
+  );
+
+
+  if (!entries.length) {
+
+    body.innerHTML = `
+      <tr>
+        <td colspan="4">
+          هنوز بازیکنی ثبت نشده است.
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
+
+  body.innerHTML =
+    entries
+      .slice(0, 50)
+      .map(
+        (entry, index) => `
+          <tr>
+
+            <td>
+              ${
+                index === 0
+                  ? "🥇"
+                  : index === 1
+                    ? "🥈"
+                    : index === 2
+                      ? "🥉"
+                      : index + 1
+              }
+            </td>
+
+            <td>
+              ${escapeHTML(
+                entry.name
+              )}
+            </td>
+
+            <td>
+              ${formatNumber(
+                entry.xp
+              )}
+            </td>
+
+            <td>
+              ${formatNumber(
+                entry.stage
+              )}
+            </td>
+
+          </tr>
+        `
+      )
+      .join("");
+}
+
+
+/* =========================================================
+   SUBSCRIPTION UI
+========================================================= */
+
+function renderSubscription() {
+
+  $$(".select-plan")
+    .forEach(
+      button => {
+
+        const plan =
+          PLANS[
+            button.dataset.plan
+          ];
+
+        if (!plan) return;
+
+        button.textContent =
+          plan.premium
+            ? "انتخاب Premium"
+            : "انتخاب";
+
+      }
+    );
+
+}
+
+
+function selectPlan(
+  planId
+) {
+
+  if (!requireLogin()) {
+    return;
+  }
+
+
+  const plan =
+    PLANS[planId];
+
+  if (!plan) return;
+
+
+  selectedPlan =
+    plan;
+
+  discountValue =
+    0;
+
+  discountCodeUsed =
+    "";
+
+
+  const panel =
+    $("#paymentPanel");
+
+  panel?.classList.remove(
+    "hidden"
+  );
+
+
+  const title =
+    $("#selectedPlanTitle");
+
+  const amount =
+    $("#selectedAmount");
+
+  const final =
+    $("#finalPrice");
+
+
+  if (title)
+    title.textContent =
+      plan.title;
+
+  if (amount)
+    amount.textContent =
+      `${formatNumber(
+        plan.price
+      )} تومان`;
+
+  if (final)
+    final.textContent =
+      `${formatNumber(
+        plan.price
+      )} تومان`;
+}
+
+
+/* =========================================================
+   PAYMENT
+========================================================= */
+
+function fileToBase64(
+  file
+) {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      const reader =
+        new FileReader();
+
+      reader.onload =
+        () => {
+
+          const result =
+            String(
+              reader.result || ""
+            );
+
+          const index =
+            result.indexOf(",");
+
+          resolve(
+            index >= 0
+              ? result.slice(
+                  index + 1
+                )
+              : result
+          );
+        };
+
+      reader.onerror =
+        reject;
+
+      reader.readAsDataURL(
+        file
+      );
+    }
+  );
 }
 
 
@@ -965,6 +1995,7 @@ async function submitPayment() {
   if (!requireLogin()) {
     return;
   }
+
 
   if (!selectedPlan) {
 
@@ -976,16 +2007,16 @@ async function submitPayment() {
     return;
   }
 
-  const file =
-    $("#paymentFile")?.files?.[0];
 
-  const message =
-    $("#paymentMessage");
+  const file =
+    $("#paymentFile")
+      ?.files?.[0];
+
 
   if (!file) {
 
     showMessage(
-      message,
+      $("#paymentMessage"),
       "تصویر فیش پرداخت را انتخاب کنید.",
       "error"
     );
@@ -994,13 +2025,13 @@ async function submitPayment() {
   }
 
 
-  const maxBytes =
-    5 * 1024 * 1024;
-
-  if (file.size > maxBytes) {
+  if (
+    file.size >
+    5 * 1024 * 1024
+  ) {
 
     showMessage(
-      message,
+      $("#paymentMessage"),
       "حجم تصویر نباید بیشتر از ۵ مگابایت باشد.",
       "error"
     );
@@ -1009,52 +2040,27 @@ async function submitPayment() {
   }
 
 
-  if (!file.type.startsWith("image/")) {
-
-    showMessage(
-      message,
-      "لطفاً یک فایل تصویری انتخاب کنید.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  const submitButton =
-    $("#submitPayment");
-
-  if (submitButton) {
-    submitButton.disabled = true;
-    submitButton.textContent =
-      "در حال ارسال...";
-  }
-
-
   try {
 
     const base64 =
-      await fileToBase64(file);
-
-    const finalAmount =
-      Math.max(
-        0,
-        selectedPlan.price - discountValue
+      await fileToBase64(
+        file
       );
 
 
     const response =
       await postJSON({
-        action: "payment",
+        action:
+          "payment",
 
         userId:
-          state.user?.id || "",
+          state.userId || "",
 
         username:
-          state.user?.name || "",
+          state.username,
 
         phone:
-          state.user?.phone || "",
+          state.phone || "",
 
         planId:
           selectedPlan.id,
@@ -1063,7 +2069,7 @@ async function submitPayment() {
           selectedPlan.title,
 
         amount:
-          finalAmount,
+          selectedPlan.price,
 
         originalAmount:
           selectedPlan.price,
@@ -1085,1103 +2091,50 @@ async function submitPayment() {
       });
 
 
-    if (response?.success) {
+    if (
+      response?.success
+    ) {
 
       showMessage(
-        message,
+        $("#paymentMessage"),
         response.message ||
-          "فیش با موفقیت ارسال شد و پس از تأیید، اشتراک فعال می‌شود.",
+          "فیش با موفقیت ارسال شد و پس از تأیید اشتراک فعال می‌شود.",
         "success"
       );
 
       toast(
-        "فیش برای بررسی ارسال شد.",
+        "فیش ارسال شد.",
         "success"
       );
 
-      $("#paymentFile").value = "";
+      $("#paymentFile").value =
+        "";
+
       $("#fileName").textContent =
         "فایلی انتخاب نشده است";
 
-      return;
-    }
+    } else {
 
-
-    showMessage(
-      message,
-      response?.message ||
-        "ارسال فیش ناموفق بود.",
-      "error"
-    );
-
-  } catch (error) {
-
-    console.error(error);
-
-    showMessage(
-      message,
-      "ارتباط با سرور پرداخت برقرار نشد.",
-      "error"
-    );
-
-  } finally {
-
-    if (submitButton) {
-      submitButton.disabled = false;
-      submitButton.textContent =
-        "ارسال فیش برای بررسی";
-    }
-  }
-}
-
-
-/* =========================================================
-   QUIZ DATA
-========================================================= */
-
-async function loadQuizData() {
-
-  try {
-
-    const [generalResponse, funResponse] =
-      await Promise.all([
-        fetch("../../data/general.json", {
-          cache: "no-store"
-        }),
-
-        fetch("../../data/fun.json", {
-          cache: "no-store"
-        })
-      ]);
-
-
-    if (!generalResponse.ok) {
-      throw new Error(
-        `Could not load ../../data/general.json (${generalResponse.status})`
+      showMessage(
+        $("#paymentMessage"),
+        response?.message ||
+          "ارسال فیش ناموفق بود.",
+        "error"
       );
     }
-
-
-    if (!funResponse.ok) {
-      throw new Error(
-        `Could not load ../../data/fun.json (${funResponse.status})`
-      );
-    }
-
-
-    const [generalData, funData] =
-      await Promise.all([
-        generalResponse.json(),
-        funResponse.json()
-      ]);
-
-
-    quizData.general =
-      normalizeQuizData(
-        Array.isArray(generalData)
-          ? generalData
-          : generalData.questions ||
-            generalData.items ||
-            []
-      );
-
-
-    quizData.fun =
-      normalizeQuizData(
-        Array.isArray(funData)
-          ? funData
-          : funData.questions ||
-            funData.items ||
-            []
-      );
-
-
-    console.log(
-      "QuizDuo quiz data loaded:",
-      {
-        general:
-          quizData.general.length,
-
-        fun:
-          quizData.fun.length
-      }
-    );
-
 
   } catch (error) {
 
     console.error(
-      "Could not load quiz data:",
       error
     );
 
-
-    quizData = {
-      general: [],
-      fun: []
-    };
-
-
-    toast(
-      "فایل سوالات پیدا نشد. مسیر data/general.json و data/fun.json را بررسی کنید.",
-      "error"
-    );
-  }
-}
-
-
-function normalizeQuizData(data) {
-
-  if (!Array.isArray(data)) {
-    return [];
-  }
-
-  return data.map((question, index) => {
-
-    const options =
-      Array.isArray(question.options)
-        ? question.options
-        : [];
-
-    let correctIndex =
-      Number.isInteger(question.correctIndex)
-        ? question.correctIndex
-        : -1;
-
-    if (
-      correctIndex < 0 &&
-      question.answer !== undefined
-    ) {
-      correctIndex =
-        options.findIndex(
-          (option) =>
-            String(option).trim() ===
-            String(question.answer).trim()
-        );
-    }
-
-    return {
-      id:
-        question.id ||
-        `${index + 1}`,
-
-      question:
-        question.question ||
-        question.text ||
-        "",
-
-      options,
-
-      correctIndex,
-
-      explanation:
-        question.explanation || "",
-
-      category:
-        question.category || currentCategory
-    };
-  });
-}
-
-
-function getStageQuestions(category, stage) {
-
-  const all =
-    quizData[category] || [];
-
-  /*
-   * 15 questions per stage for stages 1–7.
-   * Stage 8 contains 18 questions.
-   */
-
-  if (stage <= 0) {
-    return [];
-  }
-
-  const start =
-    stage <= 7
-      ? (stage - 1) * 15
-      : 7 * 15;
-
-  const count =
-    stage === 8
-      ? 18
-      : 15;
-
-  return all.slice(
-    start,
-    start + count
-  );
-}
-
-
-function getStageCount(category) {
-  const questions = quizData[category] || [];
-
-  if (!questions.length) {
-    return 0;
-  }
-
-  return Math.min(
-    8,
-    Math.ceil(questions.length / 15)
-  );
-}
-
-
-/* =========================================================
-   STAGE ACCESS
-========================================================= */
-
-function renderStages() {
-
-  const container = $("#stages");
-
-  if (!container) {
-    return;
-  }
-
-  const totalStages =
-    Math.max(
-      8,
-      getStageCount(currentCategory)
-    );
-
-
-  container.innerHTML = "";
-
-
-  for (
-    let stage = 1;
-    stage <= totalStages;
-    stage++
-  ) {
-
-    const questions =
-      getStageQuestions(
-        currentCategory,
-        stage
-      );
-
-    const completed =
-      state.completedStages[
-        currentCategory
-      ]?.includes(stage);
-
-
-    const unlocked =
-      canAccessStage(stage);
-
-    const card =
-      document.createElement("article");
-
-    card.className =
-      "stage-card" +
-      (completed ? " completed" : "") +
-      (!unlocked ? " locked" : "");
-
-
-    const lock =
-      unlocked
-        ? completed
-          ? "✅"
-          : "▶️"
-        : "🔒";
-
-
-    card.innerHTML = `
-      <span class="stage-lock">${lock}</span>
-
-      <div>
-        <div class="stage-number">
-          ${stage}
-        </div>
-
-        <h3>
-          مرحله ${stage}
-        </h3>
-
-        <p>
-          ${
-            questions.length
-              ? `${questions.length} سؤال`
-              : "در حال آماده‌سازی"
-          }
-        </p>
-      </div>
-
-      <button
-        class="${unlocked ? "primary" : "secondary"}"
-        data-stage="${stage}"
-        ${questions.length ? "" : "disabled"}
-      >
-        ${
-          unlocked
-            ? completed
-              ? "بازی دوباره"
-              : "شروع مرحله"
-            : "🔒 نیاز به اشتراک"
-        }
-      </button>
-    `;
-
-
-    const button =
-      $("button", card);
-
-    if (button) {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          if (!canAccessStage(stage)) {
-
-            toast(
-              "برای دسترسی به مرحله ۲ به بعد، اشتراک تأییدشده لازم است.",
-              "warning"
-            );
-
-            navigate("subscription");
-
-            return;
-          }
-
-          startStage(
-            currentCategory,
-            stage
-          );
-        }
-      );
-    }
-
-
-    container.appendChild(card);
-  }
-
-
-  updateQuizStats();
-}
-
-
-function updateQuizStats() {
-
-  const element =
-    $("#quizStats");
-
-  if (!element) return;
-
-  const progress =
-    state.progress[currentCategory] || 0;
-
-  const total =
-    getStageCount(currentCategory);
-
-  element.textContent =
-    `مرحله ${formatNumber(progress)} از ${formatNumber(total)}`;
-}
-
-
-/* =========================================================
-   START QUIZ
-========================================================= */
-
-function startStage(category, stage) {
-
-  if (!canAccessStage(stage)) {
-
-    toast(
-      "این مرحله قفل است.",
-      "warning"
-    );
-
-    return;
-  }
-
-
-  const questions =
-    getStageQuestions(
-      category,
-      stage
-    );
-
-
-  if (!questions.length) {
-
-    toast(
-      "برای این مرحله سوالی وجود ندارد.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  currentCategory = category;
-  currentStage = stage;
-  currentQuestionIndex = 0;
-  currentQuizScore = 0;
-  currentQuizXP = 0;
-
-
-  const quizBox =
-    $("#quizBox");
-
-  if (!quizBox) return;
-
-  quizBox.classList.remove("hidden");
-
-  renderCurrentQuestion();
-
-  quizBox.scrollIntoView({
-    behavior: "smooth",
-    block: "start"
-  });
-}
-
-
-function renderCurrentQuestion() {
-
-  const quizBox =
-    $("#quizBox");
-
-  if (!quizBox) return;
-
-
-  const questions =
-    getStageQuestions(
-      currentCategory,
-      currentStage
-    );
-
-  const question =
-    questions[currentQuestionIndex];
-
-
-  if (!question) {
-    finishStage();
-    return;
-  }
-
-
-  const progress =
-    Math.round(
-      (
-        currentQuestionIndex /
-        questions.length
-      ) * 100
-    );
-
-
-  quizBox.innerHTML = `
-
-    <div class="quiz-question">
-
-      <div class="section-heading">
-
-        <div>
-
-          <span class="eyebrow">
-            مرحله ${currentStage}
-          </span>
-
-          <h3>
-            سؤال
-            ${currentQuestionIndex + 1}
-            از
-            ${questions.length}
-          </h3>
-
-        </div>
-
-        <span class="quiz-score">
-          امتیاز:
-          ${formatNumber(currentQuizScore)}
-        </span>
-
-      </div>
-
-
-      <div class="quiz-progress">
-        <div
-          style="width:${progress}%"
-        ></div>
-      </div>
-
-
-      <h3>
-        ${escapeHTML(question.question)}
-      </h3>
-
-
-      <div class="quiz-options">
-
-        ${question.options
-          .map(
-            (option, index) => `
-              <button
-                class="quiz-option"
-                data-option-index="${index}"
-              >
-                ${escapeHTML(option)}
-              </button>
-            `
-          )
-          .join("")}
-
-      </div>
-
-
-      <div
-        id="answerFeedback"
-        class="message"
-      ></div>
-
-
-      <div class="quiz-footer">
-
-        <span>
-          ❤️
-          ${formatNumber(state.hearts)}
-        </span>
-
-        <button
-          id="exitQuiz"
-          class="dark-action"
-        >
-          خروج
-        </button>
-
-      </div>
-
-    </div>
-  `;
-
-
-  $$(".quiz-option", quizBox)
-    .forEach((button) => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          answerQuestion(
-            Number(
-              button.dataset.optionIndex
-            )
-          );
-        }
-      );
-
-    });
-
-
-  $("#exitQuiz")?.addEventListener(
-    "click",
-    () => {
-      quizBox.classList.add("hidden");
-    }
-  );
-}
-
-
-/* =========================================================
-   ANSWER
-========================================================= */
-
-function answerQuestion(selectedIndex) {
-
-  const questions =
-    getStageQuestions(
-      currentCategory,
-      currentStage
-    );
-
-  const question =
-    questions[currentQuestionIndex];
-
-
-  if (!question) {
-    return;
-  }
-
-
-  const buttons =
-    $$(".quiz-option");
-
-
-  buttons.forEach((button) => {
-    button.disabled = true;
-  });
-
-
-  const isCorrect =
-    selectedIndex === question.correctIndex;
-
-
-  const feedback =
-    $("#answerFeedback");
-
-
-  if (isCorrect) {
-
-    currentQuizScore += 10;
-    currentQuizXP += 10;
-
-    state.xp += 10;
-
-    state.hearts =
-      Math.min(
-        10,
-        Number(state.hearts || 0) + 1
-      );
-
     showMessage(
-      feedback,
-      "✅ پاسخ درست بود!",
-      "success"
-    );
-
-    buttons[selectedIndex]
-      ?.classList.add("correct");
-
-  } else {
-
-    state.hearts =
-      Math.max(
-        0,
-        Number(state.hearts || 0) - 1
-      );
-
-    showMessage(
-      feedback,
-      `❌ پاسخ نادرست بود. پاسخ درست: ${
-        question.options[
-          question.correctIndex
-        ] || "نامشخص"
-      }`,
+      $("#paymentMessage"),
+      "ارتباط با سرور پرداخت برقرار نشد.",
       "error"
     );
-
-    buttons[selectedIndex]
-      ?.classList.add("wrong");
-
-    buttons[question.correctIndex]
-      ?.classList.add("correct");
   }
-
-
-  saveState();
-  updateUI();
-
-
-  if (question.explanation) {
-
-    const explanation =
-      document.createElement("p");
-
-    explanation.className = "muted";
-
-    explanation.textContent =
-      question.explanation;
-
-    feedback?.appendChild(
-      explanation
-    );
-  }
-
-
-  setTimeout(() => {
-
-    currentQuestionIndex++;
-
-    if (
-      currentQuestionIndex >=
-      questions.length
-    ) {
-      finishStage();
-    } else {
-      renderCurrentQuestion();
-    }
-
-  }, 1000);
-}
-
-
-/* =========================================================
-   FINISH STAGE
-========================================================= */
-
-function finishStage() {
-
-  const category =
-    currentCategory;
-
-  const stage =
-    currentStage;
-
-
-  if (
-    !state.completedStages[category]
-  ) {
-    state.completedStages[category] = [];
-  }
-
-
-  if (
-    !state.completedStages[category]
-      .includes(stage)
-  ) {
-
-    state.completedStages[category]
-      .push(stage);
-  }
-
-
-  state.progress[category] =
-    Math.max(
-      Number(state.progress[category] || 0),
-      stage
-    );
-
-
-  state.xp += currentQuizScore;
-
-
-  saveState();
-
-
-  const quizBox =
-    $("#quizBox");
-
-
-  if (quizBox) {
-
-    quizBox.innerHTML = `
-
-      <div class="access-denied">
-
-        <span class="lock">
-          🎉
-        </span>
-
-        <h3>
-          مرحله ${stage} تمام شد!
-        </h3>
-
-        <p>
-          امتیاز این مرحله:
-          <b>
-            ${formatNumber(currentQuizScore)}
-          </b>
-        </p>
-
-        <p>
-          XP دریافت‌شده:
-          <b>
-            ${formatNumber(currentQuizXP)}
-          </b>
-        </p>
-
-        <button
-          id="backToStages"
-          class="primary"
-        >
-          بازگشت به مراحل
-        </button>
-
-      </div>
-    `;
-
-    $("#backToStages")
-      ?.addEventListener(
-        "click",
-        () => {
-          quizBox.classList.add("hidden");
-          renderStages();
-        }
-      );
-  }
-
-
-  updateUI();
-
-  syncProgress();
-}
-
-
-/* =========================================================
-   CATEGORY
-========================================================= */
-
-function setCategory(category) {
-
-  if (
-    category !== "general" &&
-    category !== "fun"
-  ) {
-    return;
-  }
-
-  currentCategory = category;
-
-  $$(".tabs button")
-    .forEach((button) => {
-
-      button.classList.toggle(
-        "active",
-        button.dataset.categoryTab ===
-          category
-      );
-
-    });
-
-  renderStages();
-}
-
-
-/* =========================================================
-   DASHBOARD
-========================================================= */
-
-function renderDashboard() {
-
-  const user =
-    state.user;
-
-  $("#dashboardName").textContent =
-    user?.name || "بازیکن مهمان";
-
-  $("#dashboardXP").textContent =
-    formatNumber(state.xp);
-
-  $("#dashboardHearts").textContent =
-    formatNumber(state.hearts);
-
-  $("#dashboardStreak").textContent =
-    formatNumber(state.streak);
-
-  $("#dashboardGeneralStage").textContent =
-    formatNumber(
-      state.progress.general || 0
-    );
-
-  $("#dashboardFunStage").textContent =
-    formatNumber(
-      state.progress.fun || 0
-    );
-
-
-  const active =
-    isSubscriptionActive();
-
-
-  const badge =
-    $("#dashboardAccessBadge");
-
-
-  const subscriptionText =
-    $("#dashboardSubscription");
-
-
-  const title =
-    $("#dashboardSubscriptionTitle");
-
-
-  const text =
-    $("#dashboardSubscriptionText");
-
-
-  if (active) {
-
-    badge?.classList.remove("free");
-    badge?.classList.add("premium");
-
-    if (badge) {
-      badge.textContent =
-        state.subscription.premium
-          ? "👑 Premium فعال"
-          : "🔓 اشتراک فعال";
-    }
-
-    if (subscriptionText) {
-      subscriptionText.textContent =
-        subscriptionLabel();
-    }
-
-    if (title) {
-      title.textContent =
-        state.subscription.premium
-          ? "Premium فعال است 👑"
-          : "اشتراک فعال است";
-    }
-
-    if (text) {
-      text.textContent =
-        `تا ${formatDate(
-          state.subscription.expiryDate
-        )} همه مراحل برای شما باز هستند.`;
-    }
-
-  } else {
-
-    badge?.classList.add("free");
-    badge?.classList.remove("premium");
-
-    if (badge) {
-      badge.textContent =
-        "🔒 فقط ۱ مرحله رایگان";
-    }
-
-    if (subscriptionText) {
-      subscriptionText.textContent =
-        "رایگان — ۱ مرحله";
-    }
-
-    if (title) {
-      title.textContent =
-        "حساب رایگان";
-    }
-
-    if (text) {
-      text.textContent =
-        "حساب رایگان فقط به مرحله ۱ دسترسی دارد؛ با اشتراک تأییدشده، همه مراحل باز می‌شوند.";
-    }
-  }
-
-
-  updateNoticeCount();
-}
-
-
-function updateNoticeCount() {
-
-  const unread =
-    state.notifications.filter(
-      (n) => !n.read
-    ).length;
-
-  const element =
-    $("#dashboardNoticeCount");
-
-  if (!element) {
-    return;
-  }
-
-  element.textContent =
-    unread
-      ? `${formatNumber(unread)} پیام جدید`
-      : "بدون پاسخ جدید";
-}
-
-
-/* =========================================================
-   LEADERBOARD
-========================================================= */
-
-function renderLeaderboard() {
-
-  const body =
-    $("#leaderBody");
-
-  if (!body) {
-    return;
-  }
-
-
-  const users =
-    loadLocalUsers();
-
-
-  const current =
-    state.user
-      ? [{
-          id: state.user.id,
-          name: state.user.name,
-          xp: state.xp,
-          stage:
-            Math.max(
-              state.progress.general || 0,
-              state.progress.fun || 0
-            )
-        }]
-      : [];
-
-
-  const entries = [
-    ...users.map((user) => ({
-      id: user.id,
-      name: user.name,
-      xp: Number(user.xp || 0),
-      stage: Number(user.stage || 0)
-    })),
-    ...current
-  ];
-
-
-  const unique =
-    new Map();
-
-  entries.forEach((entry) => {
-    unique.set(entry.id, entry);
-  });
-
-
-  const sorted =
-    [...unique.values()]
-      .sort((a, b) => b.xp - a.xp)
-      .slice(0, 50);
-
-
-  if (!sorted.length) {
-
-    body.innerHTML = `
-      <tr>
-        <td colspan="4">
-          هنوز بازیکنی ثبت نشده است.
-        </td>
-      </tr>
-    `;
-
-    return;
-  }
-
-
-  body.innerHTML =
-    sorted
-      .map((entry, index) => {
-
-        const medal =
-          index === 0
-            ? "🥇"
-            : index === 1
-              ? "🥈"
-              : index === 2
-                ? "🥉"
-                : index + 1;
-
-
-        return `
-          <tr>
-            <td class="rank-medal">
-              ${medal}
-            </td>
-
-            <td>
-              ${escapeHTML(entry.name)}
-            </td>
-
-            <td>
-              ${formatNumber(entry.xp)}
-            </td>
-
-            <td>
-              ${formatNumber(entry.stage)}
-            </td>
-          </tr>
-        `;
-      })
-      .join("");
 }
 
 
@@ -2191,21 +2144,20 @@ function renderLeaderboard() {
 
 function renderChat() {
 
-  const container =
+  const box =
     $("#messages");
 
-  if (!container) {
-    return;
-  }
+  if (!box) return;
 
 
   const messages =
-    state.chatMessages || [];
+    state.chatMessages ||
+    [];
 
 
   if (!messages.length) {
 
-    container.innerHTML = `
+    box.innerHTML = `
       <div class="muted">
         هنوز پیامی وجود ندارد.
       </div>
@@ -2215,35 +2167,18 @@ function renderChat() {
   }
 
 
-  container.innerHTML =
+  box.innerHTML =
     messages
-      .map((message) => {
-
-        const mine =
-          message.from === "user";
-
-
-        return `
-          <div
-            class="chat-message ${
-              mine ? "mine" : ""
-            }"
-          >
-            ${escapeHTML(message.text)}
-
-            <span class="meta">
-              ${formatDateTime(
-                message.date
-              )}
-            </span>
+      .map(
+        message => `
+          <div class="chat-message">
+            ${escapeHTML(
+              message.text
+            )}
           </div>
-        `;
-      })
+        `
+      )
       .join("");
-
-
-  container.scrollTop =
-    container.scrollHeight;
 }
 
 
@@ -2261,32 +2196,42 @@ async function sendChatMessage() {
     input?.value.trim();
 
 
-  if (!text) {
-    return;
+  if (!text) return;
+
+
+  if (
+    !Array.isArray(
+      state.chatMessages
+    )
+  ) {
+
+    state.chatMessages =
+      [];
   }
 
 
-  const message = {
+  state.chatMessages.push({
     id:
-      "msg_" +
-      Date.now(),
+      `msg_${Date.now()}`,
 
-    from: "user",
+    from:
+      "user",
 
     text,
 
     date:
       new Date().toISOString()
-  };
+  });
 
 
-  state.chatMessages.push(
-    message
+  saveState(
+    state,
+    state.username
   );
 
-  saveState();
 
-  input.value = "";
+  input.value =
+    "";
 
   renderChat();
 
@@ -2294,13 +2239,14 @@ async function sendChatMessage() {
   try {
 
     await postJSON({
-      action: "supportUserReply",
+      action:
+        "supportUserReply",
 
       userId:
-        state.user.id,
+        state.userId || "",
 
       username:
-        state.user.name,
+        state.username,
 
       text
     });
@@ -2308,7 +2254,6 @@ async function sendChatMessage() {
   } catch (error) {
 
     console.warn(
-      "Chat sync failed:",
       error
     );
   }
@@ -2334,14 +2279,11 @@ async function sendSupport() {
     $("#supportText")
       ?.value.trim();
 
-  const message =
-    $("#supportMsg");
-
 
   if (!subject || !text) {
 
     showMessage(
-      message,
+      $("#supportMsg"),
       "موضوع و متن پیام را وارد کنید.",
       "error"
     );
@@ -2354,69 +2296,55 @@ async function sendSupport() {
 
     const response =
       await postJSON({
-        action: "support",
+        action:
+          "support",
 
         userId:
-          state.user.id,
+          state.userId || "",
 
         username:
-          state.user.name,
+          state.username,
 
         phone:
-          state.user.phone || "",
+          state.phone || "",
 
         subject,
         text
       });
 
 
-    if (response?.success) {
-
-      state.supportTickets.push({
-        id:
-          response.ticketId ||
-          `ticket_${Date.now()}`,
-
-        subject,
-        text,
-
-        status: "open",
-
-        date:
-          new Date().toISOString()
-      });
-
-      saveState();
-
+    if (
+      response?.success
+    ) {
 
       showMessage(
-        message,
+        $("#supportMsg"),
         response.message ||
           "درخواست پشتیبانی ارسال شد.",
         "success"
       );
 
+      $("#supportSubject").value =
+        "";
 
-      $("#supportSubject").value = "";
-      $("#supportText").value = "";
+      $("#supportText").value =
+        "";
 
+    } else {
 
-      return;
+      showMessage(
+        $("#supportMsg"),
+        response?.message ||
+          "ارسال درخواست ناموفق بود.",
+        "error"
+      );
     }
 
+  } catch {
 
     showMessage(
-      message,
-      response?.message ||
-        "ارسال درخواست ناموفق بود.",
-      "error"
-    );
-
-  } catch (error) {
-
-    showMessage(
-      message,
-      "ارتباط با سرور پشتیبانی برقرار نشد.",
+      $("#supportMsg"),
+      "ارتباط با سرور برقرار نشد.",
       "error"
     );
   }
@@ -2424,16 +2352,19 @@ async function sendSupport() {
 
 
 /* =========================================================
-   SERVER SYNC
+   SERVER
 ========================================================= */
 
-async function postJSON(payload) {
+async function postJSON(
+  payload
+) {
 
   const response =
     await fetch(
       API_URL,
       {
-        method: "POST",
+        method:
+          "POST",
 
         headers: {
           "Content-Type":
@@ -2441,7 +2372,9 @@ async function postJSON(payload) {
         },
 
         body:
-          JSON.stringify(payload)
+          JSON.stringify(
+            payload
+          )
       }
     );
 
@@ -2450,242 +2383,121 @@ async function postJSON(payload) {
     await response.text();
 
 
-  let data;
-
-
   try {
-    data = JSON.parse(text);
+
+    return JSON.parse(
+      text
+    );
+
   } catch {
 
     throw new Error(
-      "پاسخ سرور JSON معتبر نیست."
+      "پاسخ سرور معتبر نیست."
     );
   }
-
-
-  return data;
 }
 
 
 async function syncUser() {
 
-  if (!state.user) {
-    return null;
-  }
-
-
-  try {
-
-    const data =
-      await postJSON({
-        action: "userUpdates",
-
-        userId:
-          state.user.id,
-
-        username:
-          state.user.name,
-
-        phone:
-          state.user.phone || "",
-
-        localXP:
-          state.xp,
-
-        localGeneralStage:
-          state.progress.general,
-
-        localFunStage:
-          state.progress.fun
-      });
-
-
-    if (!data?.success) {
-      return data;
-    }
-
-
-    /*
-     * Server is authoritative for subscription.
-     * This is important because payment approval
-     * happens in Admin.html / Code.gs.
-     */
-
-    if (data.subscription) {
-
-      activateSubscriptionFromServer(
-        data.subscription
-      );
-    }
-
-
-    if (Array.isArray(data.notifications)) {
-
-      state.notifications =
-        data.notifications;
-    }
-
-
-    if (Array.isArray(data.supportTickets)) {
-
-      state.supportTickets =
-        data.supportTickets;
-    }
-
-
-    if (
-      Number.isFinite(
-        Number(data.xp)
-      )
-    ) {
-      state.xp =
-        Math.max(
-          state.xp,
-          Number(data.xp)
-        );
-    }
-
-
-    if (data.progress) {
-
-      state.progress.general =
-        Math.max(
-          Number(
-            state.progress.general || 0
-          ),
-          Number(
-            data.progress.general || 0
-          )
-        );
-
-      state.progress.fun =
-        Math.max(
-          Number(
-            state.progress.fun || 0
-          ),
-          Number(
-            data.progress.fun || 0
-          )
-        );
-    }
-
-
-    state.lastSync =
-      Date.now();
-
-    saveState();
-
-    updateUI();
-
-    return data;
-
-  } catch (error) {
-
-    console.warn(
-      "QuizDuo server sync failed:",
-      error
-    );
-
-    return null;
-  }
-}
-
-
-async function syncProgress() {
-
-  if (!state.user) {
+  if (!isLoggedIn()) {
     return;
   }
 
 
   try {
 
-    await postJSON({
-      action: "userUpdates",
+    const response =
+      await postJSON({
+        action:
+          "userUpdates",
 
-      userId:
-        state.user.id,
+        userId:
+          state.userId || "",
 
-      username:
-        state.user.name,
+        username:
+          state.username,
 
-      phone:
-        state.user.phone || "",
+        phone:
+          state.phone || "",
 
-      localXP:
-        state.xp,
+        localXP:
+          state.xp,
 
-      localGeneralStage:
-        state.progress.general,
+        localGeneralStage:
+          Math.max(
+            0,
+            Number(
+              state.generalStage ||
+              1
+            ) - 1
+          ),
 
-      localFunStage:
-        state.progress.fun
-    });
+        localFunStage:
+          Math.max(
+            0,
+            Number(
+              state.funStage ||
+              1
+            ) - 1
+          )
+      });
+
+
+    if (!response?.success) {
+      return;
+    }
+
+
+    if (
+      response.subscription
+    ) {
+
+      state.subscription =
+        response.subscription;
+    }
+
+
+    if (
+      Number.isFinite(
+        Number(
+          response.xp
+        )
+      )
+    ) {
+
+      state.xp =
+        Math.max(
+          state.xp,
+          Number(
+            response.xp
+          )
+        );
+    }
+
+
+    saveState(
+      state,
+      state.username
+    );
+
+
+    updateUI();
 
   } catch (error) {
 
     console.warn(
-      "Progress sync failed:",
+      "Server sync failed:",
       error
     );
   }
 }
 
 
-/* =========================================================
-   DATE HELPERS
-========================================================= */
+async function syncProgress() {
 
-function formatDate(value) {
+  await syncUser();
 
-  if (!value) {
-    return "نامشخص";
-  }
-
-
-  const date =
-    new Date(value);
-
-
-  if (Number.isNaN(date.getTime())) {
-    return "نامشخص";
-  }
-
-
-  return date.toLocaleDateString(
-    "fa-IR",
-    {
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    }
-  );
-}
-
-
-function formatDateTime(value) {
-
-  if (!value) {
-    return "";
-  }
-
-
-  const date =
-    new Date(value);
-
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-
-  return date.toLocaleString(
-    "fa-IR",
-    {
-      dateStyle: "short",
-      timeStyle: "short"
-    }
-  );
 }
 
 
@@ -2697,24 +2509,29 @@ function loadTheme() {
 
   const theme =
     localStorage.getItem(
-      THEME_KEY
+      "quizduo_theme"
     );
 
+  if (
+    theme === "dark"
+  ) {
 
-  if (theme === "dark") {
-    document.body.classList.add("dark");
+    document.body.classList.add(
+      "dark"
+    );
   }
 }
 
 
 function toggleTheme() {
 
-  document.body.classList.toggle("dark");
+  document.body.classList.toggle(
+    "dark"
+  );
 
 
   localStorage.setItem(
-    THEME_KEY,
-
+    "quizduo_theme",
     document.body.classList.contains(
       "dark"
     )
@@ -2725,72 +2542,46 @@ function toggleTheme() {
 
 
 /* =========================================================
-   FILE NAME
-========================================================= */
-
-function updateFileName(file) {
-
-  const element =
-    $("#fileName");
-
-  if (!element) {
-    return;
-  }
-
-
-  element.textContent =
-    file
-      ? file.name
-      : "فایلی انتخاب نشده است";
-}
-
-
-/* =========================================================
-   UPDATE UI
+   UI
 ========================================================= */
 
 function updateUI() {
 
-  const authButton =
+  const auth =
     $("#authButton");
 
 
-  if (authButton) {
+  if (auth) {
 
-    authButton.textContent =
-      state.user
-        ? `👤 ${state.user.name}`
+    auth.textContent =
+      isLoggedIn()
+        ? `👤 ${state.username}`
         : "ورود / ثبت‌نام";
   }
 
 
-  renderDashboard();
-
-  updateNoticeCount();
+  renderProfile();
 
   updateQuizStats();
 }
 
 
 /* =========================================================
-   GLOBAL EVENT HANDLERS
+   EVENTS
 ========================================================= */
 
 function setupNavigation() {
 
   document.addEventListener(
     "click",
-    (event) => {
+    event => {
 
       const button =
         event.target.closest(
           "[data-page]"
         );
 
-
-      if (!button) {
-        return;
-      }
+      if (!button) return;
 
 
       event.preventDefault();
@@ -2802,14 +2593,20 @@ function setupNavigation() {
 
       if (
         page === "profile" &&
-        !state.user
+        !isLoggedIn()
       ) {
-        openAuth("login");
+
+        openAuth(
+          "login"
+        );
+
         return;
       }
 
 
-      navigate(page);
+      navigate(
+        page
+      );
     }
   );
 }
@@ -2822,10 +2619,19 @@ function setupAuth() {
       "click",
       () => {
 
-        if (state.user) {
-          navigate("profile");
+        if (
+          isLoggedIn()
+        ) {
+
+          navigate(
+            "profile"
+          );
+
         } else {
-          openAuth("login");
+
+          openAuth(
+            "login"
+          );
         }
       }
     );
@@ -2841,30 +2647,35 @@ function setupAuth() {
   $("#toggleAuth")
     ?.addEventListener(
       "click",
-      () => {
-
+      () =>
         openAuth(
           authMode === "login"
             ? "register"
             : "login"
-        );
-      }
+        )
     );
 
 
   $("#authBack")
     ?.addEventListener(
       "click",
-      () => navigate("home")
+      () =>
+        navigate(
+          "home"
+        )
     );
 
 
   $("#authPassword")
     ?.addEventListener(
       "keydown",
-      (event) => {
+      event => {
 
-        if (event.key === "Enter") {
+        if (
+          event.key ===
+          "Enter"
+        ) {
+
           handleAuthSubmit();
         }
       }
@@ -2874,50 +2685,49 @@ function setupAuth() {
 
 function setupQuiz() {
 
-  $$("[data-category-tab]")
-    .forEach((button) => {
+  $$(
+    "[data-category-tab]"
+  ).forEach(
+    button => {
 
       button.addEventListener(
         "click",
-        () => {
-
+        () =>
           setCategory(
-            button.dataset.categoryTab
-          );
-        }
+            button.dataset
+              .categoryTab
+          )
       );
-    });
+    }
+  );
 }
 
 
 function setupSubscription() {
 
   $$(".select-plan")
-    .forEach((button) => {
+    .forEach(
+      button => {
 
-      button.addEventListener(
-        "click",
-        () => {
-
-          selectPlan(
-            button.dataset.plan
-          );
-        }
-      );
-    });
+        button.addEventListener(
+          "click",
+          () =>
+            selectPlan(
+              button.dataset.plan
+            )
+        );
+      }
+    );
 
 
   $("#closePayment")
     ?.addEventListener(
       "click",
-      closePaymentPanel
-    );
-
-
-  $("#applyDiscount")
-    ?.addEventListener(
-      "click",
-      applyDiscountCode
+      () =>
+        $("#paymentPanel")
+          ?.classList.add(
+            "hidden"
+          )
     );
 
 
@@ -2931,11 +2741,21 @@ function setupSubscription() {
   $("#paymentFile")
     ?.addEventListener(
       "change",
-      (event) => {
+      event => {
 
-        updateFileName(
-          event.target.files?.[0]
-        );
+        const file =
+          event.target.files?.[0];
+
+        const label =
+          $("#fileName");
+
+        if (label) {
+
+          label.textContent =
+            file
+              ? file.name
+              : "فایلی انتخاب نشده است";
+        }
       }
     );
 }
@@ -2953,13 +2773,16 @@ function setupChat() {
   $("#chatInput")
     ?.addEventListener(
       "keydown",
-      (event) => {
+      event => {
 
         if (
-          event.key === "Enter" &&
+          event.key ===
+            "Enter" &&
           !event.shiftKey
         ) {
+
           event.preventDefault();
+
           sendChatMessage();
         }
       }
@@ -2987,60 +2810,74 @@ function setupTheme() {
 }
 
 
-function setupDashboard() {
-
-  $$("[data-dashboard-target]")
-    .forEach((button) => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          $$("[data-dashboard-target]")
-            .forEach((item) => {
-              item.classList.remove("active");
-            });
-
-          button.classList.add("active");
-        }
-      );
-    });
-}
-
-
 /* =========================================================
    INIT
 ========================================================= */
 
 async function init() {
 
-  loadTheme();
+  try {
 
-  setupNavigation();
-  setupAuth();
-  setupQuiz();
-  setupSubscription();
-  setupChat();
-  setupSupport();
-  setupTheme();
-  setupDashboard();
+    loadTheme();
 
-  updateUI();
+    setupNavigation();
+    setupAuth();
+    setupQuiz();
+    setupSubscription();
+    setupChat();
+    setupSupport();
+    setupTheme();
 
-  await loadQuizData();
 
-  renderStages();
+    updateStreak(
+      state
+    );
 
-  /*
-   * If user is logged in, retrieve the authoritative
-   * subscription/payment status from Google Apps Script.
-   */
+    saveState(
+      state,
+      state.username ||
+        "guest"
+    );
 
-  if (state.user) {
-    await syncUser();
+
+    updateUI();
+
+
+    /*
+     * برای اینکه صفحه اول آزمون بلافاصله
+     * سؤال‌ها را داشته باشد.
+     */
+
+    await loadCategory(
+      "general"
+    );
+
+
+    if (
+      isLoggedIn()
+    ) {
+
+      await syncUser();
+    }
+
+
+    navigate(
+      "home"
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "QuizDuo initialization error:",
+      error
+    );
+
+    toast(
+      "خطا در راه‌اندازی QuizDuo.",
+      "error"
+    );
   }
-
-  updateUI();
 }
 
 
@@ -3077,4 +2914,5 @@ window.QuizDuo = {
   canAccessStage,
 
   toast
+
 };
