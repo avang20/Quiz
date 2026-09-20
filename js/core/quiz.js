@@ -9,8 +9,20 @@ import {
 
 export const QUIZ_CONFIG = {
 
-    questionsPerStage:
-        15,
+    /*
+     * اگر یک مرحله ۱۵ سؤال داشته باشد:
+     * ۱۰ سؤال نمایش داده می‌شود.
+     *
+     * اگر یک مرحله ۱۸ سؤال داشته باشد:
+     * ۱۳ سؤال نمایش داده می‌شود.
+     *
+     * یعنی در هر دور ۵ سؤال کنار گذاشته می‌شوند.
+     */
+    defaultQuestionsPerStage:
+        10,
+
+    reserveQuestions:
+        5,
 
     passingPercentage:
         0.5,
@@ -36,9 +48,7 @@ function normalizeQuestion(
         !raw ||
         typeof raw !== "object"
     ) {
-
         return null;
-
     }
 
 
@@ -68,7 +78,7 @@ function normalizeQuestion(
     }
 
 
-    let options =
+    let rawOptions =
         raw.options ??
         raw.choices ??
         raw.answers ??
@@ -79,46 +89,69 @@ function normalizeQuestion(
 
     if (
         !Array.isArray(
-            options
+            rawOptions
         )
     ) {
 
-        options =
+        rawOptions =
             Object.values(
-                options || {}
+                rawOptions || {}
             );
 
     }
 
 
-    options =
-        options.map(
+    const options =
+        rawOptions.map(
             option => {
 
                 if (
                     option &&
-                    typeof option === "object"
+                    typeof option ===
+                        "object"
                 ) {
 
-                    return String(
-                        option.text ??
-                        option.label ??
-                        option.value ??
-                        option.answer ??
-                        option.content ??
-                        ""
-                    );
+                    return {
+
+                        text:
+                            String(
+                                option.text ??
+                                option.label ??
+                                option.value ??
+                                option.answer ??
+                                option.content ??
+                                ""
+                            ),
+
+                        original:
+                            option
+
+                    };
 
                 }
 
 
-                return String(
-                    option ?? ""
-                );
+                return {
+
+                    text:
+                        String(
+                            option ??
+                            ""
+                        ),
+
+                    original:
+                        option
+
+                };
 
             }
         );
 
+
+    /*
+     * ابتدا جواب صحیح را بر اساس ترتیب اصلی
+     * پیدا می‌کنیم.
+     */
 
     const rawAnswer =
         raw.answer ??
@@ -133,7 +166,7 @@ function normalizeQuestion(
         raw.correct_option;
 
 
-    let answer =
+    let correctIndex =
         -1;
 
 
@@ -151,7 +184,7 @@ function normalizeQuestion(
                 options.length
         ) {
 
-            answer =
+            correctIndex =
                 rawAnswer;
 
         } else if (
@@ -160,7 +193,7 @@ function normalizeQuestion(
                 options.length
         ) {
 
-            answer =
+            correctIndex =
                 rawAnswer - 1;
 
         }
@@ -192,7 +225,7 @@ function normalizeQuestion(
                     options.length
             ) {
 
-                answer =
+                correctIndex =
                     numeric;
 
             } else if (
@@ -201,7 +234,7 @@ function normalizeQuestion(
                     options.length
             ) {
 
-                answer =
+                correctIndex =
                     numeric - 1;
 
             }
@@ -210,26 +243,27 @@ function normalizeQuestion(
 
 
         if (
-            answer < 0 &&
+            correctIndex < 0 &&
             /^[A-Za-z]$/.test(
                 trimmed
             )
         ) {
 
-            const index =
+            const letterIndex =
                 trimmed
                     .toUpperCase()
-                    .charCodeAt(0) - 65;
+                    .charCodeAt(0) -
+                65;
 
 
             if (
-                index >= 0 &&
-                index <
+                letterIndex >= 0 &&
+                letterIndex <
                     options.length
             ) {
 
-                answer =
-                    index;
+                correctIndex =
+                    letterIndex;
 
             }
 
@@ -237,23 +271,17 @@ function normalizeQuestion(
 
 
         if (
-            answer < 0
+            correctIndex < 0
         ) {
 
-            const normalized =
-                trimmed
-                    .toLocaleLowerCase();
-
-
-            answer =
+            correctIndex =
                 options.findIndex(
                     option =>
-                        String(
-                            option
-                        )
+                        option.text
                             .trim()
                             .toLocaleLowerCase() ===
-                        normalized
+                        trimmed
+                            .toLocaleLowerCase()
                 );
 
         }
@@ -276,12 +304,11 @@ function normalizeQuestion(
             undefined
         ) {
 
-            answer =
+            correctIndex =
                 options.findIndex(
                     option =>
-                        String(
-                            option
-                        ).trim() ===
+                        option.text
+                            .trim() ===
                         String(
                             candidate
                         ).trim()
@@ -292,8 +319,13 @@ function normalizeQuestion(
     }
 
 
+    /*
+     * اگر correctOptions وجود داشته باشد،
+     * آن را هم امتحان می‌کنیم.
+     */
+
     if (
-        answer < 0
+        correctIndex < 0
     ) {
 
         const correctOptions =
@@ -308,11 +340,11 @@ function normalizeQuestion(
             correctOptions.length
         ) {
 
-            answer =
+            correctIndex =
                 options.findIndex(
                     option =>
                         String(
-                            option
+                            option.text
                         ).trim() ===
                         String(
                             correctOptions[0]
@@ -322,6 +354,64 @@ function normalizeQuestion(
         }
 
     }
+
+
+    /*
+     * اگر جواب معتبر نباشد، سؤال را
+     * نگه می‌داریم ولی بعداً فیلتر می‌شود.
+     */
+
+    let shuffledOptions =
+        options;
+
+
+    /*
+     * گزینه‌ها را به صورت تصادفی جابه‌جا می‌کنیم.
+     *
+     * چون correctIndex هم با همان آبجکت حرکت می‌کند،
+     * پاسخ صحیح دیگر همیشه گزینه اول نخواهد بود.
+     */
+
+    if (
+        correctIndex >= 0 &&
+        correctIndex <
+            options.length
+    ) {
+
+        shuffledOptions =
+            shuffle(
+                options.map(
+                    (
+                        option,
+                        index
+                    ) => ({
+
+                        ...option,
+
+                        isCorrect:
+                            index ===
+                            correctIndex
+
+                    })
+                )
+            );
+
+    } else {
+
+        shuffledOptions =
+            shuffle(
+                options
+            );
+
+    }
+
+
+    const newCorrectIndex =
+        shuffledOptions.findIndex(
+            option =>
+                option.isCorrect ===
+                true
+        );
 
 
     const stage =
@@ -354,9 +444,17 @@ function normalizeQuestion(
                 ""
             ),
 
-        options,
+        options:
+            shuffledOptions.map(
+                option =>
+                    String(
+                        option.text ??
+                        option
+                    )
+            ),
 
-        answer,
+        answer:
+            newCorrectIndex,
 
         explanation:
             String(
@@ -384,7 +482,7 @@ export class QuizEngine {
 
         this.saveState =
             typeof saveState ===
-            "function"
+                "function"
 
                 ? saveState
 
@@ -394,32 +492,42 @@ export class QuizEngine {
         this.questions =
             [];
 
+
         this.selectedQuestions =
             [];
+
 
         this.currentQuestion =
             0;
 
+
         this.currentCategory =
             "general";
+
 
         this.currentStage =
             1;
 
+
         this.correctAnswers =
             0;
+
 
         this.wrongAnswers =
             0;
 
+
         this.combo =
             0;
+
 
         this.finished =
             false;
 
+
         this.isReplay =
             false;
+
 
         this.stageRewardGiven =
             false;
@@ -619,6 +727,54 @@ export class QuizEngine {
     }
 
 
+    getQuestionsForThisRound(
+        stage
+    ) {
+
+        const stageQuestions =
+            this.getStageQuestions(
+                stage
+            );
+
+
+        if (
+            stageQuestions.length <=
+            QUIZ_CONFIG.defaultQuestionsPerStage
+        ) {
+
+            return shuffle(
+                stageQuestions
+            );
+
+        }
+
+
+        /*
+         * قانون اصلی:
+         *
+         * 15 -> 10
+         * 16 -> 11
+         * 17 -> 12
+         * 18 -> 13
+         *
+         * یعنی همیشه 5 سؤال کنار گذاشته می‌شود.
+         */
+
+        const count =
+            stageQuestions.length -
+            QUIZ_CONFIG.reserveQuestions;
+
+
+        return shuffle(
+            stageQuestions
+        ).slice(
+            0,
+            count
+        );
+
+    }
+
+
     startStage(
         category,
         stage,
@@ -628,59 +784,60 @@ export class QuizEngine {
         this.currentCategory =
             category;
 
+
         this.currentStage =
             Number(
                 stage
             ) ||
             1;
 
+
         this.isReplay =
             Boolean(
                 replay
             );
 
+
         this.currentQuestion =
             0;
+
 
         this.correctAnswers =
             0;
 
+
         this.wrongAnswers =
             0;
+
 
         this.combo =
             0;
 
+
         this.finished =
             false;
+
 
         this.stageRewardGiven =
             false;
 
 
-        const stageQuestions =
-            this.getStageQuestions(
+        this.selectedQuestions =
+            this.getQuestionsForThisRound(
                 this.currentStage
             );
-
-
-        this.selectedQuestions =
-            shuffle(
-                stageQuestions
-            )
-                .slice(
-                    0,
-                    Math.min(
-                        QUIZ_CONFIG.questionsPerStage,
-                        stageQuestions.length
-                    )
-                );
 
 
         console.log(
             "Starting stage:",
             this.currentStage,
-            "questions:",
+
+            "total stage questions:",
+            this.getStageQuestions(
+                this.currentStage
+            ).length,
+
+            "questions this round:",
             this.selectedQuestions.length
         );
 
@@ -710,7 +867,8 @@ export class QuizEngine {
 
 
     answer(
-        answerIndex
+        answerIndex,
+        timedOut = false
     ) {
 
         const question =
@@ -739,6 +897,7 @@ export class QuizEngine {
 
 
         const correct =
+            !timedOut &&
             Number(
                 answerIndex
             ) ===
@@ -776,11 +935,14 @@ export class QuizEngine {
         let passed =
             false;
 
+
         let earnedXP =
             0;
 
+
         let heartLost =
             false;
+
 
         let newlyCompleted =
             false;
@@ -859,11 +1021,14 @@ export class QuizEngine {
 
                     this.state.hearts =
                         Math.max(
+
                             0,
+
                             Number(
                                 this.state.hearts
                             ) -
                             QUIZ_CONFIG.failedStageHeartPenalty
+
                         );
 
 
@@ -889,6 +1054,12 @@ export class QuizEngine {
         return {
 
             correct,
+
+            timedOut:
+
+                Boolean(
+                    timedOut
+                ),
 
             finished,
 
