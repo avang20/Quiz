@@ -1124,7 +1124,7 @@ class App {
         ) {
 
             box.innerHTML =
-                "<p>برای این مرحله سوال معتبری پیدا نشد.</p>";
+                "<div class=\"quiz-card\"><p>برای این مرحله سؤال معتبری پیدا نشد.</p></div>";
 
             box.classList.remove(
                 "hidden"
@@ -1141,67 +1141,106 @@ class App {
                     String(option).trim() !== ""
             );
 
-        box.classList.remove(
-            "hidden"
-        );
+        const current =
+            this.quiz.currentQuestion + 1;
+
+        const total =
+            this.quiz.getQuestionCount();
+
+        const progress =
+            total
+                ? Math.round(
+                    (current / total) * 100
+                  )
+                : 0;
+
+        const letters = [
+            "الف",
+            "ب",
+            "ج",
+            "د"
+        ];
+
+        box.classList.remove("hidden");
 
         box.innerHTML = `
-            <div class="quiz-top">
-                <span>
-                    مرحله ${this.quiz.currentStage}
-                </span>
+            <div class="quiz-card">
 
-                <span>
-                    سوال ${
-                        this.quiz.currentQuestion + 1
-                    }
-                    از
-                    ${this.quiz.getQuestionCount()}
-                </span>
+                <div class="quiz-top">
+                    <span class="quiz-stage-pill">
+                        ✨ مرحله ${this.quiz.currentStage}
+                    </span>
 
-                <span id="questionTimer">⏱ 20</span>
+                    <span>
+                        سؤال ${current} از ${total}
+                    </span>
+
+                    <span
+                        id="questionTimer"
+                        class="quiz-stage-pill"
+                        aria-live="polite"
+                    >
+                        ⏱ 20
+                    </span>
+                </div>
+
+                <div class="quiz-progress-wrap">
+                    <div
+                        class="quiz-progress"
+                        style="width:${progress}%"
+                    ></div>
+                </div>
+
+                <div class="quiz-mini-stat">
+                    <span>
+                        🎯 پاسخ‌های درست: ${this.quiz.correctAnswers}
+                    </span>
+
+                    <span>
+                        🔥 Combo: ${this.quiz.combo}
+                    </span>
+                </div>
+
+                <h3 class="quiz-question">
+                    ${escapeHTML(normalized.question)}
+                </h3>
+
+                <div class="quiz-options-grid">
+                    ${options.map(
+                        (option, index) => `
+                            <button
+                                class="quiz-option"
+                                data-i="${index}"
+                                type="button"
+                            >
+                                <span class="quiz-option-letter">
+                                    ${letters[index] || index + 1}
+                                </span>
+
+                                <span>
+                                    ${escapeHTML(String(option))}
+                                </span>
+                            </button>
+                        `
+                    ).join("")}
+                </div>
+
+                <div
+                    id="quizFeedback"
+                    class="quiz-feedback"
+                    aria-live="polite"
+                ></div>
             </div>
-
-            <h3>
-                ${escapeHTML(
-                    normalized.question
-                )}
-            </h3>
-
-            <div class="options">
-                ${options.map(
-                    (option, index) => `
-                        <button
-                            class="option"
-                            data-i="${index}"
-                        >
-                            ${escapeHTML(
-                                String(option)
-                            )}
-                        </button>
-                    `
-                ).join("")}
-            </div>
-
-            <div
-                id="quizFeedback"
-                class="quiz-feedback"
-                aria-live="polite"
-            ></div>
         `;
 
         box
-            .querySelectorAll(
-                ".option"
-            )
+            .querySelectorAll(".quiz-option")
             .forEach(btn => {
                 btn.addEventListener(
                     "click",
                     () =>
                         this.answer(
-                            Number(
-                                btn.dataset.i
-                            ),
+                            Number(btn.dataset.i),
                             false
                         )
                 );
@@ -1221,7 +1260,10 @@ class App {
         this.stopQuestionTimer();
 
         const result =
-            this.quiz.answer(index, timedOut);
+            this.quiz.answer(
+                index,
+                timedOut
+            );
 
         const box =
             document.getElementById(
@@ -1230,72 +1272,120 @@ class App {
 
         if (box) {
             box
-                .querySelectorAll(
-                    ".option"
-                )
+                .querySelectorAll(".quiz-option")
                 .forEach(
                     button =>
                         button.disabled = true
                 );
         }
 
+        const selectedButton =
+            box && index >= 0
+                ? box.querySelector(
+                    `.quiz-option[data-i="${index}"]`
+                  )
+                : null;
+
+        if (selectedButton) {
+            selectedButton.classList.add(
+                result.correct
+                    ? "correct"
+                    : "wrong"
+            );
+        }
+
+        const feedback =
+            document.getElementById(
+                "quizFeedback"
+            );
+
+        if (!feedback) {
+            return;
+        }
+
+        if (result.timedOut) {
+            feedback.innerHTML = `
+                <div class="error">
+                    ⏰ زمان تمام شد؛ این سؤال پاسخ‌داده‌نشده ثبت شد.
+                </div>
+            `;
+        } else if (result.correct) {
+            feedback.innerHTML = `
+                <div class="success">
+                    ✓ پاسخ درست بود!
+                </div>
+            `;
+        } else {
+            feedback.innerHTML = `
+                <div class="error">
+                    ✗ پاسخ اشتباه بود.
+                </div>
+            `;
+        }
+
         if (result.finished) {
-
-            const feedback =
-                document.getElementById(
-                    "quizFeedback"
-                );
-
-            if (feedback) {
-                feedback.innerHTML =
-                    result.passed
-                        ? `<div class="result-good">
+            feedback.innerHTML +=
+                result.passed
+                    ? `
+                        <div class="result-good">
                             🎉 مرحله با موفقیت تمام شد.
                             ${
                                 result.earnedXP
                                     ? ` +${result.earnedXP} XP`
                                     : ""
                             }
-                           </div>`
-                        : `<div class="result-bad">
+                        </div>
+                      `
+                    : `
+                        <div class="result-bad">
                             این مرحله را رد نکردی.
                             ${
                                 result.heartLost
                                     ? " یک قلب کم شد."
                                     : ""
                             }
-                           </div>`;
+                        </div>
+                      `;
 
-                feedback.innerHTML +=
-                    `<button
-                        id="quizNext"
-                        class="primary full quiz-next"
-                    >
-                        ادامه
-                    </button>`;
+            feedback.innerHTML += `
+                <button
+                    id="quizNext"
+                    class="primary full quiz-next"
+                    type="button"
+                >
+                    ادامه
+                </button>
+            `;
 
-                document
-                    .getElementById(
-                        "quizNext"
-                    )
-                    .onclick =
-                    () =>
-                        this.renderStages();
-            }
+            document
+                .getElementById("quizNext")
+                .onclick =
+                () => this.renderStages();
 
         } else {
-            window.setTimeout(
+            feedback.innerHTML += `
+                <button
+                    id="quizNext"
+                    class="primary full quiz-next"
+                    type="button"
+                >
+                    سؤال بعدی
+                </button>
+            `;
+
+            document
+                .getElementById("quizNext")
+                .onclick =
                 () =>
                     this.renderQuestion(
                         this.quiz.getCurrentQuestion()
-                    ),
-                150
-            );
+                    );
         }
 
         this.renderQuizStats();
         this.renderProfile();
     }
+
 
 
     renderQuizStats() {
