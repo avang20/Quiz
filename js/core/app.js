@@ -1,6 +1,5 @@
 import {
     createDefaultState,
-    getUnlockedStage,
     isStageCompleted
 } from "./state.js";
 
@@ -295,6 +294,22 @@ class App {
 
             support: []
         };
+
+        this.state.subscriptionInfo =
+            this.state.subscriptionInfo &&
+            typeof this.state.subscriptionInfo === "object"
+                ? this.state.subscriptionInfo
+                : {
+                    active:
+                        this.state.subscriptionStatus === "active",
+                    planId:
+                        this.state.subscriptionPlan || "",
+                    planName:
+                        this.state.subscriptionName || "",
+                    start: null,
+                    expiry:
+                        this.state.subscriptionExpiry || null
+                };
 
 
         this.serverSyncTimer =
@@ -877,13 +892,6 @@ class App {
             );
 
 
-            const unlocked =
-                getUnlockedStage(
-                    this.state,
-                    category
-                );
-
-
             const maxStage =
                 Math.max(
                     5,
@@ -892,6 +900,11 @@ class App {
                             Number(q.stage) || 1
                     )
                 );
+
+            const unlocked =
+                this.hasActiveSubscription()
+                    ? maxStage
+                    : 1;
 
 
             box.innerHTML = "";
@@ -1006,6 +1019,17 @@ class App {
 
     async startStage(stage) {
 
+        if (
+            Number(stage) > 1 &&
+            !this.hasActiveSubscription()
+        ) {
+            alert(
+                "مرحله اول رایگان است. برای باز شدن مراحل بعدی، اشتراک تأییدشده لازم است."
+            );
+            this.go("subscription");
+            return;
+        }
+
         const category =
             this.quiz.currentCategory;
 
@@ -1072,31 +1096,66 @@ class App {
         this.stopQuestionTimer();
 
         const limit = 20;
-        this.questionTimeLeft = limit;
+
+        this.questionTimeLeft =
+            limit;
 
         const timer =
-            document.getElementById("questionTimer");
+            document.getElementById(
+                "questionTimer"
+            );
 
-        if (timer) {
-            timer.textContent = `⏱ ${this.questionTimeLeft}`;
-        }
+        const timerFill =
+            document.getElementById(
+                "questionTimerFill"
+            );
+
+        const update =
+            () => {
+
+                const left =
+                    Math.max(
+                        0,
+                        this.questionTimeLeft
+                    );
+
+                if (timer) {
+                    timer.textContent =
+                        `⏱ ${left.toLocaleString("fa-IR")} ثانیه`;
+                }
+
+                if (timerFill) {
+                    timerFill.style.width =
+                        `${Math.max(
+                            0,
+                            Math.min(
+                                100,
+                                (left / limit) * 100
+                            )
+                        )}%`;
+                }
+            };
+
+        update();
 
         this.questionTimer =
             window.setInterval(
                 () => {
+
                     this.questionTimeLeft -= 1;
 
-                    const currentTimer =
-                        document.getElementById("questionTimer");
+                    update();
 
-                    if (currentTimer) {
-                        currentTimer.textContent =
-                            `⏱ ${Math.max(0, this.questionTimeLeft)}`;
-                    }
+                    if (
+                        this.questionTimeLeft <= 0
+                    ) {
 
-                    if (this.questionTimeLeft <= 0) {
                         this.stopQuestionTimer();
-                        this.answer(-1, true);
+
+                        this.answer(
+                            -1,
+                            true
+                        );
                     }
                 },
                 1000
@@ -1124,7 +1183,7 @@ class App {
         ) {
 
             box.innerHTML =
-                "<div class=\"quiz-card\"><p>برای این مرحله سؤال معتبری پیدا نشد.</p></div>";
+                `<div class="quiz-box"><p>برای این مرحله سؤال معتبری پیدا نشد.</p></div>`;
 
             box.classList.remove(
                 "hidden"
@@ -1151,75 +1210,62 @@ class App {
             total
                 ? Math.round(
                     (current / total) * 100
-                  )
+                )
                 : 0;
 
-        const letters = [
-            "الف",
-            "ب",
-            "ج",
-            "د"
-        ];
-
-        box.classList.remove("hidden");
+        box.classList.remove(
+            "hidden"
+        );
 
         box.innerHTML = `
-            <div class="quiz-card">
+            <div class="quiz-box">
 
-                <div class="quiz-top">
-                    <span class="quiz-stage-pill">
-                        ✨ مرحله ${this.quiz.currentStage}
+                <div class="quiz-topline">
+                    <span>
+                        مرحله ${this.quiz.currentStage}
                     </span>
 
                     <span>
-                        سؤال ${current} از ${total}
-                    </span>
-
-                    <span
-                        id="questionTimer"
-                        class="quiz-stage-pill"
-                        aria-live="polite"
-                    >
-                        ⏱ 20
+                        سؤال ${current}
+                        از ${total}
                     </span>
                 </div>
 
-                <div class="quiz-progress-wrap">
+                <div class="progress-track">
                     <div
-                        class="quiz-progress"
+                        class="progress-fill"
                         style="width:${progress}%"
                     ></div>
                 </div>
 
-                <div class="quiz-mini-stat">
-                    <span>
-                        🎯 پاسخ‌های درست: ${this.quiz.correctAnswers}
-                    </span>
-
-                    <span>
-                        🔥 Combo: ${this.quiz.combo}
-                    </span>
+                <div class="timer-row">
+                    <strong id="questionTimer">⏱ ۲۰ ثانیه</strong>
+                    <span>زمان پاسخ‌گویی</span>
                 </div>
 
-                <h3 class="quiz-question">
-                    ${escapeHTML(normalized.question)}
-                </h3>
+                <div class="timer-track">
+                    <div
+                        id="questionTimerFill"
+                        class="timer-fill"
+                        style="width:100%"
+                    ></div>
+                </div>
 
-                <div class="quiz-options-grid">
+                <h2>
+                    ${escapeHTML(
+                        normalized.question
+                    )}
+                </h2>
+
+                <div class="answers">
                     ${options.map(
                         (option, index) => `
                             <button
-                                class="quiz-option"
+                                class="answer-btn"
                                 data-i="${index}"
                                 type="button"
                             >
-                                <span class="quiz-option-letter">
-                                    ${letters[index] || index + 1}
-                                </span>
-
-                                <span>
-                                    ${escapeHTML(String(option))}
-                                </span>
+                                ${escapeHTML(String(option))}
                             </button>
                         `
                     ).join("")}
@@ -1234,13 +1280,14 @@ class App {
         `;
 
         box
-            .querySelectorAll(".quiz-option")
-            .forEach(btn => {
-                btn.addEventListener(
+            .querySelectorAll(".answer-btn")
+            .forEach(button => {
+
+                button.addEventListener(
                     "click",
                     () =>
                         this.answer(
-                            Number(btn.dataset.i),
+                            Number(button.dataset.i),
                             false
                         )
                 );
@@ -1272,7 +1319,9 @@ class App {
 
         if (box) {
             box
-                .querySelectorAll(".quiz-option")
+                .querySelectorAll(
+                    ".answer-btn"
+                )
                 .forEach(
                     button =>
                         button.disabled = true
@@ -1280,12 +1329,18 @@ class App {
         }
 
         const selectedButton =
-            box && index >= 0
+            box &&
+            index >= 0
                 ? box.querySelector(
-                    `.quiz-option[data-i="${index}"]`
+                    `.answer-btn[data-i="${index}"]`
                   )
                 : null;
 
+        /*
+         * اگر کاربر اشتباه کند، فقط انتخاب خودش قرمز می‌شود.
+         * جواب صحیح هرگز بعد از پاسخ اشتباه یا اتمام زمان سبز نمی‌شود.
+         * اگر خودش جواب درست را انتخاب کند، همان گزینه سبز می‌شود.
+         */
         if (selectedButton) {
             selectedButton.classList.add(
                 result.correct
@@ -1304,18 +1359,23 @@ class App {
         }
 
         if (result.timedOut) {
+
             feedback.innerHTML = `
                 <div class="error">
-                    ⏰ زمان تمام شد؛ این سؤال پاسخ‌داده‌نشده ثبت شد.
+                    ⏰ زمان تمام شد؛ این سؤال را از دست دادی.
                 </div>
             `;
+
         } else if (result.correct) {
+
             feedback.innerHTML = `
                 <div class="success">
                     ✓ پاسخ درست بود!
                 </div>
             `;
+
         } else {
+
             feedback.innerHTML = `
                 <div class="error">
                     ✗ پاسخ اشتباه بود.
@@ -1324,6 +1384,7 @@ class App {
         }
 
         if (result.finished) {
+
             feedback.innerHTML +=
                 result.passed
                     ? `
@@ -1350,7 +1411,7 @@ class App {
             feedback.innerHTML += `
                 <button
                     id="quizNext"
-                    class="primary full quiz-next"
+                    class="primary full next-btn"
                     type="button"
                 >
                     ادامه
@@ -1363,10 +1424,11 @@ class App {
                 () => this.renderStages();
 
         } else {
+
             feedback.innerHTML += `
                 <button
                     id="quizNext"
-                    class="primary full quiz-next"
+                    class="primary full next-btn"
                     type="button"
                 >
                     سؤال بعدی
@@ -1404,82 +1466,259 @@ class App {
     }
 
 
+    getSubscriptionInfo() {
+
+        return (
+            this.state.subscriptionInfo &&
+            typeof this.state.subscriptionInfo === "object"
+        )
+            ? this.state.subscriptionInfo
+            : {
+                active: false,
+                planId: "",
+                planName: "",
+                start: null,
+                expiry: null
+            };
+    }
+
+
+    hasActiveSubscription() {
+
+        const info =
+            this.getSubscriptionInfo();
+
+        if (info.active !== true) {
+            return false;
+        }
+
+        const expiry =
+            new Date(
+                info.expiry || 0
+            ).getTime();
+
+        return Number.isFinite(expiry) &&
+            expiry > Date.now();
+    }
+
+
+    getRemainingSubscriptionDays() {
+
+        const info =
+            this.getSubscriptionInfo();
+
+        const expiry =
+            new Date(
+                info.expiry || 0
+            ).getTime();
+
+        if (
+            !Number.isFinite(expiry) ||
+            expiry <= Date.now()
+        ) {
+            return 0;
+        }
+
+        return Math.max(
+            0,
+            Math.ceil(
+                (expiry - Date.now()) /
+                86400000
+            )
+        );
+    }
+
+
+    getRemainingSubscriptionText() {
+
+        if (!this.hasActiveSubscription()) {
+            return "رایگان — فقط مرحله ۱";
+        }
+
+        const days =
+            this.getRemainingSubscriptionDays();
+
+        if (days <= 0) {
+            return "اشتراک منقضی شده است";
+        }
+
+        const info =
+            this.getSubscriptionInfo();
+
+        const plan =
+            info.planName ||
+            this.getPlanDuration(
+                info.planId
+            );
+
+        return `اشتراک فعال · ${plan} · ${days.toLocaleString("fa-IR")} روز باقی مانده`;
+    }
+
+
     renderProfile() {
 
         const s =
             this.state;
 
-
-        const name =
-            document.getElementById(
-                "profileName"
-            );
-
-
-        if (!name) {
-            return;
-        }
-
-
-        name.textContent =
+        const username =
             s.username ||
             "بازیکن مهمان";
 
+        const active =
+            this.hasActiveSubscription();
 
-        document
-            .getElementById(
-                "profileScore"
-            )
-            .textContent =
-            s.xp || 0;
+        const remainingText =
+            this.getRemainingSubscriptionText();
 
+        const dashboardName =
+            document.getElementById("dashboardName");
 
-        document
-            .getElementById(
-                "profileStreak"
-            )
-            .textContent =
-            s.streak || 0;
+        const dashboardXP =
+            document.getElementById("dashboardXP");
 
+        const dashboardHearts =
+            document.getElementById("dashboardHearts");
 
-        document
-            .getElementById(
-                "profileStage"
-            )
-            .textContent =
-            Math.max(
-                1,
-                s.generalStage || 1,
-                s.funStage || 1
-            ) - 1;
+        const dashboardStreak =
+            document.getElementById("dashboardStreak");
 
+        const dashboardGeneral =
+            document.getElementById("dashboardGeneralStage");
 
-        const status =
-            s.subscriptionStatus === "active" ||
-            s.subscription === "paid"
-                ? "اشتراکی"
-                : "رایگان";
+        const dashboardFun =
+            document.getElementById("dashboardFunStage");
 
+        const dashboardSubscription =
+            document.getElementById("dashboardSubscription");
 
-        document
-            .getElementById(
-                "subscriptionStatus"
-            )
-            .textContent =
-            status;
+        const dashboardBadge =
+            document.getElementById("dashboardAccessBadge");
 
+        const dashboardTitle =
+            document.getElementById("dashboardSubscriptionTitle");
 
-        document
-            .getElementById(
-                "authButton"
-            )
-            .textContent =
-            s.username ===
-            "بازیکن مهمان"
+        const dashboardText =
+            document.getElementById("dashboardSubscriptionText");
 
-                ? "ورود / ثبت‌نام"
+        const profileName =
+            document.getElementById("profileName");
 
-                : s.username;
+        const profileScore =
+            document.getElementById("profileScore");
+
+        const profileStreak =
+            document.getElementById("profileStreak");
+
+        const profileStage =
+            document.getElementById("profileStage");
+
+        const subscriptionStatus =
+            document.getElementById("subscriptionStatus");
+
+        if (dashboardName) {
+            dashboardName.textContent =
+                username;
+        }
+
+        if (dashboardXP) {
+            dashboardXP.textContent =
+                Number(s.xp || 0).toLocaleString("fa-IR");
+        }
+
+        if (dashboardHearts) {
+            dashboardHearts.textContent =
+                Number(s.hearts || 0).toLocaleString("fa-IR");
+        }
+
+        if (dashboardStreak) {
+            dashboardStreak.textContent =
+                Number(s.streak || 0).toLocaleString("fa-IR");
+        }
+
+        if (dashboardGeneral) {
+            dashboardGeneral.textContent =
+                Math.max(
+                    0,
+                    Number(s.generalStage || 1) - 1
+                ).toLocaleString("fa-IR");
+        }
+
+        if (dashboardFun) {
+            dashboardFun.textContent =
+                Math.max(
+                    0,
+                    Number(s.funStage || 1) - 1
+                ).toLocaleString("fa-IR");
+        }
+
+        if (dashboardSubscription) {
+            dashboardSubscription.textContent =
+                remainingText;
+        }
+
+        if (dashboardBadge) {
+            dashboardBadge.classList.toggle("free", !active);
+            dashboardBadge.classList.toggle("premium", active);
+            dashboardBadge.textContent =
+                active
+                    ? "🔓 اشتراک فعال"
+                    : "🔒 فقط ۱ مرحله رایگان";
+        }
+
+        if (dashboardTitle) {
+            dashboardTitle.textContent =
+                active
+                    ? "اشتراک شما فعال است"
+                    : "حساب رایگان";
+        }
+
+        if (dashboardText) {
+            dashboardText.textContent =
+                active
+                    ? remainingText
+                    : "حساب رایگان فقط به مرحله ۱ دسترسی دارد.";
+        }
+
+        if (profileName) {
+            profileName.textContent =
+                username;
+        }
+
+        if (profileScore) {
+            profileScore.textContent =
+                Number(s.xp || 0).toLocaleString("fa-IR");
+        }
+
+        if (profileStreak) {
+            profileStreak.textContent =
+                Number(s.streak || 0).toLocaleString("fa-IR");
+        }
+
+        if (profileStage) {
+            profileStage.textContent =
+                Math.max(
+                    0,
+                    Number(s.generalStage || 1) - 1,
+                    Number(s.funStage || 1) - 1
+                ).toLocaleString("fa-IR");
+        }
+
+        if (subscriptionStatus) {
+            subscriptionStatus.textContent =
+                active
+                    ? remainingText
+                    : "رایگان";
+        }
+
+        const authButton =
+            document.getElementById("authButton");
+
+        if (authButton) {
+            authButton.textContent =
+                username === "بازیکن مهمان"
+                    ? "ورود / ثبت‌نام"
+                    : username;
+        }
     }
 
 
@@ -2638,95 +2877,117 @@ class App {
         ) {
 
             this.renderUserPanels();
-
+            this.renderProfile();
             return;
         }
-
 
         try {
 
             const data =
                 await this.serverRequest({
-
-                    action:
-                        "userUpdates",
-
-                    username:
-                        this.state.username
+                    action: "userUpdates",
+                    username: this.state.username
                 });
 
-
             if (!data.success) {
-
                 throw new Error(
                     data.message ||
                     "دریافت وضعیت ناموفق بود."
                 );
             }
 
-
             this.lastServerUpdates = {
-
                 payments:
-                    Array.isArray(
-                        data.payments
-                    )
+                    Array.isArray(data.payments)
                         ? data.payments
                         : [],
-
                 support:
-                    Array.isArray(
-                        data.support
-                    )
+                    Array.isArray(data.support)
                         ? data.support
                         : []
             };
 
+            const serverSubscription =
+                data.subscription &&
+                typeof data.subscription === "object"
+                    ? data.subscription
+                    : {
+                        active: false,
+                        planId: "",
+                        planName: "",
+                        start: null,
+                        expiry: null
+                    };
 
-            const approved =
-                this.lastServerUpdates
-                    .payments
-                    .find(
-                        p =>
-                            p.status ===
-                            "تأیید شد"
-                    );
+            const before =
+                JSON.stringify(
+                    this.getSubscriptionInfo()
+                );
 
+            this.state.subscriptionInfo =
+                serverSubscription;
 
-            if (approved) {
-
-                const changed =
-                    this.state.subscriptionPlan !==
-                        approved.planId ||
-
-                    this.state.subscriptionStatus !==
-                        "active";
-
+            if (serverSubscription.active === true) {
 
                 this.state.subscriptionStatus =
                     "active";
 
-
                 this.state.subscriptionPlan =
-                    approved.planId;
-
+                    serverSubscription.planId || "";
 
                 this.state.subscriptionName =
-                    approved.planName;
+                    serverSubscription.planName || "";
 
+                this.state.subscriptionExpiry =
+                    serverSubscription.expiry || null;
 
-                this.state.subscription = "paid";
+                this.state.subscriptionStart =
+                    serverSubscription.start || null;
 
+                this.state.subscription =
+                    "paid";
 
-                if (changed) {
-                    this.persist();
-                }
+            } else {
+
+                this.state.subscriptionStatus =
+                    "inactive";
+
+                this.state.subscriptionPlan =
+                    "";
+
+                this.state.subscriptionName =
+                    "";
+
+                this.state.subscriptionExpiry =
+                    null;
+
+                this.state.subscriptionStart =
+                    null;
+
+                this.state.subscription =
+                    "free";
             }
 
+            const after =
+                JSON.stringify(
+                    this.getSubscriptionInfo()
+                );
+
+            if (before !== after) {
+                this.persist();
+            }
 
             this.renderUserPanels();
-
             this.renderProfile();
+
+            if (
+                serverSubscription.active === true &&
+                document
+                    .getElementById("quiz")
+                    ?.classList.contains("active")
+            ) {
+                this.renderStages();
+            }
 
         } catch (error) {
 
@@ -2734,7 +2995,6 @@ class App {
                 "User update sync failed:",
                 error
             );
-
 
             this.renderUserPanels(
                 error
