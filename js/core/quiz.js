@@ -9,7 +9,7 @@ import {
 export const QUIZ_CONFIG = {
     defaultQuestionsPerStage: 10,
     reserveQuestions: 5,
-    passingPercentage: 0.5,
+    passingPercentage: 0.75,
     questionTime: 20,
     stageXP: 10,
     failedStageHeartPenalty: 1
@@ -424,6 +424,23 @@ export class QuizEngine {
             passed =
                 percentage >=
                 QUIZ_CONFIG.passingPercentage;
+
+            const scoreKey =
+                this.currentCategory === "general"
+                    ? "stageScoresGeneral"
+                    : "stageScoresFun";
+
+            if (!this.state[scoreKey] || typeof this.state[scoreKey] !== "object") {
+                this.state[scoreKey] = {};
+            }
+
+            const stageKey = String(this.currentStage);
+            const previousBest =
+                Number(this.state[scoreKey][stageKey] || 0);
+
+            if (percentage > previousBest) {
+                this.state[scoreKey][stageKey] = percentage;
+            }
 
             if (passed) {
                 const alreadyCompleted =
