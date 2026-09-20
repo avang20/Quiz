@@ -424,8 +424,8 @@ class App {
         this.go("home");
 
         window.setTimeout(
-            () => this.showWelcomeOnce(),
-            600
+            () => this.showFirstSiteWelcomeOnce(),
+            650
         );
 
         this.syncServerUpdates();
@@ -786,10 +786,16 @@ class App {
         }
 
 
+        const registeredNow =
+            this.authRegister === true;
+
         setTimeout(
             () => {
                 this.go("home");
-                this.showWelcomeOnce();
+
+                if (registeredNow && !this.state.registrationCelebrationSeen) {
+                    this.showCelebration("registration");
+                }
             },
             450
         );
@@ -998,28 +1004,99 @@ class App {
     }
 
 
-    showWelcomeOnce() {
+    showFirstSiteWelcomeOnce() {
 
-        if (
-            !this.state.username ||
-            this.state.username === "بازیکن مهمان" ||
-            this.state.welcomeSeen === true
-        ) {
-            return;
+        try {
+            if (localStorage.getItem("quizduo_first_site_visit_seen") === "1") {
+                return;
+            }
+        } catch {
+            // Continue even if localStorage is unavailable.
         }
+
+        this.showCelebration("site");
+    }
+
+
+    showCelebration(type) {
 
         const modal =
             document.getElementById("welcomeModal");
 
         if (!modal) return;
 
-        const name =
-            document.getElementById("welcomeUserName");
+        const presets = {
+            site: {
+                icon: "🎓✨",
+                kicker: "به خانواده QuizDuo خوش اومدی",
+                title: "سلام دانش‌آموز! 👋",
+                text: "اینجا جاییه که دانشت، سرعت عملت و پشتکارت با هم تبدیل به پیشرفت می‌شن. آماده‌ای اولین چالش رو شروع کنی؟",
+                points: [
+                    ["🧠", "سؤال‌های متنوع"],
+                    ["⚡", "۲۰ ثانیه برای هر سؤال"],
+                    ["🏆", "XP و مرحله‌های بیشتر"]
+                ],
+                note: "مرحله ۱ رایگانه؛ برای مرحله‌های بعدی باید اشتراک فعال داشته باشی و مرحله قبلی رو حداقل با ۷۵٪ رد کنی.",
+                button: "شروع ماجرا 🚀"
+            },
+            registration: {
+                icon: "🎉🪪",
+                kicker: "حساب تو آماده‌ست",
+                title: "تبریک! <span id="welcomeUserName">دوست QuizDuo</span> ثبت‌نامت انجام شد 🎊",
+                text: "از اینجا به بعد امتیازها، پیشرفت مرحله‌ها و رکوردت برای حسابت ذخیره می‌شن. اولین قدمت رو با قدرت بردار!",
+                points: [
+                    ["✅", "حساب ساخته شد"],
+                    ["⭐", "امتیاز و XP"],
+                    ["🔥", "Streak و پیشرفت"]
+                ],
+                note: "یادت نره: مرحله بعدی با حداقل ۷۵٪ مرحله قبلی و داشتن اشتراک فعال باز می‌شه.",
+                button: "بزن بریم! 🎮"
+            },
+            subscription: {
+                icon: "👑🎉",
+                kicker: "اولین اشتراک فعال شد",
+                title: "تبریک! حالا اشتراکی شدی! 👑",
+                text: "اولین اشتراک QuizDuo با موفقیت تأیید شد. از اینجا به بعد درهای مراحل بیشتر به روت بازه؛ فقط شرط ۷۵٪ مرحله قبلی رو یادت نره.",
+                points: [
+                    ["🔓", "مراحل بیشتر"],
+                    ["👑", "اشتراک فعال"],
+                    ["🚀", "ادامه مسیر"]
+                ],
+                note: "مدت باقی‌مانده اشتراکت همین حالا در پروفایلت نمایش داده می‌شه.",
+                button: "مشاهده مراحل 🔓"
+            }
+        };
 
-        if (name) {
-            name.textContent =
-                this.state.username;
+        const preset =
+            presets[type] || presets.site;
+
+        modal.dataset.celebrationType = type;
+
+        const icon = document.getElementById("welcomeIcon");
+        const kicker = document.getElementById("welcomeKicker");
+        const title = document.getElementById("welcomeTitle");
+        const text = document.getElementById("welcomeText");
+        const note = document.getElementById("welcomeNote");
+        const button = document.getElementById("welcomeClose");
+
+        if (icon) icon.textContent = preset.icon;
+        if (kicker) kicker.textContent = preset.kicker;
+        if (title) title.innerHTML = preset.title;
+        if (text) text.textContent = preset.text;
+        if (note) note.textContent = preset.note;
+        if (button) button.textContent = preset.button;
+
+        if (type === "registration") {
+            const titleName = document.getElementById("welcomeUserName");
+            if (titleName) titleName.textContent = this.state.username || "دوست QuizDuo";
         }
+
+        preset.points.forEach((point, index) => {
+            const iconEl = document.getElementById(`welcomePoint${index + 1}Icon`);
+            const textEl = document.getElementById(`welcomePoint${index + 1}Text`);
+            if (iconEl) iconEl.textContent = point[0];
+            if (textEl) textEl.textContent = point[1];
+        });
 
         modal.classList.remove("hidden");
         modal.setAttribute("aria-hidden", "false");
@@ -1032,24 +1109,80 @@ class App {
             close.dataset.bound = "1";
             close.addEventListener(
                 "click",
-                () => this.closeWelcome()
+                () => this.closeCelebration()
             );
         }
+
+        this.launchConfetti();
     }
 
 
-    closeWelcome() {
+    launchConfetti() {
 
-        this.state.welcomeSeen = true;
-        this.persist();
+        const container =
+            document.getElementById("celebrationConfetti");
+
+        if (!container) return;
+
+        container.innerHTML = "";
+
+        const count = window.innerWidth < 600 ? 26 : 38;
+
+        for (let i = 0; i < count; i++) {
+            const piece = document.createElement("span");
+            piece.className = `confetti-piece confetti-${i % 6}`;
+            piece.style.setProperty("--x", `${Math.random() * 100}%`);
+            piece.style.setProperty("--delay", `${Math.random() * 0.45}s`);
+            piece.style.setProperty("--duration", `${2.5 + Math.random() * 1.3}s`);
+            piece.style.setProperty("--drift", `${-90 + Math.random() * 180}px`);
+            piece.style.setProperty("--spin", `${240 + Math.random() * 500}deg`);
+            container.appendChild(piece);
+        }
+
+        window.setTimeout(
+            () => {
+                if (container) container.innerHTML = "";
+            },
+            4300
+        );
+    }
+
+
+    closeCelebration() {
 
         const modal =
             document.getElementById("welcomeModal");
 
+        const type =
+            modal?.dataset.celebrationType || "site";
+
+        if (type === "site") {
+            try {
+                localStorage.setItem("quizduo_first_site_visit_seen", "1");
+            } catch {}
+        } else if (type === "registration") {
+            this.state.registrationCelebrationSeen = true;
+            this.persist();
+        } else if (type === "subscription") {
+            this.state.subscriptionCelebrationSeen = true;
+            this.persist();
+        }
+
+        this.state.welcomeSeen = true;
+        saveState(
+            this.state,
+            this.state.username === "بازیکن مهمان" ? "guest" : this.state.username
+        );
+
         if (modal) {
             modal.classList.add("hidden");
             modal.setAttribute("aria-hidden", "true");
+            delete modal.dataset.celebrationType;
         }
+
+        const confetti =
+            document.getElementById("celebrationConfetti");
+        if (confetti) confetti.innerHTML = "";
 
         if (!this.quizModalOpen) {
             document.body.classList.remove("modal-open");
@@ -3128,6 +3261,9 @@ class App {
                     this.getSubscriptionInfo()
                 );
 
+            const wasActiveBeforeSync =
+                this.hasActiveSubscription();
+
             this.state.subscriptionInfo =
                 serverSubscription;
 
@@ -3183,6 +3319,18 @@ class App {
 
             this.renderUserPanels();
             this.renderProfile();
+
+            const becameActiveForFirstTime =
+                !wasActiveBeforeSync &&
+                serverSubscription.active === true &&
+                this.state.subscriptionCelebrationSeen !== true;
+
+            if (becameActiveForFirstTime) {
+                window.setTimeout(
+                    () => this.showCelebration("subscription"),
+                    250
+                );
+            }
 
             if (
                 serverSubscription.active === true &&
