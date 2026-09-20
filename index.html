@@ -1,865 +1,273 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>QuizDuo</title>
-    <link rel="stylesheet" href="css/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QuizDuo</title>
+<link rel="stylesheet" href="css/style.css">
 </head>
-
 <body>
-
 <header class="site-header">
-
-    <a class="brand" href="#" data-page="home">
-        QuizDuo
-    </a>
-
-    <nav class="main-nav">
-        <button data-page="home">خانه</button>
-        <button data-page="quiz">سوالات</button>
-        <button data-page="leaderboard">لیدربورد</button>
-        <button data-page="chat">چت</button>
-        <button data-page="support">پشتیبانی</button>
-        <button data-page="profile">پروفایل</button>
-        <button data-page="subscription">اشتراک 👑</button>
-    </nav>
-
-    <div class="header-actions">
-        <button id="themeToggle" class="secondary">
-            ☀️ روشن / 🌙 تاریک
-        </button>
-
-        <button id="authButton" class="primary">
-            ورود / ثبت‌نام
-        </button>
-    </div>
-
+  <a class="brand" href="#" data-page="home">QuizDuo</a>
+  <nav class="main-nav">
+    <button data-page="home">خانه</button>
+    <button data-page="quiz">سوالات</button>
+    <button data-page="leaderboard">لیدربورد</button>
+    <button data-page="chat">چت</button>
+    <button data-page="support">پشتیبانی</button>
+    <button data-page="profile">پروفایل</button>
+    <button data-page="subscription">اشتراک 👑</button>
+  </nav>
+  <div class="header-actions">
+    <button id="themeToggle" class="secondary">☀️ روشن / 🌙 تاریک</button>
+    <button id="authButton" class="primary">ورود / ثبت‌نام</button>
+  </div>
 </header>
 
-
 <main>
-
-<!-- =========================
-     HOME
-========================= -->
-
 <section id="home" class="page active">
-
-    <div class="hero">
-
-        <div>
-
-            <span class="eyebrow">
-                🎯 یادگیری + رقابت + سرگرمی
-            </span>
-
-            <h1>
-                QuizDuo
-            </h1>
-
-            <p>
-                یاد بگیر، بازی کن، مرحله رد کن و امتیاز جمع کن.
-            </p>
-
-            <div class="hero-actions">
-
-                <button
-                    class="primary big"
-                    data-page="quiz">
-                    شروع بازی
-                </button>
-
-                <button
-                    class="secondary big"
-                    data-page="subscription">
-                    مشاهده اشتراک‌ها
-                </button>
-
-            </div>
-
-        </div>
-
-
-        <div class="premium-preview">
-
-            <span class="premium-crown">
-                ♛
-            </span>
-
-            <h3>
-                اشتراک ۹ ماهه
-            </h3>
-
-            <p>
-                تنها پلن دارای عنوان
-                <b>Premium</b>
-            </p>
-
-            <button
-                class="primary"
-                data-page="subscription">
-                مشاهده Premium
-            </button>
-
-        </div>
-
+  <div class="hero">
+    <div>
+      <span class="eyebrow">🎯 یادگیری + رقابت + سرگرمی</span>
+      <h1>QuizDuo</h1>
+      <p>یاد بگیر، بازی کن، مرحله رد کن و امتیاز جمع کن.</p>
+      <div class="hero-actions">
+        <button class="primary big" data-page="quiz">شروع بازی</button>
+        <button class="secondary big" data-page="subscription">مشاهده اشتراک‌ها</button>
+      </div>
     </div>
-
-
-    <div class="grid feature-grid">
-
-        <article class="feature-card">
-            <span>🧠</span>
-            <h3>اطلاعات عمومی</h3>
-            <p>
-                مراحل متنوع برای محک زدن دانشت.
-            </p>
-        </article>
-
-        <article class="feature-card">
-            <span>🎮</span>
-            <h3>تفریحی</h3>
-            <p>
-                سوال‌های سرگرم‌کننده و متفاوت.
-            </p>
-        </article>
-
-        <article class="feature-card">
-            <span>🏆</span>
-            <h3>رقابت</h3>
-            <p>
-                XP جمع کن و در لیدربورد بالا برو.
-            </p>
-        </article>
-
-        <article class="feature-card">
-            <span>🔥</span>
-            <h3>Streak و Combo</h3>
-            <p>
-                با بازی مداوم و پاسخ‌های درست رکورد بساز.
-            </p>
-        </article>
-
+    <div class="premium-preview">
+      <span class="premium-crown">♛</span>
+      <h3>اشتراک ۹ ماهه</h3>
+      <p>تنها پلن دارای عنوان <b>Premium</b></p>
+      <button class="primary" data-page="subscription">مشاهده Premium</button>
     </div>
+  </div>
 
+  <div class="grid feature-grid">
+    <article class="feature-card"><span>🧠</span><h3>اطلاعات عمومی</h3><p>مراحل متنوع برای محک زدن دانشت.</p></article>
+    <article class="feature-card"><span>🎮</span><h3>تفریحی</h3><p>سوال‌های سرگرم‌کننده و متفاوت.</p></article>
+    <article class="feature-card"><span>🏆</span><h3>رقابت</h3><p>XP جمع کن و در لیدربورد بالا برو.</p></article>
+    <article class="feature-card"><span>🔥</span><h3>Streak و Combo</h3><p>با بازی مداوم و پاسخ‌های درست رکورد بساز.</p></article>
+  </div>
 </section>
-
-
-<!-- =========================
-     AUTH
-========================= -->
 
 <section id="auth" class="page">
-
-    <div class="panel narrow auth-panel">
-
-        <h2 id="authTitle">
-            ورود
-        </h2>
-
-        <input
-            id="authName"
-            placeholder="نام کاربری"
-            autocomplete="username"
-        >
-
-        <div id="phoneField" class="hidden">
-
-            <input
-                id="authPhone"
-                type="tel"
-                inputmode="numeric"
-                placeholder="شماره تماس (مثلاً 09123456789)"
-                autocomplete="tel"
-            >
-
-        </div>
-
-        <input
-            id="authPassword"
-            type="password"
-            placeholder="رمز عبور"
-            autocomplete="current-password"
-        >
-
-        <button
-            id="authSubmit"
-            class="primary full">
-            ورود
-        </button>
-
-        <button
-            id="toggleAuth"
-            class="secondary full">
-            ساخت حساب جدید
-        </button>
-
-        <button
-            id="authBack"
-            class="dark-action full">
-            بازگشت
-        </button>
-
-        <p
-            id="authMsg"
-            class="message">
-        </p>
-
+  <div class="panel narrow auth-panel">
+    <h2 id="authTitle">ورود</h2>
+    <input id="authName" placeholder="نام کاربری" autocomplete="username">
+    <div id="phoneField" class="hidden">
+      <input id="authPhone" type="tel" inputmode="numeric" placeholder="شماره تماس (مثلاً 09123456789)" autocomplete="tel">
     </div>
-
+    <input id="authPassword" type="password" placeholder="رمز عبور" autocomplete="current-password">
+    <button id="authSubmit" class="primary full">ورود</button>
+    <button id="toggleAuth" class="secondary full">ساخت حساب جدید</button>
+    <button id="authBack" class="dark-action full">بازگشت</button>
+    <p id="authMsg" class="message"></p>
+  </div>
 </section>
-
-
-<!-- =========================
-     QUIZ
-========================= -->
 
 <section id="quiz" class="page">
-
-    <div class="section-heading">
-
-        <div>
-
-            <span class="eyebrow">
-                مرحله‌ها
-            </span>
-
-            <h2>
-                سوالات
-            </h2>
-
-        </div>
-
-        <div
-            id="quizStats"
-            class="stats-pill">
-        </div>
-
-    </div>
-
-
-    <div class="tabs">
-
-        <button
-            class="active"
-            data-category-tab="general">
-            اطلاعات عمومی
-        </button>
-
-        <button
-            data-category-tab="fun">
-            تفریحی
-        </button>
-
-    </div>
-
-
-    <div
-        id="stages"
-        class="grid stage-grid">
-    </div>
-
-
-    <div
-        id="quizBox"
-        class="panel hidden">
-    </div>
-
+  <div class="section-heading">
+    <div><span class="eyebrow">مرحله‌ها</span><h2>سوالات</h2></div>
+    <div id="quizStats" class="stats-pill"></div>
+  </div>
+  <div class="tabs">
+    <button class="active" data-category-tab="general">اطلاعات عمومی</button>
+    <button data-category-tab="fun">تفریحی</button>
+  </div>
+  <div id="stages" class="grid stage-grid"></div>
+  <div id="quizBox" class="panel hidden"></div>
 </section>
-
-
-<!-- =========================
-     LEADERBOARD
-========================= -->
 
 <section id="leaderboard" class="page">
-
-    <div class="section-heading">
-
-        <div>
-
-            <span class="eyebrow">
-                🏆 رقابت
-            </span>
-
-            <h2>
-                لیدربورد
-            </h2>
-
-        </div>
-
-    </div>
-
-
-    <div class="panel table-panel">
-
-        <table>
-
-            <thead>
-
-                <tr>
-                    <th>رتبه</th>
-                    <th>بازیکن</th>
-                    <th>XP</th>
-                    <th>مرحله</th>
-                </tr>
-
-            </thead>
-
-            <tbody id="leaderBody">
-            </tbody>
-
-        </table>
-
-    </div>
-
-
-    <p class="muted">
-        در این نسخه، لیدربورد بین حساب‌های ثبت‌شده روی همین مرورگر ذخیره می‌شود.
-    </p>
-
+  <div class="section-heading"><div><span class="eyebrow">🏆 رقابت</span><h2>لیدربورد</h2></div></div>
+  <div class="panel table-panel">
+    <table>
+      <thead><tr><th>رتبه</th><th>بازیکن</th><th>XP</th><th>مرحله</th></tr></thead>
+      <tbody id="leaderBody"></tbody>
+    </table>
+  </div>
+  <p class="muted">در این نسخه، لیدربورد بین حساب‌های ثبت‌شده روی همین مرورگر ذخیره می‌شود.</p>
 </section>
-
-
-<!-- =========================
-     PROFILE
-========================= -->
 
 <section id="profile" class="page">
+  <div class="section-heading">
+    <div><span class="eyebrow">👤 حساب کاربری</span><h2>پنل کاربری</h2></div>
+    <span id="dashboardAccessBadge" class="dashboard-badge free">🔒 فقط ۳ مرحله رایگان</span>
+  </div>
 
-    <div class="section-heading">
+  <div class="user-dashboard-layout">
+    <aside class="panel user-dashboard-sidebar">
+      <div class="dashboard-avatar">👤</div>
+      <h3 id="dashboardName">بازیکن مهمان</h3>
+      <p id="dashboardSubscription">رایگان — ۳ مرحله</p>
+      <div class="dashboard-menu">
+        <button class="active" data-dashboard-target="overview">📊 نمای کلی</button>
+        <button data-page="quiz">🎮 ادامه بازی</button>
+        <button data-page="subscription">👑 اشتراک</button>
+        <button data-page="support">🎫 پشتیبانی</button>
+        <button data-page="leaderboard">🏆 لیدربورد</button>
+      </div>
+    </aside>
 
+    <div class="user-dashboard-main">
+      <div class="grid dashboard-stat-grid">
+        <div class="panel dashboard-stat"><span>⭐ XP</span><strong id="dashboardXP">0</strong></div>
+        <div class="panel dashboard-stat"><span>❤️ قلب</span><strong id="dashboardHearts">0</strong></div>
+        <div class="panel dashboard-stat"><span>🔥 Streak</span><strong id="dashboardStreak">0</strong><small>روز</small></div>
+        <div class="panel dashboard-stat"><span>🎫 پشتیبانی</span><strong id="dashboardNoticeCount">بدون پاسخ جدید</strong></div>
+      </div>
+
+      <div class="grid dashboard-progress-grid">
+        <div class="panel dashboard-progress-card">
+          <div class="section-heading"><h3>🧠 اطلاعات عمومی</h3><span>مرحله <b id="dashboardGeneralStage">0</b></span></div>
+          <p>حساب رایگان تا ۳ مرحله دسترسی دارد؛ با اشتراک، همه مراحل باز می‌شوند.</p>
+          <button class="secondary full" data-page="quiz">مشاهده مراحل</button>
+        </div>
+        <div class="panel dashboard-progress-card">
+          <div class="section-heading"><h3>🎮 تفریحی</h3><span>مرحله <b id="dashboardFunStage">0</b></span></div>
+          <p>پیشرفت بازی تفریحی خودت را از همین پنل دنبال کن.</p>
+          <button class="secondary full" data-page="quiz">ادامه بازی</button>
+        </div>
+      </div>
+
+      <div class="panel dashboard-subscription-card">
         <div>
-
-            <span class="eyebrow">
-                👤 حساب
-            </span>
-
-            <h2>
-                پروفایل
-            </h2>
-
+          <span class="eyebrow">وضعیت اشتراک</span>
+          <h3 id="dashboardSubscriptionTitle">اشتراک و دسترسی مراحل</h3>
+          <p id="dashboardSubscriptionText">حساب رایگان: ۳ مرحله باز است.</p>
         </div>
+        <button class="primary" data-page="subscription">مدیریت اشتراک</button>
+      </div>
 
+      <div class="panel profile-card hidden" aria-hidden="true">
+        <h3 id="profileName">بازیکن مهمان</h3>
+        <p>XP: <b id="profileScore">0</b></p>
+        <p>Streak: <b id="profileStreak">0</b> روز</p>
+        <p>مرحله: <b id="profileStage">0</b></p>
+        <p>وضعیت: <b id="subscriptionStatus">رایگان</b></p>
+      </div>
     </div>
-
-
-    <div class="grid profile-grid">
-
-        <div class="panel profile-card">
-
-            <h3 id="profileName">
-                بازیکن مهمان
-            </h3>
-
-            <p>
-                XP:
-                <b id="profileScore">0</b>
-            </p>
-
-            <p>
-                Streak:
-                <b id="profileStreak">0</b>
-                روز
-            </p>
-
-            <p>
-                مرحله:
-                <b id="profileStage">0</b>
-            </p>
-
-            <p>
-                وضعیت:
-                <b id="subscriptionStatus">
-                    رایگان
-                </b>
-            </p>
-
-        </div>
-
-
-        <div class="panel profile-actions">
-
-            <button
-                class="primary full"
-                data-page="subscription">
-                مشاهده اشتراک‌ها
-            </button>
-
-            <button
-                id="logoutButton"
-                class="dark-action full">
-                خروج از حساب
-            </button>
-
-        </div>
-
-    </div>
-
+  </div>
 </section>
-
-
-<!-- =========================
-     SUBSCRIPTION
-========================= -->
 
 <section id="subscription" class="page">
+  <div class="subscription-hero compact">
+    <div>
+      <span class="eyebrow">👑 اشتراک QuizDuo</span>
+      <h2>پلن مناسب خودت را انتخاب کن</h2>
+      <p>فقط پلن ۹ ماهه دارای عنوان <b>Premium</b> است.</p>
+    </div>
+    <div class="premium-crown large">♛</div>
+  </div>
 
-    <div class="subscription-hero compact">
+  <div class="subscription-grid">
+    <article class="subscription-card">
+      <div class="plan-icon">1M</div>
+      <h3>ماهانه</h3>
+      <p>اشتراکی پایه</p>
+      <div class="price">۱۰۰٬۰۰۰ <small>تومان</small></div>
+      <button class="secondary select-plan" data-plan="monthly">انتخاب</button>
+    </article>
 
-        <div>
+    <article class="subscription-card">
+      <div class="plan-icon">3M</div>
+      <h3>سه‌ماهه</h3>
+      <p>برای بازی مداوم‌تر</p>
+      <div class="price">۲۷۰٬۰۰۰ <small>تومان</small></div>
+      <button class="secondary select-plan" data-plan="quarterly">انتخاب</button>
+    </article>
 
-            <span class="eyebrow">
-                👑 اشتراک QuizDuo
-            </span>
+    <article class="subscription-card">
+      <div class="plan-icon">6M</div>
+      <h3>شش‌ماهه</h3>
+      <p>۱ ماه هدیه</p>
+      <div class="price">۴۸۰٬۰۰۰ <small>تومان</small></div>
+      <button class="secondary select-plan" data-plan="sixMonth">انتخاب</button>
+    </article>
 
-            <h2>
-                پلن مناسب خودت را انتخاب کن
-            </h2>
+    <article class="subscription-card premium-plan">
+      <span class="popular-badge">PREMIUM</span>
+      <div class="plan-icon">9M</div>
+      <h3>نه‌ماهه 👑</h3>
+      <p>۲ ماه هدیه + امکانات Premium</p>
+      <div class="price">۶۶۰٬۰۰۰ <small>تومان</small></div>
+      <button class="primary select-plan" data-plan="nineMonth">انتخاب Premium</button>
+    </article>
+  </div>
 
-            <p>
-                فقط پلن ۹ ماهه دارای عنوان
-                <b>Premium</b>
-                است.
-            </p>
+  <div class="premium-benefits panel">
+    <h3>مزایای Premium</h3>
+    <div class="benefit-grid">
+      <div>❤️ قلب بیشتر</div><div>👑 نشان Premium</div><div>📊 آمار پیشرفته</div>
+      <div>🎯 چالش‌های ویژه</div><div>🎁 هدیه‌های دوره‌ای</div><div>🔓 امکانات ویژه</div>
+    </div>
+  </div>
 
-        </div>
+  <div class="referral-panel panel">
+    <h3>🎁 معرفی دوستان</h3>
+    <p>با معرفی کاربران جدید، ماه هدیه بگیر.</p>
+    <div class="referral-grid">
+      <div><b>۵ نفر</b><span>۱ ماه هدیه</span></div>
+      <div><b>۱۰ نفر</b><span>۲ ماه هدیه</span></div>
+      <div><b>۲۰ نفر</b><span>۴ ماه هدیه</span></div>
+    </div>
+  </div>
 
-        <div class="premium-crown large">
-            ♛
-        </div>
-
+  <div id="paymentPanel" class="payment-panel panel hidden">
+    <div class="section-heading">
+      <div><span class="eyebrow">پرداخت</span><h3 id="selectedPlanTitle">انتخاب پلن</h3></div>
+      <button id="closePayment" class="dark-action">بستن</button>
     </div>
 
-
-    <div class="subscription-grid">
-
-        <article
-            class="subscription-card"
-            data-plan="monthly">
-
-            <div class="plan-icon">
-                1M
-            </div>
-
-            <h3>
-                ماهانه
-            </h3>
-
-            <p class="plan-desc">
-                اشتراکی پایه
-            </p>
-
-            <div class="price">
-                ۱۰۰٬۰۰۰
-                <small>
-                    تومان
-                </small>
-            </div>
-
-            <button
-                class="secondary select-plan"
-                data-plan="monthly">
-                انتخاب
-            </button>
-
-        </article>
-
-
-        <article
-            class="subscription-card"
-            data-plan="quarterly">
-
-            <div class="plan-icon">
-                3M
-            </div>
-
-            <h3>
-                سه‌ماهه
-            </h3>
-
-            <p class="plan-desc">
-                برای بازی مداوم‌تر
-            </p>
-
-            <div class="price">
-                ۲۷۰٬۰۰۰
-                <small>
-                    تومان
-                </small>
-            </div>
-
-            <button
-                class="secondary select-plan"
-                data-plan="quarterly">
-                انتخاب
-            </button>
-
-        </article>
-
-
-        <article
-            class="subscription-card"
-            data-plan="sixMonth">
-
-            <div class="plan-icon">
-                6M
-            </div>
-
-            <h3>
-                شش‌ماهه
-            </h3>
-
-            <p class="plan-desc">
-                ۱ ماه هدیه
-            </p>
-
-            <div class="price">
-                ۴۸۰٬۰۰۰
-                <small>
-                    تومان
-                </small>
-            </div>
-
-            <button
-                class="secondary select-plan"
-                data-plan="sixMonth">
-                انتخاب
-            </button>
-
-        </article>
-
-
-        <article
-            class="subscription-card premium-plan"
-            data-plan="nineMonth">
-
-            <span class="popular-badge">
-                PREMIUM
-            </span>
-
-            <div class="plan-icon">
-                9M
-            </div>
-
-            <h3>
-                نه‌ماهه 👑
-            </h3>
-
-            <p class="plan-desc">
-                ۲ ماه هدیه + امکانات Premium
-            </p>
-
-            <div class="price">
-                ۶۶۰٬۰۰۰
-                <small>
-                    تومان
-                </small>
-            </div>
-
-            <button
-                class="primary select-plan"
-                data-plan="nineMonth">
-                انتخاب Premium
-            </button>
-
-        </article>
-
+    <div class="payment-info">
+      <p>مبلغ پلن: <b id="selectedAmount">۰ تومان</b></p>
+      <p class="account-box">شماره حساب: <b id="accountNumber"></b></p>
+      <p class="payment-security">پس از پرداخت، تصویر فیش را در بخش زیر بارگذاری کنید.</p>
     </div>
 
+    <div class="discount-row">
+      <input id="discountCode" placeholder="کد تخفیف">
+      <button id="applyDiscount" class="secondary">اعمال کد</button>
+    </div>
+    <p id="discountMessage" class="message"></p>
 
-    <!-- PREMIUM BENEFITS -->
+    <div class="final-price">مبلغ نهایی: <strong id="finalPrice">۰ تومان</strong></div>
 
-    <div class="premium-benefits panel">
-
-        <h3>
-            مزایای Premium
-        </h3>
-
-        <div class="benefit-grid">
-
-            <div>
-                ❤️ قلب بیشتر
-            </div>
-
-            <div>
-                👑 نشان Premium
-            </div>
-
-            <div>
-                📊 آمار پیشرفته
-            </div>
-
-            <div>
-                🎯 چالش‌های ویژه
-            </div>
-
-            <div>
-                🎁 هدیه‌های دوره‌ای
-            </div>
-
-            <div>
-                🔓 امکانات ویژه
-            </div>
-
-        </div>
-
+    <div class="receipt-upload">
+      <label for="paymentFile" class="upload-label">📷 آپلود تصویر فیش پرداخت</label>
+      <input id="paymentFile" type="file" accept="image/*">
+      <p id="fileName">فایلی انتخاب نشده است</p>
+      <small>حداکثر حجم تصویر: ۵ مگابایت</small>
     </div>
 
-
-    <!-- REFERRAL -->
-
-    <div class="referral-panel panel">
-
-        <h3>
-            🎁 معرفی دوستان
-        </h3>
-
-        <p>
-            با معرفی کاربران جدید، ماه هدیه بگیر.
-        </p>
-
-        <div class="referral-grid">
-
-            <div>
-                <b>۵ نفر</b>
-                <span>۱ ماه هدیه</span>
-            </div>
-
-            <div>
-                <b>۱۰ نفر</b>
-                <span>۲ ماه هدیه</span>
-            </div>
-
-            <div>
-                <b>۲۰ نفر</b>
-                <span>۴ ماه هدیه</span>
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- PAYMENT -->
-
-    <div
-        id="paymentPanel"
-        class="payment-panel panel hidden">
-
-        <div class="section-heading">
-
-            <div>
-
-                <span class="eyebrow">
-                    پرداخت
-                </span>
-
-                <h3 id="selectedPlanTitle">
-                    انتخاب پلن
-                </h3>
-
-            </div>
-
-            <button
-                id="closePayment"
-                class="dark-action">
-                بستن
-            </button>
-
-        </div>
-
-
-        <div class="payment-info">
-
-            <p>
-                مبلغ پلن:
-                <b id="selectedAmount">
-                    ۰ تومان
-                </b>
-            </p>
-
-            <p class="account-box">
-                شماره حساب:
-                <b id="accountNumber"></b>
-            </p>
-
-            <p class="payment-security">
-                پس از پرداخت، تصویر فیش را در بخش زیر بارگذاری کنید.
-            </p>
-
-        </div>
-
-
-        <!-- DISCOUNT -->
-
-        <div class="discount-row">
-
-            <input
-                id="discountCode"
-                placeholder="کد تخفیف">
-
-            <button
-                id="applyDiscount"
-                class="secondary">
-                اعمال کد
-            </button>
-
-        </div>
-
-
-        <p
-            id="discountMessage"
-            class="message">
-        </p>
-
-
-        <div class="final-price">
-
-            مبلغ نهایی:
-
-            <strong id="finalPrice">
-                ۰ تومان
-            </strong>
-
-        </div>
-
-
-        <!-- RECEIPT -->
-
-        <div class="receipt-upload">
-
-            <label
-                for="paymentFile"
-                class="upload-label">
-
-                📷 آپلود تصویر فیش پرداخت
-
-            </label>
-
-            <input
-                id="paymentFile"
-                type="file"
-                accept="image/*">
-
-            <p id="fileName">
-                فایلی انتخاب نشده است
-            </p>
-
-            <small>
-                حداکثر حجم تصویر: ۵ مگابایت
-            </small>
-
-        </div>
-
-
-        <p class="payment-note">
-            تصویر فیش پس از ارسال برای بررسی به سامانه مدیریت QuizDuo فرستاده می‌شود.
-        </p>
-
-
-        <button
-            id="submitPayment"
-            class="primary full">
-
-            ارسال فیش برای بررسی
-
-        </button>
-
-
-        <p
-            id="paymentMessage"
-            class="message">
-        </p>
-
-    </div>
-
+    <p class="payment-note">فیش پس از ارسال برای بررسی به سامانه مدیریت QuizDuo فرستاده می‌شود.</p>
+    <button id="submitPayment" class="primary full">ارسال فیش برای بررسی</button>
+    <p id="paymentMessage" class="message"></p>
+  </div>
 </section>
-
-
-<!-- =========================
-     CHAT
-========================= -->
 
 <section id="chat" class="page">
-
-    <h2>
-        💬 چت
-    </h2>
-
-    <div class="panel chat">
-
-        <div id="messages">
-        </div>
-
-        <div class="row">
-
-            <input
-                id="chatInput"
-                placeholder="پیام...">
-
-            <button
-                id="sendChat"
-                class="primary">
-                ارسال
-            </button>
-
-        </div>
-
-    </div>
-
+  <h2>💬 چت</h2>
+  <div class="panel chat">
+    <div id="messages"></div>
+    <div class="row"><input id="chatInput" placeholder="پیام..."><button id="sendChat" class="primary">ارسال</button></div>
+  </div>
 </section>
-
-
-<!-- =========================
-     SUPPORT
-========================= -->
 
 <section id="support" class="page">
-
-    <h2>
-        🎫 پشتیبانی
-    </h2>
-
-    <div class="panel narrow">
-
-        <input
-            id="supportSubject"
-            placeholder="موضوع">
-
-        <textarea
-            id="supportText"
-            placeholder="پیام">
-        </textarea>
-
-        <button
-            id="supportSend"
-            class="primary full">
-            ارسال
-        </button>
-
-        <p
-            id="supportMsg"
-            class="message">
-        </p>
-
-    </div>
-
+  <h2>🎫 پشتیبانی</h2>
+  <div class="panel narrow">
+    <input id="supportSubject" placeholder="موضوع">
+    <textarea id="supportText" placeholder="پیام"></textarea>
+    <button id="supportSend" class="primary full">ارسال</button>
+    <p id="supportMsg" class="message"></p>
+  </div>
 </section>
-
 </main>
 
-
-<footer>
-    QuizDuo · یاد بگیر، بازی کن، پیشرفت کن.
-</footer>
-
-
-<script
-    type="module"
-    src="js/core/app.js">
-</script>
-
+<footer>QuizDuo · یاد بگیر، بازی کن، پیشرفت کن.</footer>
+<script type="module" src="js/core/app.js"></script>
 </body>
 </html>
