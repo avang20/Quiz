@@ -357,119 +357,93 @@ export class QuizEngine {
 
 
     async loadCategory(category) {
+    this.currentCategory = category;
 
-        const response =
-            await fetch(
-                `../../data/${category}.json`,
-                {
-                    cache:
-                        "no-store"
-                }
-            );
+    const basePath = window.location.pathname
+        .replace(/\/+$/, "");
 
+    const projectPath =
+        basePath.endsWith("/Quiz")
+            ? basePath
+            : "/Quiz";
 
-        if (!response.ok) {
+    const url =
+        `${projectPath}/data/${category}.json`;
 
-            throw new Error(
-                `Could not load ../../data/${category}.json`
-            );
-        }
+    console.log("Loading quiz data:", url);
 
+    const response = await fetch(url, {
+        cache: "no-store"
+    });
 
-        const data =
-            await response.json();
-
-
-        let rawQuestions = [];
-
-
-        if (Array.isArray(data)) {
-
-            rawQuestions =
-                data;
-
-        } else if (
-            Array.isArray(
-                data.questions
-            )
-        ) {
-
-            rawQuestions =
-                data.questions;
-
-        } else if (
-            Array.isArray(
-                data.items
-            )
-        ) {
-
-            rawQuestions =
-                data.items;
-
-        } else if (
-            Array.isArray(
-                data.stages
-            )
-        ) {
-
-            data.stages.forEach(
-                stageBlock => {
-
-                    const stageNumber =
-                        Number(
-                            stageBlock.stage ??
-                            stageBlock.id ??
-                            1
-                        ) || 1;
-
-
-                    const list =
-                        Array.isArray(
-                            stageBlock.questions
-                        )
-                            ? stageBlock.questions
-                            : [];
-
-
-                    list.forEach(
-                        question => {
-
-                            rawQuestions.push({
-                                ...question,
-
-                                stage:
-                                    question.stage ??
-                                    stageNumber
-                            });
-                        }
-                    );
-                }
-            );
-        }
-
-
-        this.questions =
-            rawQuestions
-                .map(
-                    question =>
-                        normalizeQuestion(
-                            question,
-                            1
-                        )
-                )
-                .filter(
-                    question =>
-                        question &&
-                        question.question
-                            .trim() &&
-                        question.options
-                            .length > 0
-                );
-
-
-        this.currentCategory =
-            category;
+    if (!response.ok) {
+        throw new Error(
+            `Could not load ${url} (${response.status})`
+        );
     }
+
+    const data = await response.json();
+
+    let rawQuestions = [];
+
+    if (Array.isArray(data)) {
+        rawQuestions = data;
+    }
+    else if (Array.isArray(data.questions)) {
+        rawQuestions = data.questions;
+    }
+    else if (Array.isArray(data.items)) {
+        rawQuestions = data.items;
+    }
+    else if (Array.isArray(data.stages)) {
+
+        data.stages.forEach(stageBlock => {
+
+            const stageNumber =
+                Number(
+                    stageBlock.stage ??
+                    stageBlock.id ??
+                    1
+                ) || 1;
+
+            const list =
+                Array.isArray(stageBlock.questions)
+                    ? stageBlock.questions
+                    : [];
+
+            list.forEach(question => {
+
+                rawQuestions.push({
+                    ...question,
+                    stage:
+                        question.stage ??
+                        stageNumber
+                });
+
+            });
+        });
+    }
+
+    this.questions =
+        rawQuestions
+            .map(question =>
+                normalizeQuestion(
+                    question,
+                    1
+                )
+            )
+            .filter(question =>
+                question &&
+                question.question.trim() &&
+                question.options.length > 0
+            );
+
+    console.log(
+        `Loaded ${this.questions.length} ${category} questions`
+    );
+
+    this.currentCategory = category;
+}
 
 
     getStageQuestions(stage) {
