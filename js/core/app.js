@@ -63,50 +63,33 @@ const subscriptionPlans = {
 
 
 const money = value =>
-    Number(
-        value || 0
-    )
-        .toLocaleString(
-            "fa-IR"
-        ) +
+    Number(value || 0)
+        .toLocaleString("fa-IR") +
     " تومان";
 
 
-function normalizeQuestionForUI(
-    question
-) {
+function normalizeQuestionForUI(question) {
 
     if (!question) {
         return null;
     }
 
-
     return {
-
         ...question,
 
-        question:
-            String(
-                question.question ??
-                question.q ??
-                question.text ??
-                ""
-            ),
+        question: String(
+            question.question ??
+            question.q ??
+            question.text ??
+            ""
+        ),
 
-        options:
-            Array.isArray(
-                question.options
+        options: Array.isArray(question.options)
+            ? question.options.map(option =>
+                String(option)
             )
-                ? question.options.map(
-                    option =>
-                        String(
-                            option
-                        )
-                  )
-                : []
-
+            : []
     };
-
 }
 
 
@@ -127,75 +110,44 @@ class App {
 
 
         this.state.username =
-            username ===
-            "guest"
-
+            username === "guest"
                 ? "بازیکن مهمان"
-
                 : username;
 
 
         this.quiz =
             new QuizEngine(
                 this.state,
-                () =>
-                    this.persist()
+                () => this.persist()
             );
 
 
-        this.authRegister =
-            false;
+        this.authRegister = false;
 
+        this.selectedPlan = null;
 
-        this.selectedPlan =
-            null;
-
-
-        this.paymentFile =
-            null;
-
+        this.paymentFile = null;
 
         this.lastServerUpdates = {
-
-            payments:
-                [],
-
-            support:
-                []
-
+            payments: [],
+            support: []
         };
 
+        this.serverLeaderboard = [];
 
-        this.serverLeaderboard =
-            [];
+        this.timerId = null;
 
+        this.timeLeft = 0;
 
-        this.timerId =
-            null;
+        this.serverStateTimer = null;
 
+        this.supportPanelReady = false;
 
-        this.timeLeft =
-            0;
+        this.paymentPanelReady = false;
 
+        this.leaderboardLoading = false;
 
-        this.serverStateTimer =
-            null;
-
-
-        this.supportPanelReady =
-            false;
-
-
-        this.paymentPanelReady =
-            false;
-
-
-        this.leaderboardLoading =
-            false;
-
-
-        this.boundSupportEvents =
-            false;
+        this.boundSupportEvents = false;
 
     }
 
@@ -203,7 +155,6 @@ class App {
     /* ======================================================
        INIT
     ====================================================== */
-
 
     init() {
 
@@ -231,13 +182,9 @@ class App {
 
         this.updateAuthButton();
 
-        this.go(
-            "home"
-        );
-
+        this.go("home");
 
         this.syncServerUpdates();
-
     }
 
 
@@ -245,48 +192,38 @@ class App {
        NAVIGATION
     ====================================================== */
 
-
     bindNavigation() {
 
         document
-            .querySelectorAll(
-                "[data-page]"
-            )
-            .forEach(
-                element => {
+            .querySelectorAll("[data-page]")
+            .forEach(element => {
 
-                    element.addEventListener(
-                        "click",
-                        event => {
+                element.addEventListener(
+                    "click",
+                    event => {
 
-                            event.preventDefault();
+                        event.preventDefault();
 
-                            this.go(
-                                element.dataset.page
-                            );
+                        this.go(
+                            element.dataset.page
+                        );
 
-                        }
-                    );
+                    }
+                );
 
-                }
-            );
+            });
 
 
         document
-            .getElementById(
-                "themeToggle"
-            )
+            .getElementById("themeToggle")
             ?.addEventListener(
                 "click",
-                () =>
-                    this.toggleTheme()
+                () => this.toggleTheme()
             );
 
 
         document
-            .getElementById(
-                "authButton"
-            )
+            .getElementById("authButton")
             ?.addEventListener(
                 "click",
                 () =>
@@ -302,61 +239,44 @@ class App {
 
     go(page) {
 
+        this.stopTimer();
+
         document
-            .querySelectorAll(
-                ".page"
-            )
-            .forEach(
-                section =>
-                    section.classList.remove(
-                        "active"
-                    )
+            .querySelectorAll(".page")
+            .forEach(section =>
+                section.classList.remove(
+                    "active"
+                )
             );
 
 
         document
-            .getElementById(
-                page
-            )
-            ?.classList.add(
-                "active"
-            );
+            .getElementById(page)
+            ?.classList.add("active");
 
 
-        if (
-            page ===
-            "quiz"
-        ) {
+        if (page === "quiz") {
 
             this.renderStages();
 
         }
 
 
-        if (
-            page ===
-            "leaderboard"
-        ) {
+        if (page === "leaderboard") {
 
             this.renderLeaderboard();
 
         }
 
 
-        if (
-            page ===
-            "profile"
-        ) {
+        if (page === "profile") {
 
             this.renderProfile();
 
         }
 
 
-        if (
-            page ===
-            "subscription"
-        ) {
+        if (page === "subscription") {
 
             this.ensurePaymentStatusPanel();
 
@@ -367,10 +287,7 @@ class App {
         }
 
 
-        if (
-            page ===
-            "support"
-        ) {
+        if (page === "support") {
 
             this.ensureSupportPanel();
 
@@ -380,13 +297,8 @@ class App {
 
 
         window.scrollTo({
-
-            top:
-                0,
-
-            behavior:
-                "smooth"
-
+            top: 0,
+            behavior: "smooth"
         });
 
     }
@@ -396,25 +308,18 @@ class App {
        THEME
     ====================================================== */
 
-
     toggleTheme() {
 
         document.body
             .classList
-            .toggle(
-                "dark"
-            );
+            .toggle("dark");
 
 
         const theme =
-            document.body
-                .classList
-                .contains(
-                    "dark"
-                )
-
+            document.body.classList.contains(
+                "dark"
+            )
                 ? "dark"
-
                 : "light";
 
 
@@ -447,8 +352,7 @@ class App {
             .classList
             .toggle(
                 "dark",
-                saved ===
-                    "dark"
+                saved === "dark"
             );
 
     }
@@ -457,7 +361,6 @@ class App {
     /* ======================================================
        HELPERS
     ====================================================== */
-
 
     isGuest() {
 
@@ -469,9 +372,7 @@ class App {
     }
 
 
-    formatDate(
-        value
-    ) {
+    formatDate(value) {
 
         if (!value) {
             return "";
@@ -482,25 +383,20 @@ class App {
 
             return new Date(
                 value
-            )
-                .toLocaleString(
-                    "fa-IR"
-                );
+            ).toLocaleString(
+                "fa-IR"
+            );
 
         } catch {
 
-            return String(
-                value
-            );
+            return String(value);
 
         }
 
     }
 
 
-    toast(
-        text
-    ) {
+    toast(text) {
 
         let toast =
             document.getElementById(
@@ -523,34 +419,16 @@ class App {
             Object.assign(
                 toast.style,
                 {
-
-                    position:
-                        "fixed",
-
-                    right:
-                        "20px",
-
-                    bottom:
-                        "20px",
-
-                    zIndex:
-                        "99999",
-
-                    background:
-                        "#17262d",
-
-                    color:
-                        "#fff",
-
-                    padding:
-                        "12px 16px",
-
-                    borderRadius:
-                        "13px",
-
+                    position: "fixed",
+                    right: "20px",
+                    bottom: "20px",
+                    zIndex: "99999",
+                    background: "#17262d",
+                    color: "#fff",
+                    padding: "12px 16px",
+                    borderRadius: "13px",
                     boxShadow:
                         "0 12px 30px rgba(0,0,0,.2)"
-
                 }
             );
 
@@ -573,8 +451,7 @@ class App {
 
         this.toastTimer =
             setTimeout(
-                () =>
-                    toast.remove(),
+                () => toast.remove(),
                 3000
             );
 
@@ -582,26 +459,20 @@ class App {
 
 
     /* ======================================================
-       STATE / SERVER USER SYNC
+       STATE
     ====================================================== */
-
 
     persist() {
 
         saveState(
-
             this.state,
-
             this.isGuest()
                 ? "guest"
                 : this.state.username
-
         );
 
 
-        if (
-            !this.isGuest()
-        ) {
+        if (!this.isGuest()) {
 
             updateLeaderboard(
                 this.state
@@ -629,8 +500,7 @@ class App {
 
         this.serverStateTimer =
             setTimeout(
-                () =>
-                    this.sendUserState(),
+                () => this.sendUserState(),
                 700
             );
 
@@ -639,12 +509,8 @@ class App {
 
     async sendUserState() {
 
-        if (
-            this.isGuest()
-        ) {
-
+        if (this.isGuest()) {
             return;
-
         }
 
 
@@ -652,8 +518,7 @@ class App {
 
             await this.serverWrite({
 
-                action:
-                    "userState",
+                action: "userState",
 
                 username:
                     this.state.username,
@@ -663,39 +528,32 @@ class App {
 
                 xp:
                     Number(
-                        this.state.xp ||
-                        0
+                        this.state.xp || 0
                     ),
 
                 level:
                     Number(
-                        this.state.level ||
-                        1
+                        this.state.level || 1
                     ),
 
                 streak:
                     Number(
-                        this.state.streak ||
-                        0
+                        this.state.streak || 0
                     ),
 
                 generalStage:
                     Number(
-                        this.state.generalStage ||
-                        1
+                        this.state.generalStage || 1
                     ),
 
                 funStage:
                     Number(
-                        this.state.funStage ||
-                        1
+                        this.state.funStage || 1
                     )
 
             });
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "User state sync failed:",
@@ -725,8 +583,7 @@ class App {
             );
 
 
-        return current?.phone ||
-            "";
+        return current?.phone || "";
 
     }
 
@@ -735,13 +592,10 @@ class App {
        AUTH
     ====================================================== */
 
-
     initAuth() {
 
         document
-            .getElementById(
-                "toggleAuth"
-            )
+            .getElementById("toggleAuth")
             ?.addEventListener(
                 "click",
                 () => {
@@ -751,9 +605,7 @@ class App {
 
 
                     document
-                        .getElementById(
-                            "authTitle"
-                        )
+                        .getElementById("authTitle")
                         .textContent =
                         this.authRegister
                             ? "ساخت حساب جدید"
@@ -761,9 +613,7 @@ class App {
 
 
                     document
-                        .getElementById(
-                            "authSubmit"
-                        )
+                        .getElementById("authSubmit")
                         .textContent =
                         this.authRegister
                             ? "ثبت‌نام"
@@ -771,9 +621,7 @@ class App {
 
 
                     document
-                        .getElementById(
-                            "toggleAuth"
-                        )
+                        .getElementById("toggleAuth")
                         .textContent =
                         this.authRegister
                             ? "ورود به حساب"
@@ -781,9 +629,7 @@ class App {
 
 
                     document
-                        .getElementById(
-                            "phoneField"
-                        )
+                        .getElementById("phoneField")
                         ?.classList
                         .toggle(
                             "hidden",
@@ -795,26 +641,18 @@ class App {
 
 
         document
-            .getElementById(
-                "authBack"
-            )
+            .getElementById("authBack")
             ?.addEventListener(
                 "click",
-                () =>
-                    this.go(
-                        "home"
-                    )
+                () => this.go("home")
             );
 
 
         document
-            .getElementById(
-                "authSubmit"
-            )
+            .getElementById("authSubmit")
             ?.addEventListener(
                 "click",
-                () =>
-                    this.submitAuth()
+                () => this.submitAuth()
             );
 
     }
@@ -824,26 +662,20 @@ class App {
 
         const name =
             document
-                .getElementById(
-                    "authName"
-                )
+                .getElementById("authName")
                 .value
                 .trim();
 
 
         const password =
             document
-                .getElementById(
-                    "authPassword"
-                )
+                .getElementById("authPassword")
                 .value;
 
 
         const phone =
             document
-                .getElementById(
-                    "authPhone"
-                )
+                .getElementById("authPhone")
                 .value
                 .trim();
 
@@ -881,13 +713,9 @@ class App {
             );
 
 
-        if (
-            this.authRegister
-        ) {
+        if (this.authRegister) {
 
-            if (
-                existing
-            ) {
+            if (existing) {
 
                 message.textContent =
                     "این نام کاربری قبلاً استفاده شده است.";
@@ -913,8 +741,7 @@ class App {
 
             users.push({
 
-                username:
-                    name,
+                username: name,
 
                 password,
 
@@ -926,14 +753,9 @@ class App {
             });
 
 
-            saveUsers(
-                users
-            );
+            saveUsers(users);
 
-
-            setCurrentUser(
-                name
-            );
+            setCurrentUser(name);
 
 
             this.state =
@@ -949,20 +771,11 @@ class App {
 
             this.persist();
 
-
-            this.sendUserState();
-
-
-            message.textContent =
-                "حساب با موفقیت ساخته شد.";
-
-
         } else {
 
             if (
                 !existing ||
-                existing.password !==
-                    password
+                existing.password !== password
             ) {
 
                 message.textContent =
@@ -991,24 +804,22 @@ class App {
 
             this.persist();
 
-
-            this.sendUserState();
-
-
-            message.textContent =
-                "ورود موفق بود.";
-
         }
 
 
         this.updateAuthButton();
 
+        this.sendUserState();
+
+
+        message.textContent =
+            this.authRegister
+                ? "حساب با موفقیت ساخته شد."
+                : "ورود موفق بود.";
+
 
         setTimeout(
-            () =>
-                this.go(
-                    "home"
-                ),
+            () => this.go("home"),
             450
         );
 
@@ -1023,12 +834,8 @@ class App {
             );
 
 
-        if (
-            !button
-        ) {
-
+        if (!button) {
             return;
-
         }
 
 
@@ -1043,7 +850,6 @@ class App {
     /* ======================================================
        QUIZ
     ====================================================== */
-
 
     initQuiz() {
 
@@ -1167,6 +973,36 @@ class App {
     }
 
 
+    hasActiveSubscription() {
+
+        const info =
+            this.state.subscriptionInfo ||
+            {};
+
+
+        if (
+            info.active !== true
+        ) {
+
+            return false;
+
+        }
+
+
+        const expiry =
+            new Date(
+                info.expiry || 0
+            ).getTime();
+
+
+        return (
+            Number.isFinite(expiry) &&
+            expiry > Date.now()
+        );
+
+    }
+
+
     async renderStages() {
 
         const box =
@@ -1175,12 +1011,8 @@ class App {
             );
 
 
-        if (
-            !box
-        ) {
-
+        if (!box) {
             return;
-
         }
 
 
@@ -1210,34 +1042,27 @@ class App {
 
             const maxStage =
                 Math.max(
-
                     8,
-
                     ...this.quiz.questions.map(
                         question =>
                             Number(
                                 question.stage
-                            ) ||
-                            1
+                            ) || 1
                     )
-
                 );
 
 
-            box.innerHTML =
-                "";
+            box.innerHTML = "";
 
 
             for (
                 let stage = 1;
-                stage <=
-                maxStage;
+                stage <= maxStage;
                 stage++
             ) {
 
                 const available =
-                    stage ===
-                        1 ||
+                    stage === 1 ||
                     subscribed;
 
 
@@ -1365,9 +1190,7 @@ class App {
                 );
 
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "Quiz loading failed:",
@@ -1400,8 +1223,7 @@ class App {
     ) {
 
         if (
-            Number(stage) >
-                1 &&
+            Number(stage) > 1 &&
             !this.hasActiveSubscription()
         ) {
 
@@ -1433,18 +1255,13 @@ class App {
 
 
         if (
-            completed
+            completed &&
+            !confirm(
+                "این مرحله قبلاً تکمیل شده است. دوباره بازی شود؟"
+            )
         ) {
 
-            if (
-                !confirm(
-                    "این مرحله قبلاً تکمیل شده است. دوباره بازی شود؟"
-                )
-            ) {
-
-                return;
-
-            }
+            return;
 
         }
 
@@ -1520,8 +1337,7 @@ class App {
 
 
         const current =
-            this.quiz.currentQuestion +
-            1;
+            this.quiz.currentQuestion + 1;
 
 
         const total =
@@ -1535,12 +1351,12 @@ class App {
                         current /
                         total
                     ) * 100
-                  )
+                )
                 : 0;
 
 
         const letters =
-            ["الف","ب","ج","د"];
+            ["الف", "ب", "ج", "د"];
 
 
         box.classList.remove(
@@ -1559,20 +1375,13 @@ class App {
                         <div class="quiz-top">
 
                             <span>
-                                مرحله ${
-                                    this.quiz.currentStage
-                                }
+                                مرحله ${this.quiz.currentStage}
                             </span>
 
                             <span>
 
-                                سوال ${
-                                    current
-                                }
-                                از
-                                ${
-                                    total
-                                }
+                                سوال ${current}
+                                از ${total}
 
                             </span>
 
@@ -1586,10 +1395,7 @@ class App {
                         class="quiz-timer"
                     >
 
-                        ${
-                            QUIZ_CONFIG.questionTime
-                        }
-
+                        ${QUIZ_CONFIG.questionTime}
                         ثانیه
 
                     </div>
@@ -1643,11 +1449,9 @@ class App {
 
                                         <span>
 
-                                            ${
-                                                escapeHTML(
-                                                    option
-                                                )
-                                            }
+                                            ${escapeHTML(
+                                                option
+                                            )}
 
                                         </span>
 
@@ -1671,6 +1475,11 @@ class App {
         `;
 
 
+        /*
+         * این قسمت در نسخه قبلی یک ) کم داشت.
+         * الان کامل و صحیح است.
+         */
+
         box
             .querySelectorAll(
                 "[data-answer]"
@@ -1685,7 +1494,8 @@ class App {
                                 Number(
                                     button.dataset.answer
                                 )
-                            );
+                            )
+                    );
 
                 }
             );
@@ -1695,17 +1505,16 @@ class App {
 
 
         box.scrollIntoView({
-
-            behavior:
-                "smooth",
-
-            block:
-                "center"
-
+            behavior: "smooth",
+            block: "center"
         });
 
     }
 
+
+    /* ======================================================
+       TIMER
+    ====================================================== */
 
     startTimer() {
 
@@ -1718,19 +1527,18 @@ class App {
             );
 
 
-        const timerElement =
+        const timer =
             document.getElementById(
                 "quizTimer"
             );
 
 
-        if (
-            !timerElement
-        ) {
-
+        if (!timer) {
             return;
-
         }
+
+
+        this.updateTimerDisplay();
 
 
         this.timerId =
@@ -1739,12 +1547,12 @@ class App {
 
                     this.timeLeft--;
 
+
                     this.updateTimerDisplay();
 
 
                     if (
-                        this.timeLeft <=
-                        0
+                        this.timeLeft <= 0
                     ) {
 
                         this.stopTimer();
@@ -1761,9 +1569,6 @@ class App {
                 1000
             );
 
-
-        this.updateTimerDisplay();
-
     }
 
 
@@ -1777,6 +1582,7 @@ class App {
                 this.timerId
             );
 
+
             this.timerId =
                 null;
 
@@ -1787,49 +1593,43 @@ class App {
 
     updateTimerDisplay() {
 
-        const timerElement =
+        const timer =
             document.getElementById(
                 "quizTimer"
             );
 
 
-        if (
-            !timerElement
-        ) {
-
+        if (!timer) {
             return;
-
         }
 
 
-        timerElement.textContent =
+        timer.textContent =
             `${Math.max(
                 0,
                 this.timeLeft
             )} ثانیه`;
 
 
-        timerElement.classList.remove(
+        timer.classList.remove(
             "warning",
             "danger"
         );
 
 
         if (
-            this.timeLeft <=
-            5
+            this.timeLeft <= 5
         ) {
 
-            timerElement.classList.add(
+            timer.classList.add(
                 "danger"
             );
 
         } else if (
-            this.timeLeft <=
-            10
+            this.timeLeft <= 10
         ) {
 
-            timerElement.classList.add(
+            timer.classList.add(
                 "warning"
             );
 
@@ -1846,6 +1646,16 @@ class App {
         this.stopTimer();
 
 
+        const questionIndex =
+            this.quiz.currentQuestion;
+
+
+        const currentQuestion =
+            this.quiz.selectedQuestions[
+                questionIndex
+            ];
+
+
         const result =
             this.quiz.answer(
                 index,
@@ -1859,12 +1669,8 @@ class App {
             );
 
 
-        if (
-            !box
-        ) {
-
+        if (!box) {
             return;
-
         }
 
 
@@ -1873,9 +1679,12 @@ class App {
                 "[data-answer]"
             )
             .forEach(
-                button =>
+                button => {
+
                     button.disabled =
-                        true
+                        true;
+
+                }
             );
 
 
@@ -1891,30 +1700,20 @@ class App {
         ) {
 
             clicked.classList.add(
-
                 result.correct
                     ? "correct"
                     : "wrong"
-
             );
 
         }
 
 
         /*
-         * پاسخ صحیح را بعد از جواب نشان می‌دهیم.
+         * نشان دادن جواب صحیح
          */
 
         const correctIndex =
-            this.quiz
-                .selectedQuestions[
-                    Math.max(
-                        0,
-                        this.quiz.currentQuestion -
-                        1
-                    )
-                ]
-                ?.answer;
+            currentQuestion?.answer;
 
 
         const correctButton =
@@ -1940,12 +1739,8 @@ class App {
             );
 
 
-        if (
-            !feedback
-        ) {
-
+        if (!feedback) {
             return;
-
         }
 
 
@@ -2063,11 +1858,8 @@ class App {
                     "quizNext"
                 )
                 .onclick =
-                () => {
-
+                () =>
                     this.renderStages();
-
-                };
 
 
         } else {
@@ -2107,7 +1899,6 @@ class App {
     /* ======================================================
        SUBSCRIPTION
     ====================================================== */
-
 
     initSubscription() {
 
@@ -2187,10 +1978,6 @@ class App {
             );
 
 
-        /*
-         * Premium و هدیه‌های قبلی از نسخه فعلی حذف می‌شوند.
-         */
-
         [
             ".premium-preview",
             ".premium-benefits",
@@ -2245,12 +2032,8 @@ class App {
             ];
 
 
-        if (
-            !plan
-        ) {
-
+        if (!plan) {
             return;
-
         }
 
 
@@ -2334,11 +2117,7 @@ class App {
             message.textContent =
                 "ابتدا وارد حساب شوید.";
 
-
-            this.go(
-                "auth"
-            );
-
+            this.go("auth");
 
             return;
 
@@ -2416,8 +2195,7 @@ class App {
 
             await this.serverWrite({
 
-                action:
-                    "payment",
+                action: "payment",
 
                 username:
                     this.state.username,
@@ -2480,9 +2258,7 @@ class App {
             );
 
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "payment",
@@ -2498,9 +2274,7 @@ class App {
     }
 
 
-    fileToBase64(
-        file
-    ) {
+    fileToBase64(file) {
 
         return new Promise(
             (
@@ -2546,7 +2320,6 @@ class App {
        SUPPORT
     ====================================================== */
 
-
     initSupport() {
 
         this.ensureSupportPanel();
@@ -2586,15 +2359,12 @@ class App {
                     );
 
 
-                if (
-                    replyButton
-                ) {
+                if (replyButton) {
 
                     this.sendSupportReply(
                         replyButton.dataset
                             .supportReply
                     );
-
 
                     return;
 
@@ -2607,15 +2377,12 @@ class App {
                     );
 
 
-                if (
-                    closeButton
-                ) {
+                if (closeButton) {
 
                     this.closeSupport(
                         closeButton.dataset
                             .supportClose
                     );
-
 
                     return;
 
@@ -2628,9 +2395,7 @@ class App {
                     );
 
 
-                if (
-                    refresh
-                ) {
+                if (refresh) {
 
                     this.syncServerUpdates();
 
@@ -2663,12 +2428,8 @@ class App {
             );
 
 
-        if (
-            !support
-        ) {
-
+        if (!support) {
             return;
-
         }
 
 
@@ -2751,12 +2512,8 @@ class App {
             );
 
 
-        if (
-            !subscription
-        ) {
-
+        if (!subscription) {
             return;
-
         }
 
 
@@ -2792,9 +2549,7 @@ class App {
 
             </div>
 
-            <div
-                id="subscriptionPaymentsContent"
-            >
+            <div id="subscriptionPaymentsContent">
 
                 <p class="message">
                     در حال دریافت...
@@ -2868,7 +2623,6 @@ class App {
             msg.textContent =
                 "موضوع و پیام را وارد کنید.";
 
-
             return;
 
         }
@@ -2884,9 +2638,7 @@ class App {
 
                 ? crypto.randomUUID()
 
-                : `conversation-${Date.now()}-${Math.random()
-                    .toString(36)
-                    .slice(2)}`;
+                : `conversation-${Date.now()}`;
 
 
         try {
@@ -2939,9 +2691,7 @@ class App {
             );
 
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "support",
@@ -3015,9 +2765,7 @@ class App {
             );
 
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             this.toast(
                 "ارسال پیام به سامانه ناموفق بود."
@@ -3070,9 +2818,7 @@ class App {
             );
 
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             this.toast(
                 "بستن گفت‌وگو ناموفق بود."
@@ -3084,179 +2830,8 @@ class App {
 
 
     /* ======================================================
-       CHAT
-    ====================================================== */
-
-
-    initChat() {
-
-        const send =
-            () => {
-
-                const input =
-                    document.getElementById(
-                        "chatInput"
-                    );
-
-
-                const text =
-                    input?.value.trim();
-
-
-                if (
-                    !text
-                ) {
-
-                    return;
-
-                }
-
-
-                const messages =
-                    JSON.parse(
-                        localStorage.getItem(
-                            "quizduo_chat"
-                        ) ||
-                        "[]"
-                    );
-
-
-                messages.push({
-
-                    username:
-                        this.state.username,
-
-                    text,
-
-                    time:
-                        Date.now()
-
-                });
-
-
-                localStorage.setItem(
-
-                    "quizduo_chat",
-
-                    JSON.stringify(
-                        messages
-                    )
-
-                );
-
-
-                input.value =
-                    "";
-
-
-                this.renderChat();
-
-            };
-
-
-        document
-            .getElementById(
-                "sendChat"
-            )
-            ?.addEventListener(
-                "click",
-                send
-            );
-
-
-        document
-            .getElementById(
-                "chatInput"
-            )
-            ?.addEventListener(
-                "keydown",
-                event => {
-
-                    if (
-                        event.key ===
-                        "Enter"
-                    ) {
-
-                        event.preventDefault();
-
-                        send();
-
-                    }
-
-                }
-            );
-
-
-        this.renderChat();
-
-    }
-
-
-    renderChat() {
-
-        const box =
-            document.getElementById(
-                "messages"
-            );
-
-
-        if (
-            !box
-        ) {
-
-            return;
-
-        }
-
-
-        const messages =
-            JSON.parse(
-                localStorage.getItem(
-                    "quizduo_chat"
-                ) ||
-                "[]"
-            );
-
-
-        box.innerHTML =
-            messages.length
-
-                ? messages
-                    .map(
-                        item =>
-                            `
-                            <div class="chat-message">
-
-                                <b>
-                                    ${escapeHTML(
-                                        item.username
-                                    )}
-                                </b>
-
-                                <p>
-                                    ${escapeHTML(
-                                        item.text
-                                    )}
-                                </p>
-
-                            </div>
-                            `
-                    )
-                    .join("")
-
-                : `
-                    <p class="muted">
-                        هنوز پیامی وجود ندارد.
-                    </p>
-                  `;
-
-    }
-
-
-    /* ======================================================
        SERVER READ
     ====================================================== */
-
 
     async serverGet(
         action
@@ -3264,8 +2839,7 @@ class App {
 
         if (
             this.isGuest() &&
-            action ===
-                "userUpdates"
+            action === "userUpdates"
         ) {
 
             return {
@@ -3280,10 +2854,8 @@ class App {
                     [],
 
                 subscription: {
-
                     active:
                         false
-
                 }
 
             };
@@ -3330,12 +2902,8 @@ class App {
                 const cleanup =
                     () => {
 
-                        if (
-                            finished
-                        ) {
-
+                        if (finished) {
                             return;
-
                         }
 
 
@@ -3390,8 +2958,7 @@ class App {
 
                         if (
                             data &&
-                            data.success ===
-                                false
+                            data.success === false
                         ) {
 
                             reject(
@@ -3447,17 +3014,11 @@ class App {
        SERVER WRITE
     ====================================================== */
 
-
-    serverWrite(
-        payload
-    ) {
+    serverWrite(payload) {
 
         /*
-         * به جای fetch مستقیم، از یک فرم مخفی استفاده می‌کنیم.
-         *
-         * فرم Cross-Origin تحت قوانین CORS برای navigation
-         * محدودیت fetch را ندارد و Google Apps Script
-         * می‌تواند آن را با doPost دریافت کند.
+         * ارسال فرم به Apps Script
+         * بدون fetch/CORS response.
          */
 
         return new Promise(
@@ -3543,23 +3104,19 @@ class App {
                 );
 
 
-                let done =
+                let finished =
                     false;
 
 
                 const cleanup =
                     () => {
 
-                        if (
-                            done
-                        ) {
-
+                        if (finished) {
                             return;
-
                         }
 
 
-                        done =
+                        finished =
                             true;
 
 
@@ -3569,11 +3126,6 @@ class App {
 
                     };
 
-
-                /*
-                 * Apps Script ممکن است ابتدا کمی زمان برای
-                 * ذخیره اطلاعات نیاز داشته باشد.
-                 */
 
                 const timer =
                     setTimeout(
@@ -3587,17 +3139,12 @@ class App {
                             });
 
                         },
-                        1400
+                        1600
                     );
 
 
                 iframe.onload =
                     () => {
-
-                        /*
-                         * load فقط یعنی درخواست navigation
-                         * انجام شده است.
-                         */
 
                         clearTimeout(
                             timer
@@ -3611,14 +3158,12 @@ class App {
 
 
                                 resolve({
-
                                     success:
                                         true
-
                                 });
 
                             },
-                            300
+                            250
                         );
 
                     };
@@ -3648,9 +3193,7 @@ class App {
 
                     form.submit();
 
-                } catch (
-                    error
-                ) {
+                } catch (error) {
 
                     clearTimeout(
                         timer
@@ -3675,7 +3218,6 @@ class App {
     /* ======================================================
        SERVER SYNC
     ====================================================== */
-
 
     async syncServerUpdates() {
 
@@ -3722,9 +3264,7 @@ class App {
                     this.state
                         .subscriptionInfo
                         .active
-
                         ? "active"
-
                         : "inactive";
 
 
@@ -3732,18 +3272,17 @@ class App {
                     this.state
                         .subscriptionInfo
                         .active
-
                         ? "paid"
-
                         : "free";
 
 
-                this.persist();
+                saveState(
+                    this.state,
+                    this.state.username
+                );
 
 
-            } catch (
-                error
-            ) {
+            } catch (error) {
 
                 console.error(
                     "Server sync failed:",
@@ -3757,29 +3296,12 @@ class App {
 
         this.renderServerUpdates();
 
-
-        if (
-            document
-                .getElementById(
-                    "leaderboard"
-                )
-                ?.classList
-                .contains(
-                    "active"
-                )
-        ) {
-
-            this.renderLeaderboard();
-
-        }
-
     }
 
 
     /* ======================================================
        LEADERBOARD
     ====================================================== */
-
 
     async renderLeaderboard() {
 
@@ -3789,12 +3311,8 @@ class App {
             );
 
 
-        if (
-            !body
-        ) {
-
+        if (!body) {
             return;
-
         }
 
 
@@ -3850,7 +3368,6 @@ class App {
                     </tr>
                     `;
 
-
                 return;
 
             }
@@ -3864,42 +3381,29 @@ class App {
                             index
                         ) =>
                             `
-
                             <tr>
 
                                 <td>
-
-                                    ${
-                                        index + 1
-                                    }
-
+                                    ${index + 1}
                                 </td>
 
                                 <td>
-
                                     ${escapeHTML(
                                         item.username ||
                                         "بازیکن"
                                     )}
-
                                 </td>
 
                                 <td>
-
-                                    ${
-                                        Number(
-                                            item.xp ||
-                                            0
-                                        )
-                                            .toLocaleString(
-                                                "fa-IR"
-                                            )
-                                    }
-
+                                    ${Number(
+                                        item.xp ||
+                                        0
+                                    ).toLocaleString(
+                                        "fa-IR"
+                                    )}
                                 </td>
 
                                 <td>
-
                                     ${
                                         Math.max(
                                             Number(
@@ -3912,19 +3416,15 @@ class App {
                                             )
                                         ) - 1
                                     }
-
                                 </td>
 
                             </tr>
-
                             `
                     )
                     .join("");
 
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "Leaderboard error:",
@@ -3955,7 +3455,6 @@ class App {
        SERVER UI
     ====================================================== */
 
-
     renderServerUpdates() {
 
         this.ensureSupportPanel();
@@ -3981,7 +3480,8 @@ class App {
 
             const payments =
                 this.lastServerUpdates
-                    .payments || [];
+                    .payments ||
+                [];
 
 
             if (
@@ -4013,7 +3513,6 @@ class App {
                         .map(
                             payment =>
                                 `
-
                                 <div class="user-update-card">
 
                                     <div class="section-heading">
@@ -4042,27 +3541,22 @@ class App {
 
                                     <div class="muted">
 
-                                        ${
-                                            money(
-                                                payment.amount
-                                            )
-                                        }
+                                        ${money(
+                                            payment.amount
+                                        )}
 
                                         ·
 
-                                        ${
-                                            escapeHTML(
-                                                this.formatDate(
-                                                    payment.timestamp
-                                                )
+                                        ${escapeHTML(
+                                            this.formatDate(
+                                                payment.timestamp
                                             )
-                                        }
+                                        )}
 
                                     </div>
 
                                     ${
                                         payment.userMessage
-
                                             ? `
                                                 <p>
                                                     ${escapeHTML(
@@ -4070,12 +3564,10 @@ class App {
                                                     )}
                                                 </p>
                                               `
-
                                             : ""
                                     }
 
                                 </div>
-
                                 `
                         )
                         .join("");
@@ -4091,7 +3583,8 @@ class App {
 
             const support =
                 this.lastServerUpdates
-                    .support || [];
+                    .support ||
+                [];
 
 
             if (
@@ -4132,8 +3625,7 @@ class App {
                                             item =>
                                                 `
                                                 <div class="support-message ${
-                                                    item.sender ===
-                                                    "admin"
+                                                    item.sender === "admin"
                                                         ? "admin-message"
                                                         : "user-message"
                                                 }">
@@ -4141,11 +3633,8 @@ class App {
                                                     <div class="support-message-author">
 
                                                         ${
-                                                            item.sender ===
-                                                            "admin"
-
+                                                            item.sender === "admin"
                                                                 ? "پشتیبانی QuizDuo"
-
                                                                 : "شما"
                                                         }
 
@@ -4171,7 +3660,6 @@ class App {
                                                     </small>
 
                                                 </div>
-
                                                 `
                                         )
                                         .join("");
@@ -4288,52 +3776,11 @@ class App {
     }
 
 
-    planName(
-        id
-    ) {
+    planName(id) {
 
         return (
-            subscriptionPlans[
-                id
-            ]?.name ||
+            subscriptionPlans[id]?.name ||
             "اشتراک"
-        );
-
-    }
-
-
-    hasActiveSubscription() {
-
-        const info =
-            this.state
-                .subscriptionInfo ||
-            {};
-
-
-        if (
-            info.active !==
-            true
-        ) {
-
-            return false;
-
-        }
-
-
-        const expiry =
-            new Date(
-                info.expiry ||
-                0
-            )
-                .getTime();
-
-
-        return (
-            Number.isFinite(
-                expiry
-            ) &&
-            expiry >
-                Date.now()
         );
 
     }
@@ -4342,7 +3789,6 @@ class App {
     /* ======================================================
        PROFILE
     ====================================================== */
-
 
     renderProfile() {
 
@@ -4371,10 +3817,9 @@ class App {
                     Number(
                         this.state.xp ||
                         0
+                    ).toLocaleString(
+                        "fa-IR"
                     )
-                        .toLocaleString(
-                            "fa-IR"
-                        )
                 )
             );
 
@@ -4388,10 +3833,9 @@ class App {
                     Number(
                         this.state.hearts ??
                         5
+                    ).toLocaleString(
+                        "fa-IR"
                     )
-                        .toLocaleString(
-                            "fa-IR"
-                        )
                 )
             );
 
@@ -4405,10 +3849,9 @@ class App {
                     Number(
                         this.state.streak ||
                         0
+                    ).toLocaleString(
+                        "fa-IR"
                     )
-                        .toLocaleString(
-                            "fa-IR"
-                        )
                 )
             );
 
@@ -4523,27 +3966,21 @@ class App {
             )
             ?.replaceChildren(
                 document.createTextNode(
-
                     `⭐ ${
                         Number(
                             this.state.xp ||
                             0
+                        ).toLocaleString(
+                            "fa-IR"
                         )
-                            .toLocaleString(
-                                "fa-IR"
-                            )
-                    }
-                    •
-                    ❤️ ${
+                    } • ❤️ ${
                         Number(
                             this.state.hearts ??
                             5
+                        ).toLocaleString(
+                            "fa-IR"
                         )
-                            .toLocaleString(
-                                "fa-IR"
-                            )
                     }`
-
                 )
             );
 
@@ -4551,9 +3988,8 @@ class App {
 
 
     /* ======================================================
-       LEADERBOARD / LOCAL
+       LOGOUT
     ====================================================== */
-
 
     logout() {
 
