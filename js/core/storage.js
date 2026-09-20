@@ -1,288 +1,156 @@
-const STATE_PREFIX =
-    "quizduo_state_";
-
-
-const USERS_KEY =
-    "quizduo_users";
-
-
-const CURRENT_USER_KEY =
-    "quizduo_current_user";
-
-
-const LEADERBOARD_KEY =
-    "quizduo_leaderboard";
-
+const STATE_PREFIX = "quizduo_state_";
+const USERS_KEY = "quizduo_users";
+const CURRENT_USER_KEY = "quizduo_current_user";
+const LEADERBOARD_KEY = "quizduo_leaderboard";
 
 function userKey(username) {
-
     return (
         STATE_PREFIX +
         encodeURIComponent(
-            String(
-                username ||
-                "guest"
-            ).toLowerCase()
+            String(username || "guest").toLowerCase()
         )
     );
-
 }
 
+function normalizeStageScoreMap(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return {};
+    }
+    const result = {};
+    Object.entries(value).forEach(([stage, score]) => {
+        const numeric = Number(score);
+        if (Number.isFinite(numeric)) {
+            result[String(stage)] = Math.max(0, Math.min(1, numeric));
+        }
+    });
+    return result;
+}
 
-export function loadState(
-    defaultState,
-    username = "guest"
-) {
-
+export function loadState(defaultState, username = "guest") {
     try {
-
-        const saved =
-            localStorage.getItem(
-                userKey(username)
-            );
-
+        const saved = localStorage.getItem(userKey(username));
 
         if (!saved) {
-
-            return structuredClone(
-                defaultState
-            );
-
+            return structuredClone(defaultState);
         }
 
-
-        const parsed =
-            JSON.parse(saved);
-
+        const parsed = JSON.parse(saved);
+        const base = structuredClone(defaultState);
 
         return {
-
-            ...structuredClone(
-                defaultState
-            ),
-
+            ...base,
             ...parsed,
-
             completedGeneralStages:
-                Array.isArray(
-                    parsed.completedGeneralStages
-                )
-                    ? parsed.completedGeneralStages
+                Array.isArray(parsed.completedGeneralStages)
+                    ? parsed.completedGeneralStages.map(Number)
                     : [],
-
             completedFunStages:
-                Array.isArray(
-                    parsed.completedFunStages
-                )
-                    ? parsed.completedFunStages
-                    : []
-
+                Array.isArray(parsed.completedFunStages)
+                    ? parsed.completedFunStages.map(Number)
+                    : [],
+            stageScoresGeneral:
+                normalizeStageScoreMap(parsed.stageScoresGeneral),
+            stageScoresFun:
+                normalizeStageScoreMap(parsed.stageScoresFun),
+            subscriptionInfo:
+                parsed.subscriptionInfo &&
+                typeof parsed.subscriptionInfo === "object"
+                    ? parsed.subscriptionInfo
+                    : base.subscriptionInfo,
+            welcomeSeen:
+                parsed.welcomeSeen === true
         };
-
     } catch (error) {
-
-        console.error(
-            "QuizDuo state error:",
-            error
-        );
-
-
-        return structuredClone(
-            defaultState
-        );
-
+        console.error("QuizDuo state error:", error);
+        return structuredClone(defaultState);
     }
-
 }
 
-
-export function saveState(
-    state,
-    username =
-        state.username ||
-        "guest"
-) {
-
+export function saveState(state, username = state.username || "guest") {
     try {
-
         localStorage.setItem(
             userKey(username),
             JSON.stringify(state)
         );
-
         return true;
-
     } catch (error) {
-
-        console.error(
-            "Could not save state:",
-            error
-        );
-
+        console.error("Could not save state:", error);
         return false;
-
     }
-
 }
-
 
 export function getCurrentUser() {
-
-    return localStorage.getItem(
-        CURRENT_USER_KEY
-    ) || null;
-
+    return localStorage.getItem(CURRENT_USER_KEY) || null;
 }
 
-
-export function setCurrentUser(
-    username
-) {
-
-    localStorage.setItem(
-        CURRENT_USER_KEY,
-        username
-    );
-
+export function setCurrentUser(username) {
+    localStorage.setItem(CURRENT_USER_KEY, username);
 }
-
 
 export function logoutUser() {
-
-    localStorage.removeItem(
-        CURRENT_USER_KEY
-    );
-
+    localStorage.removeItem(CURRENT_USER_KEY);
 }
-
 
 export function getUsers() {
-
     try {
-
-        const users =
-            JSON.parse(
-                localStorage.getItem(
-                    USERS_KEY
-                ) || "[]"
-            );
-
-
-        return Array.isArray(users)
-            ? users
-            : [];
-
+        const users = JSON.parse(
+            localStorage.getItem(USERS_KEY) || "[]"
+        );
+        return Array.isArray(users) ? users : [];
     } catch {
-
         return [];
-
     }
-
 }
 
-
-export function saveUsers(
-    users
-) {
-
-    localStorage.setItem(
-        USERS_KEY,
-        JSON.stringify(users)
-    );
-
+export function saveUsers(users) {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
-
 
 export function getLeaderboard() {
-
     try {
-
-        const board =
-            JSON.parse(
-                localStorage.getItem(
-                    LEADERBOARD_KEY
-                ) || "[]"
-            );
-
-
-        return Array.isArray(board)
-            ? board
-            : [];
-
+        const board = JSON.parse(
+            localStorage.getItem(LEADERBOARD_KEY) || "[]"
+        );
+        return Array.isArray(board) ? board : [];
     } catch {
-
         return [];
-
     }
-
 }
 
-
-export function updateLeaderboard(
-    state
-) {
-
+export function updateLeaderboard(state) {
     if (
         !state.username ||
-        state.username ===
-        "بازیکن مهمان"
+        state.username === "بازیکن مهمان"
     ) {
-
         return;
-
     }
 
+    const username = String(state.username);
+    const key = username.toLowerCase();
 
-    const board =
-        getLeaderboard().filter(
-            item =>
-                item.username.toLowerCase() !==
-                state.username.toLowerCase()
-        );
-
+    const board = getLeaderboard().filter(
+        item =>
+            String(item.username || "").toLowerCase() !== key
+    );
 
     board.push({
-
-        username:
-            state.username,
-
-        xp:
-            state.xp,
-
-        level:
-            state.level,
-
-        generalStage:
-            Math.max(
-                0,
-                state.generalStage - 1
-            ),
-
-        funStage:
-            Math.max(
-                0,
-                state.funStage - 1
-            ),
-
-        updatedAt:
-            Date.now()
-
+        username,
+        xp: Number(state.xp || 0),
+        level: Number(state.level || 1),
+        generalStage: Number(state.generalStage || 1),
+        funStage: Number(state.funStage || 1),
+        updatedAt: Date.now()
     });
-
 
     board.sort(
         (a, b) =>
-            b.xp - a.xp ||
-            b.level - a.level ||
-            b.updatedAt - a.updatedAt
+            Number(b.xp || 0) - Number(a.xp || 0) ||
+            Number(b.level || 1) - Number(a.level || 1) ||
+            Number(b.updatedAt || 0) - Number(a.updatedAt || 0)
     );
-
 
     localStorage.setItem(
         LEADERBOARD_KEY,
-        JSON.stringify(
-            board.slice(0, 100)
-        )
+        JSON.stringify(board.slice(0, 100))
     );
-
 }
