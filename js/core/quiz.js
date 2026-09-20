@@ -398,6 +398,10 @@ export class QuizEngine {
         if (correct) {
             this.correctAnswers++;
             this.combo++;
+            this.state.bestCombo = Math.max(
+                Number(this.state.bestCombo || 0),
+                this.combo
+            );
         } else {
             this.wrongAnswers++;
             this.combo = 0;
