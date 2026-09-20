@@ -2913,6 +2913,8 @@ window.QuizDuo = {
 
   canAccessStage,
 
-  toast
-
+  toast,
+   
+   showPage
 };
+
