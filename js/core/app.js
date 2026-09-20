@@ -1,5 +1,6 @@
 import {
     createDefaultState,
+    addXP,
     isStageCompleted
 } from "./state.js";
 
@@ -15,7 +16,9 @@ import {
 } from "./storage.js";
 
 import {
-    escapeHTML
+    escapeHTML,
+    todayKey,
+    updateStreak
 } from "./utils.js";
 
 import {
@@ -326,6 +329,88 @@ class App {
 
         this.quizModalOpen =
             false;
+
+        this.leaderboardPeriod =
+            "week";
+    }
+
+
+    getDailyLoginRewardAmount(day) {
+
+        const rewards = [3, 5, 7, 10, 13, 16, 20];
+        const safeDay = Math.max(1, Number(day || 1));
+
+        return rewards[Math.min(safeDay, 7) - 1];
+    }
+
+
+    applyDailyLoginReward() {
+
+        if (this.state.username === "بازیکن مهمان") {
+            return null;
+        }
+
+        const today = todayKey();
+
+        if (this.state.dailyLoginRewardDate === today) {
+            return null;
+        }
+
+        updateStreak(this.state);
+
+        const day = Math.max(1, Number(this.state.streak || 1));
+        const reward = this.getDailyLoginRewardAmount(day);
+
+        addXP(this.state, reward);
+
+        this.state.dailyLoginRewardDate = today;
+        this.state.dailyLoginRewardDay = Math.min(day, 7);
+        this.state.dailyLoginRewardXP = reward;
+
+        return {
+            day: Math.min(day, 7),
+            reward,
+            streak: Number(this.state.streak || 1)
+        };
+    }
+
+
+    showDailyLoginReward(reward) {
+
+        if (!reward) return;
+
+        const dayText =
+            reward.day >= 7
+                ? "روز هفتم و بعد از آن"
+                : `روز ${Number(reward.day).toLocaleString("fa-IR")}`;
+
+        const message =
+            `🔥 ${dayText}: +${Number(reward.reward).toLocaleString("fa-IR")} XP دریافت کردی!`;
+
+        let toast = document.getElementById("quizduoDailyRewardToast");
+
+        if (!toast) {
+            toast = document.createElement("div");
+            toast.id = "quizduoDailyRewardToast";
+            toast.className = "daily-reward-toast";
+            document.body.appendChild(toast);
+        }
+
+        toast.innerHTML = `
+            <span class="daily-reward-icon">🔥</span>
+            <span>
+                <b>پاداش ورود روزانه</b>
+                <small>${escapeHTML(message)}</small>
+            </span>
+        `;
+
+        toast.classList.remove("show");
+        void toast.offsetWidth;
+        toast.classList.add("show");
+
+        window.setTimeout(() => {
+            toast?.classList.remove("show");
+        }, 4200);
     }
 
 
@@ -421,7 +506,18 @@ class App {
 
         this.renderQuizStats();
 
+        this.initLeaderboard();
+
         this.go("home");
+
+        const dailyReward = this.applyDailyLoginReward();
+        if (dailyReward) {
+            this.persist();
+            window.setTimeout(
+                () => this.showDailyLoginReward(dailyReward),
+                900
+            );
+        }
 
         window.setTimeout(
             () => this.showFirstSiteWelcomeOnce(),
@@ -741,9 +837,17 @@ class App {
             this.state.username =
                 name;
 
+            const dailyReward =
+                this.applyDailyLoginReward();
 
             this.persist();
 
+            if (dailyReward) {
+                window.setTimeout(
+                    () => this.showDailyLoginReward(dailyReward),
+                    700
+                );
+            }
 
             msg.textContent =
                 "حساب با موفقیت ساخته شد.";
@@ -777,9 +881,17 @@ class App {
             this.state.username =
                 existing.username;
 
+            const dailyReward =
+                this.applyDailyLoginReward();
 
             this.persist();
 
+            if (dailyReward) {
+                window.setTimeout(
+                    () => this.showDailyLoginReward(dailyReward),
+                    700
+                );
+            }
 
             msg.textContent =
                 "ورود موفق بود.";
@@ -836,6 +948,7 @@ class App {
             xp: Number(this.state.xp || 0),
             level: Number(this.state.level || 1),
             streak: Number(this.state.streak || 0),
+            bestCombo: Number(this.state.bestCombo || 0),
             generalStage: Math.max(
                 0,
                 Number(this.state.generalStage || 1) - 1
@@ -1029,14 +1142,14 @@ class App {
             site: {
                 icon: "🎓✨",
                 kicker: "به خانواده QuizDuo خوش اومدی",
-                title: "سلام دانش‌آموز! 👋",
+                title: "سلام دوست عزیز! 👋",
                 text: "اینجا جاییه که دانشت، سرعت عملت و پشتکارت با هم تبدیل به پیشرفت می‌شن. آماده‌ای اولین چالش رو شروع کنی؟",
                 points: [
                     ["🧠", "سؤال‌های متنوع"],
-                    ["⚡", "۲۰ ثانیه برای هر سؤال"],
+                    ["⚡", "رقابت و هیجان"],
                     ["🏆", "XP و مرحله‌های بیشتر"]
                 ],
-                note: "مرحله ۱ رایگانه؛ برای مرحله‌های بعدی باید اشتراک فعال داشته باشی و مرحله قبلی رو حداقل با ۷۵٪ رد کنی.",
+                note: "مرحله ۱ رایگانه؛ اما برای مرحله‌های بعدی باید اشتراک فعال داشته باشی.",
                 button: "شروع ماجرا 🚀"
             },
             registration: {
@@ -1049,14 +1162,14 @@ class App {
                     ["⭐", "امتیاز و XP"],
                     ["🔥", "Streak و پیشرفت"]
                 ],
-                note: "یادت نره: مرحله بعدی با حداقل ۷۵٪ مرحله قبلی و داشتن اشتراک فعال باز می‌شه.",
+                note: "یادت نره: هر روز به اینجا سر بزنی تا زود امتیازت زیاد بشه.",
                 button: "بزن بریم! 🎮"
             },
             subscription: {
                 icon: "👑🎉",
                 kicker: "اولین اشتراک فعال شد",
                 title: "تبریک! حالا اشتراکی شدی! 👑",
-                text: "اولین اشتراک QuizDuo با موفقیت تأیید شد. از اینجا به بعد درهای مراحل بیشتر به روت بازه؛ فقط شرط ۷۵٪ مرحله قبلی رو یادت نره.",
+                text: "اولین اشتراک QuizDuo با موفقیت تأیید شد. از اینجا به بعد درهای مراحل بیشتر به روت بازه؛ برای شروع چالش‌ها آماده‌ای؟",
                 points: [
                     ["🔓", "مراحل بیشتر"],
                     ["👑", "اشتراک فعال"],
@@ -1066,7 +1179,6 @@ class App {
                 button: "مشاهده مراحل 🔓"
             }
         };
-
         const preset =
             presets[type] || presets.site;
 
@@ -2059,120 +2171,207 @@ class App {
     }
 
 
-    async renderLeaderboard() {
+    initLeaderboard() {
 
-        const body =
-            document.getElementById(
-                "leaderBody"
-            );
+        document
+            .querySelectorAll("[data-leader-period]")
+            .forEach(button => {
+                button.addEventListener("click", () => {
+                    this.leaderboardPeriod =
+                        button.dataset.leaderPeriod || "week";
 
-        if (!body) {
-            return;
-        }
+                    document
+                        .querySelectorAll("[data-leader-period]")
+                        .forEach(item =>
+                            item.classList.toggle(
+                                "active",
+                                item.dataset.leaderPeriod === this.leaderboardPeriod
+                            )
+                        );
 
-        body.innerHTML = `
-            <tr>
-                <td colspan="4">در حال بارگذاری لیدربورد...</td>
-            </tr>
-        `;
-
-        let rows = [];
-
-        try {
-            const data =
-                await serverJsonp(
-                    "leaderboard"
-                );
-
-            if (
-                data &&
-                data.success &&
-                Array.isArray(data.entries)
-            ) {
-                rows = data.entries;
-            }
-        } catch (error) {
-            console.warn(
-                "Server leaderboard failed:",
-                error
-            );
-        }
-
-        if (!rows.length) {
-            const local =
-                getLeaderboard();
-
-            rows = Array.isArray(local)
-                ? local.map(item => ({
-                    username:
-                        item.username ||
-                        item.name ||
-                        "بازیکن",
-                    xp:
-                        Number(item.xp || 0),
-                    generalStage:
-                        Number(item.generalStage || item.stage || 1),
-                    funStage:
-                        Number(item.funStage || item.stage || 1)
-                }))
-                : [];
-        }
-
-        if (
-            this.state.username !== "بازیکن مهمان" &&
-            !rows.some(
-                item =>
-                    String(
-                        item.username || item.name || ""
-                    ).toLowerCase() ===
-                    String(
-                        this.state.username
-                    ).toLowerCase()
-            )
-        ) {
-            rows.push({
-                username:
-                    this.state.username,
-                xp:
-                    Number(this.state.xp || 0),
-                generalStage:
-                    Number(this.state.generalStage || 1),
-                funStage:
-                    Number(this.state.funStage || 1)
+                    this.renderLeaderboard();
+                });
             });
-        }
+    }
 
-        rows.sort(
-            (a, b) =>
-                Number(b.xp || 0) -
-                Number(a.xp || 0)
-        );
+
+    renderLeaderboardBoard(targetId, entries, metric, valueLabel) {
+
+        const target =
+            document.getElementById(targetId);
+
+        if (!target) return;
+
+        const rows = Array.isArray(entries)
+            ? entries.slice(0, 3)
+            : [];
 
         if (!rows.length) {
-            body.innerHTML = `
-                <tr>
-                    <td colspan="4">هنوز بازیکنی ثبت نشده است.</td>
-                </tr>
+            target.innerHTML = `
+                <div class="leader-empty">
+                    هنوز رکوردی برای این بازه ثبت نشده است.
+                </div>
             `;
             return;
         }
 
-        body.innerHTML =
-            rows.map(
-                (item, index) => `
-                    <tr>
-                        <td>${index + 1}</td>
-                        <td>${escapeHTML(
-                            item.username || item.name || "بازیکن"
-                        )}</td>
-                        <td>${Number(item.xp || 0)}</td>
-                        <td>${Math.max(
-                            Number(item.generalStage || 1),
-                            Number(item.funStage || 1)
-                        ) - 1}</td>
-                    </tr>
-                `
-            ).join("");
+        const medals = ["🥇", "🥈", "🥉"];
+
+        target.innerHTML = rows.map((entry, index) => {
+            const value =
+                metric === "xp"
+                    ? Number(entry.xp || 0)
+                    : metric === "combo"
+                        ? Number(entry.bestCombo || entry.combo || 0)
+                        : Number(entry.bestStage || entry.stage || 0);
+
+            return `
+                <div class="leader-entry rank-${index + 1}">
+                    <div class="leader-rank-medal">${medals[index]}</div>
+                    <div class="leader-entry-main">
+                        <strong>${escapeHTML(entry.username || "بازیکن")}</strong>
+                        <small>${escapeHTML(valueLabel)}</small>
+                    </div>
+                    <div class="leader-entry-value">
+                        ${Number(value).toLocaleString("fa-IR")}
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+
+    async renderLeaderboard() {
+
+        const period =
+            this.leaderboardPeriod || "week";
+
+        document
+            .querySelectorAll("[data-leader-period]")
+            .forEach(button =>
+                button.classList.toggle(
+                    "active",
+                    button.dataset.leaderPeriod === period
+                )
+            );
+
+        const title =
+            document.getElementById("leaderboardPeriodTitle");
+
+        const subtitle =
+            document.getElementById("leaderboardPeriodSubtitle");
+
+        const periodNames = {
+            week: "هفته جاری",
+            month: "ماه جاری",
+            year: "سال جاری"
+        };
+
+        if (title) {
+            title.textContent =
+                periodNames[period] || periodNames.week;
+        }
+
+        if (subtitle) {
+            subtitle.textContent =
+                "سه بازیکن برتر هر معیار در این بازه زمانی";
+        }
+
+        const targets = [
+            "leaderXpBody",
+            "leaderComboBody",
+            "leaderStageBody"
+        ];
+
+        targets.forEach(id => {
+            const target = document.getElementById(id);
+            if (target) {
+                target.innerHTML = `
+                    <div class="leader-loading">
+                        در حال بارگذاری...
+                    </div>
+                `;
+            }
+        });
+
+        try {
+            const data =
+                await serverJsonp(
+                    "leaderboard",
+                    { period }
+                );
+
+            const boards =
+                data && data.success && data.boards
+                    ? data.boards
+                    : {};
+
+            this.renderLeaderboardBoard(
+                "leaderXpBody",
+                boards.xp || [],
+                "xp",
+                "XP"
+            );
+
+            this.renderLeaderboardBoard(
+                "leaderComboBody",
+                boards.combo || [],
+                "combo",
+                "بهترین کمبو"
+            );
+
+            this.renderLeaderboardBoard(
+                "leaderStageBody",
+                boards.stage || [],
+                "stage",
+                "بالاترین مرحله"
+            );
+
+            const updated =
+                document.getElementById("leaderboardUpdatedAt");
+
+            if (updated && data.updatedAt) {
+                updated.textContent =
+                    `آخرین بروزرسانی: ${new Date(data.updatedAt).toLocaleString("fa-IR")}`;
+            }
+
+        } catch (error) {
+            console.warn("Advanced leaderboard failed:", error);
+
+            const localRows =
+                this.state.username === "بازیکن مهمان"
+                    ? []
+                    : [{
+                        username: this.state.username,
+                        xp: Number(this.state.xp || 0),
+                        bestCombo: Number(this.state.bestCombo || 0),
+                        bestStage: Math.max(
+                            this.getHighestPassedStage("general"),
+                            this.getHighestPassedStage("fun")
+                        )
+                    }];
+
+            this.renderLeaderboardBoard(
+                "leaderXpBody",
+                localRows,
+                "xp",
+                "XP"
+            );
+
+            this.renderLeaderboardBoard(
+                "leaderComboBody",
+                localRows,
+                "combo",
+                "بهترین کمبو"
+            );
+
+            this.renderLeaderboardBoard(
+                "leaderStageBody",
+                localRows,
+                "stage",
+                "بالاترین مرحله"
+            );
+        }
     }
 
 
