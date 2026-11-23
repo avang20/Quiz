@@ -20,6 +20,11 @@ const LEADERBOARD_HISTORY_HEADERS = [
   const action = String(params.action || '');
   const callback = String(params.callback || '').trim();
 
+  if (action === 'featureGet') {
+    const data = getFeatureSnapshot(String(params.username || ''));
+    return callback ? jsonpResponse(callback, data) : jsonResponse(data);
+  }
+
   if (action === 'leaderboard') {
     const data = getLeaderboardObject(params.period || 'week');
     return callback
@@ -63,6 +68,10 @@ function doPost(e) {
         success: false,
         message: 'درخواست خالی یا نامعتبر است.'
       });
+    }
+
+    if (data.action === 'featureAction') {
+      return handleFeatureAction(data);
     }
 
     if (data.action === 'payment') {
@@ -844,3 +853,111 @@ function jsonResponse(data) {    return ContentService     .createTextOutput(   
 }
 
 /* =========================================================    ADMIN SUPPORT STATUS ========================================================= */  function updateSupportStatus(   password,   rowNumber,   status ) {    if (!checkAdmin(password)) {     throw new Error(       'رمز مدیریت اشتباه است.'     );   }    const allowed = [     'جدید',     'در حال بررسی',     'پاسخ داده شد',     'بسته شد'   ];    if (!allowed.includes(status)) {     throw new Error(       'وضعیت نامعتبر است.'     );   }    const sheet =     getOrCreateSupportSheet();    sheet     .getRange(       Number(rowNumber),       6     )     .setValue(status);    SpreadsheetApp.flush();    return {     success: true   }; }   /* =========================================================    TEST EMAIL ========================================================= */  function testEmail() {    GmailApp.sendEmail({     to: getAdminEmail(),      subject:       'QuizDuo Test Email',      htmlBody:       '<div dir="rtl">' +       '<h2>ایمیل تست QuizDuo</h2>' +       '<p>ارسال ایمیل با موفقیت انجام شد.</p>' +       '</div>'   }); }  
+
+/* =========================================================
+   QUIZDUO SOCIAL / DAILY / ARCADE DATA
+   Persistent JSON rows in a dedicated sheet.
+========================================================= */
+const FEATURE_SHEET = 'QuizDuoFeatures';
+const FEATURE_HEADERS = ['Key', 'JSON', 'Updated At'];
+const FEATURE_CHALLENGES = [
+  {id:'logic-01',topic:'منطق',q:'اگر ۵ ماشین در ۵ دقیقه، ۵ قطعه بسازند، ۱۰۰ ماشین در ۵ دقیقه چند قطعه می‌سازند؟',a:['۲۰','۵۰','۱۰۰','۵۰۰'],correct:2},
+  {id:'math-01',topic:'ریاضی',q:'کدام عدد اول است؟',a:['۵۱','۵۷','۶۱','۶۳'],correct:2},
+  {id:'science-01',topic:'علوم',q:'واحد اندازه‌گیری شدت جریان الکتریکی چیست؟',a:['ولت','وات','آمپر','اهم'],correct:2},
+  {id:'code-01',topic:'برنامه‌نویسی',q:'کدام ساختار داده بر اساس اصل آخرین‌ورودی، اولین‌خروجی کار می‌کند؟',a:['صف','پشته','درخت','گراف'],correct:1},
+  {id:'space-01',topic:'نجوم',q:'کدام سیاره به سیاره سرخ معروف است؟',a:['زمین','مریخ','زهره','مشتری'],correct:1}
+];
+function getFeatureSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(FEATURE_SHEET);
+  if (!sh) { sh = ss.insertSheet(FEATURE_SHEET); sh.appendRow(FEATURE_HEADERS); sh.setFrozenRows(1); }
+  return sh;
+}
+function featureRead_() {
+  const sh=getFeatureSheet_(), rows=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,3).getValues():[];
+  const out={}; rows.forEach(r=>{if(r[0]){try{out[String(r[0])]=JSON.parse(String(r[1]||'null'));}catch(e){}}});
+  return out;
+}
+function featureWrite_(key,value) {
+  const sh=getFeatureSheet_(), last=sh.getLastRow();
+  if(last>1){const keys=sh.getRange(2,1,last-1,1).getValues().flat();const i=keys.indexOf(key);if(i>=0){sh.getRange(i+2,2,1,2).setValues([[JSON.stringify(value),new Date()]]);return;}}
+  sh.appendRow([key,JSON.stringify(value),new Date()]);
+}
+function featureToday_(){return Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd');}
+function featureDefaultChallenge_(store) {
+  const today=featureToday_();
+  if(store.dailyChallenge && store.dailyChallenge.date===today)return store.dailyChallenge;
+  const previous=store.dailyChallenge && store.dailyChallenge.id;
+  const pool=FEATURE_CHALLENGES.filter(x=>x.id!==previous);
+  const pick=pool[Math.floor(Math.random()*pool.length)]||FEATURE_CHALLENGES[0];
+  store.dailyChallenge={...pick,date:today,manual:false};
+  featureWrite_('dailyChallenge',store.dailyChallenge);
+  return store.dailyChallenge;
+}
+function getFeatureSnapshot(username) {
+  const s=featureRead_(), challenge=featureDefaultChallenge_(s);
+  const friends=s.friends||{}, requests=s.requests||[], groups=s.groups||[], tournaments=s.tournaments||[], matches=s.matches||[];
+  return {success:true,date:featureToday_(),challenge,challengeId:challenge.id,
+    friends:username?{[username]:friends[username]||[]}:friends,
+    requests:requests.filter(x=>x.from===username||x.to===username),
+    groups:groups.filter(g=>g.members&&g.members.includes(username)),
+    groupInvitations:groups.filter(g=>g.invites&&g.invites.includes(username)).map(g=>({id:g.id,name:g.name})),
+    claimedTasks:Object.keys(s.taskClaims||{}).filter(k=>k.startsWith(featureToday_()+'|'+username+'|')).map(k=>k.split('|').pop()),
+    tournaments:tournaments.filter(t=>!t.groupId||(groups.find(g=>g.id===t.groupId)||{}).members?.includes(username)),
+    matches:matches.filter(m=>m.players&&m.players.includes(username))};
+}
+function handleFeatureAction(data) {
+  const user=String(data.username||'').trim();
+  if(!user||user==='بازیکن مهمان')return jsonResponse({success:false,message:'ابتدا وارد حساب کاربری شوید.'});
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try {
+    const s=featureRead_(), type=String(data.type||''), now=new Date().toISOString();
+    s.friends=s.friends||{};s.requests=s.requests||[];s.groups=s.groups||[];s.tournaments=s.tournaments||[];s.matches=s.matches||[];s.taskClaims=s.taskClaims||{};s.challengeClaims=s.challengeClaims||{};
+    let result={success:true};
+    if(type==='friendRequest'){
+      const to=String(data.to||'').trim();if(!to||to===user)throw new Error('نام کاربری مقصد نامعتبر است.');
+      if(!s.requests.some(x=>x.from===user&&x.to===to&&x.status==='pending'))s.requests.push({id:Utilities.getUuid(),from:user,to,status:'pending',createdAt:now});
+      result.message='درخواست دوستی ثبت شد.';
+    } else if(type==='friendAccept'){
+      const req=s.requests.find(x=>x.id===data.requestId&&x.to===user&&x.status==='pending');if(!req)throw new Error('درخواست معتبر نیست.');
+      req.status='accepted';s.friends[req.from]=s.friends[req.from]||[];s.friends[user]=s.friends[user]||[];
+      if(!s.friends[req.from].includes(user))s.friends[req.from].push(user);if(!s.friends[user].includes(req.from))s.friends[user].push(req.from);
+    } else if(type==='groupCreate'){
+      const name=String(data.name||'').trim();if(!name)throw new Error('نام گروه را وارد کنید.');
+      const g={id:Utilities.getUuid().slice(0,8),name,owner:user,members:[user],invites:[],createdAt:now};s.groups.push(g);result.group=g;
+    } else if(type==='groupInvite'){
+      const g=s.groups.find(x=>x.id===String(data.groupId)&&x.members.includes(user));const to=String(data.to||'').trim();if(!g||!to)throw new Error('گروه یا کاربر معتبر نیست.');
+      if(!g.invites.includes(to))g.invites.push(to);result.message='دعوت ثبت شد.';
+    } else if(type==='groupJoin'){
+      const g=s.groups.find(x=>x.id===String(data.groupId)&&x.invites&&x.invites.includes(user));if(!g)throw new Error('دعوت گروه معتبر نیست.');
+      if(!g.members.includes(user))g.members.push(user);g.invites=g.invites.filter(x=>x!==user);result.group={id:g.id,name:g.name};
+    } else if(type==='tournamentCreate'){
+      const g=s.groups.find(x=>x.id===String(data.groupId)&&x.owner===user);if(!g)throw new Error('برای ساخت تورنومنت باید مدیر گروه باشی.');
+      const t={id:Utilities.getUuid().slice(0,8),name:String(data.name||'تورنومنت گروهی'),groupId:g.id,game:['chess','backgammon','uno'].includes(data.game)?data.game:'chess',players:[...g.members],status:'ثبت‌نام',createdAt:now};s.tournaments.push(t);result.tournament=t;
+    } else if(type==='matchCreate'){
+      const game=['chess','backgammon','uno'].includes(data.game)?data.game:'chess',isFriend=data.matchType==='friend',opponent=String(data.opponent||'').trim();
+      if(isFriend&&(!opponent||(s.friends[user]||[]).indexOf(opponent)<0))throw new Error('برای دعوت، ابتدا باید با آن کاربر دوست باشید.');
+      let m;if(!isFriend){m=s.matches.find(x=>x.game===game&&x.status==='waiting'&&x.players&&x.players.length===1&&x.players[0]!==user);if(m){m.players.push(user);m.status='active';m.startedAt=now;} }if(!m){m={id:Utilities.getUuid().slice(0,8),game,players:isFriend?[user,opponent]:[user],status:isFriend?'invited':'waiting',createdAt:now};s.matches.push(m);}result.match=m;
+    } else if(type==='challengeComplete'){
+      const challenge=featureDefaultChallenge_(s),key=featureToday_()+'|'+user;
+      if(String(data.challengeId||'')!==String(challenge.id)||Number(data.answerIndex)!==Number(challenge.correct))throw new Error('پاسخ چالش تأیید نشد.');
+      if(!s.challengeClaims[key]){s.challengeClaims[key]=true;result.reward=25;}else result.reward=0;
+    } else if(type==='claimTask'){
+      const allowed={answer5:{xp:10},challenge:{heart:1},playgame:{xp:20},visit:{xp:15},streak:{infiniteMinutes:30}};
+      const task=allowed[String(data.taskId||'')];if(!task)throw new Error('تسک نامعتبر است.');
+      const key=featureToday_()+'|'+user+'|'+data.taskId;if(s.taskClaims[key])throw new Error('پاداش این تسک قبلاً دریافت شده است.');
+      s.taskClaims[key]=true;result.reward=task;
+    } else {throw new Error('عملیات ناشناخته است.');}
+    Object.keys(s).forEach(k=>featureWrite_(k,s[k]));
+    return jsonResponse(result);
+  } catch(err) {return jsonResponse({success:false,message:err.message||String(err)});}
+  finally {lock.releaseLock();}
+}
+/* مدیر: تنظیم دستی چالش امروز؛ فقط از پنل Apps Script با رمز مدیر فراخوانی شود. */
+function setDailyChallengeForAdmin(password, challenge) {
+  if(!checkAdmin(password))throw new Error('رمز مدیریت اشتباه است.');
+  if(!challenge||!challenge.q||!Array.isArray(challenge.a)||challenge.a.length<2||!Number.isInteger(Number(challenge.correct)))throw new Error('ساختار چالش نامعتبر است.');
+  const value={id:'manual-'+Utilities.getUuid().slice(0,8),topic:String(challenge.topic||'عمومی'),q:String(challenge.q),a:challenge.a.map(String),correct:Number(challenge.correct),date:featureToday_(),manual:true};
+  featureWrite_('dailyChallenge',value);return {success:true,challenge:value};
+}
+function getChallengeBankForAdmin(password){if(!checkAdmin(password))throw new Error('رمز مدیریت اشتباه است.');return FEATURE_CHALLENGES;}
