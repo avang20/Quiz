@@ -81,6 +81,7 @@
       <div class="tabs">
         <button id="tabPayments" class="btn btn-secondary active" onclick="showTab('payments')">💳 پرداخت‌ها</button>
         <button id="tabSupport" class="btn btn-secondary" onclick="showTab('support')">🎫 پشتیبانی</button>
+        <button id="tabChallenge" class="btn btn-secondary" onclick="showTab('challenge')">🎯 چالش روز</button>
         <button class="btn btn-secondary" onclick="refreshAll()">🔄 بروزرسانی</button>
       </div>
 
@@ -92,6 +93,18 @@
         <div id="paymentsList" class="grid payment-grid"></div>
       </section>
 
+      <section id="challenge" class="view">
+        <div class="panel">
+          <h2>مدیریت چالش روزانه</h2>
+          <p class="muted">اگر چالش دستی تعیین نکنی، سیستم هر روز یک سؤال را به‌صورت تصادفی از بانک پیش‌فرض انتخاب می‌کند.</p>
+          <label>موضوع</label><input id="challengeTopic" placeholder="مثلاً منطق، ریاضی، نجوم">
+          <label>متن سؤال</label><textarea id="challengeQuestion" placeholder="متن چالش"></textarea>
+          <div class="grid payment-grid"><div><label>گزینه ۱</label><input id="challengeA0"></div><div><label>گزینه ۲</label><input id="challengeA1"></div><div><label>گزینه ۳</label><input id="challengeA2"></div><div><label>گزینه ۴</label><input id="challengeA3"></div></div>
+          <label>شماره گزینه صحیح</label><select id="challengeCorrect"><option value="0">گزینه ۱</option><option value="1">گزینه ۲</option><option value="2">گزینه ۳</option><option value="3">گزینه ۴</option></select>
+          <div class="actions"><button class="btn btn-primary" onclick="saveDailyChallenge()">ثبت به‌عنوان چالش امروز</button><button class="btn btn-secondary" onclick="loadChallengeBank()">نمایش بانک پیش‌فرض</button></div>
+          <p id="challengeMessage" class="muted"></p><div id="challengeBank"></div>
+        </div>
+      </section>
       <section id="support" class="view">
         <div class="toolbar">
           <h2>گفت‌وگوهای پشتیبانی</h2>
@@ -167,6 +180,7 @@
     document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
     if (name === 'payments') document.getElementById('tabPayments').classList.add('active');
     if (name === 'support') document.getElementById('tabSupport').classList.add('active');
+    if (name === 'challenge') document.getElementById('tabChallenge').classList.add('active');
   }
 
   async function refreshAll() {
@@ -296,6 +310,27 @@
       alert(error && error.message ? error.message : 'ارسال پاسخ ناموفق بود.');
     }
   }
+
+  async function saveDailyChallenge() {
+    const challenge = { topic: document.getElementById('challengeTopic').value.trim(), q: document.getElementById('challengeQuestion').value.trim(), a: [0,1,2,3].map(i => document.getElementById('challengeA'+i).value.trim()), correct: Number(document.getElementById('challengeCorrect').value) };
+    const msg = document.getElementById('challengeMessage');
+    if (!challenge.q || challenge.a.some(x => !x)) { msg.textContent = 'متن سؤال و هر چهار گزینه را کامل کن.'; return; }
+    msg.textContent = 'در حال ثبت...';
+    try { const result = await runServer('setDailyChallengeForAdmin', [adminPassword, challenge]); msg.textContent = result.success ? 'چالش امروز با موفقیت تغییر کرد.' : 'ثبت انجام نشد.'; }
+    catch (e) { msg.textContent = e.message || 'خطا در ثبت چالش.'; }
+  }
+  async function loadChallengeBank() {
+    const box = document.getElementById('challengeBank'); box.textContent = 'در حال دریافت بانک...';
+    try { const bank = await runServer('getChallengeBankForAdmin', [adminPassword]); window._qdChallengeBank = bank; box.innerHTML = bank.map((x,i) => `<div class="panel" style="margin-top:8px"><b>${esc(x.topic)}:</b> ${esc(x.q)}<div class="actions"><button class="btn btn-secondary" onclick="fillChallenge(${i})">ویرایش و انتخاب</button></div></div>`).join(''); }
+    catch(e) { box.textContent = e.message || 'خطا'; }
+  }
+  function fillChallenge(i) {
+    const x = (window._qdChallengeBank || [])[i]; if (!x) return;
+    document.getElementById('challengeTopic').value = x.topic; document.getElementById('challengeQuestion').value = x.q;
+    x.a.forEach((v,j) => { const el=document.getElementById('challengeA'+j); if(el)el.value=v; });
+    document.getElementById('challengeCorrect').value = String(x.correct); document.getElementById('challengeMessage').textContent = 'سؤال انتخاب شد؛ برای اعمال، روی ثبت چالش امروز بزن.';
+  }
+
 </script>
 </body>
 </html>
