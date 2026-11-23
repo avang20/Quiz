@@ -1,0 +1,24 @@
+
+#qd-extra{direction:rtl;font-family:inherit;color:var(--text,#172033);padding:18px 0 50px}
+#qd-extra .qd-wrap{width:min(1120px,calc(100% - 28px));margin:auto}
+#qd-extra .qd-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+#qd-extra h2,#qd-extra h3{margin:0 0 10px}
+#qd-extra .qd-nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}
+#qd-extra button,#qd-extra input,#qd-extra select{font:inherit}
+#qd-extra button{border:0;border-radius:12px;padding:10px 14px;cursor:pointer;background:#7357e8;color:white;font-weight:700}
+#qd-extra button.secondary{background:#edf0f7;color:#28334a}
+#qd-extra button:disabled{opacity:.5;cursor:not-allowed}
+#qd-extra .qd-panel{background:var(--card,#fff);border:1px solid var(--border,#dfe5ee);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 8px 24px #16233a0b}
+#qd-extra .qd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+#qd-extra .qd-muted{color:var(--muted,#6c778a);font-size:.92rem;line-height:1.8}
+#qd-extra input,#qd-extra select{width:100%;padding:10px 12px;border:1px solid var(--border,#dfe5ee);border-radius:10px;background:var(--card,#fff);color:inherit;margin:5px 0 10px}
+#qd-extra .qd-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#qd-extra .qd-status{min-height:26px;margin-top:8px;color:#7357e8}
+#qd-extra .qd-board{display:grid;grid-template-columns:repeat(8,minmax(30px,1fr));width:min(480px,100%);aspect-ratio:1;margin:14px auto;border:4px solid #26334a;border-radius:8px;overflow:hidden}
+#qd-extra .qd-square{border-radius:0;padding:0;aspect-ratio:1;font-size:clamp(20px,5vw,38px);display:grid;place-items:center;color:#111}
+#qd-extra .qd-light{background:#f0d9b5!important;color:#222!important}
+#qd-extra .qd-dark{background:#a97852!important;color:#222!important}
+#qd-extra .qd-selected{outline:4px solid #20b8ad;outline-offset:-4px}
+#qd-extra .qd-task{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid var(--border,#dfe5ee);padding:12px 0}
+#qd-extra .qd-task:last-child{border:0}
+@media(max-width:560px){#qd-extra .qd-wrap{width:calc(100% - 18px)}#qd-extra .qd-panel{padding:12px}}
